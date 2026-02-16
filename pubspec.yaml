@@ -1,0 +1,30 @@
+name: industrial_tilt_admin
+description: Industrial Tilt Monitoring Admin Dashboard
+version: 1.0.0+1
+publish_to: none
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  provider: ^6.1.2
+  fl_chart: ^0.68.0
+  shared_preferences: ^2.2.3
+  equatable: ^2.0.5
+  google_fonts: ^6.2.1
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
