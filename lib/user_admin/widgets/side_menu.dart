@@ -6,6 +6,7 @@ class UserAdminSideMenu extends StatelessWidget {
   final String currentView;
   final ValueChanged<String> onViewChanged;
   final VoidCallback onClose;
+  final VoidCallback onLogout;
   final bool showCloseButton;
 
   const UserAdminSideMenu({
@@ -15,6 +16,7 @@ class UserAdminSideMenu extends StatelessWidget {
     required this.currentView,
     required this.onViewChanged,
     required this.onClose,
+    required this.onLogout,
     this.showCloseButton = true,
   });
 
@@ -122,6 +124,54 @@ class UserAdminSideMenu extends StatelessWidget {
                           Icons.settings_applications, 'settings'),
                     ]),
                   ],
+                ),
+              ),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                        color: Theme.of(context).dividerColor, width: 1),
+                  ),
+                ),
+                child: GestureDetector(
+                  onTap: onLogout,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 11),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? const Color(0xFFf0f5fd)
+                          : const Color(0xFF203a54),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Theme.of(context).dividerColor),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.logout,
+                          size: 16,
+                          color:
+                              Theme.of(context).brightness == Brightness.light
+                                  ? const Color(0xFF4a6b8a)
+                                  : const Color(0xFF8aaac9),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Logout',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color:
+                                Theme.of(context).brightness == Brightness.light
+                                    ? const Color(0xFF1e3a5a)
+                                    : const Color(0xFFc0d6f0),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],

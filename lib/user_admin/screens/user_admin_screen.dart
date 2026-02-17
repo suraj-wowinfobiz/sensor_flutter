@@ -1,11 +1,10 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/user_admin_database_provider.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';
+import '../../screens/login_screen.dart';
 import 'alerts_screen.dart';
 import 'analytics_screen.dart';
 import 'dashboard_screen.dart';
@@ -24,6 +23,7 @@ class _UserAdminScreenState extends State<UserAdminScreen>
     with SingleTickerProviderStateMixin {
   bool _isMenuOpen = false;
   bool _dragActive = false;
+  final List<String> _openedViews = ['dashboard'];
   late AnimationController _menuController;
   late Animation<double> _menuAnimation;
 
@@ -60,6 +60,13 @@ class _UserAdminScreenState extends State<UserAdminScreen>
     }
   }
 
+  void _logout() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
   void _onHorizontalDragStart(DragStartDetails details) {
     _dragActive = _isMenuOpen || details.globalPosition.dx <= 28;
   }
@@ -92,38 +99,50 @@ class _UserAdminScreenState extends State<UserAdminScreen>
     return Consumer<UserAdminDatabaseProvider>(
       builder: (context, db, child) {
         final isDesktop = MediaQuery.of(context).size.width >= 1100;
-
-        if (isDesktop && _isMenuOpen) {
-          _isMenuOpen = false;
-          _menuController.value = 0;
-        }
-
-        final body = _buildMainContent(
-          context: context,
-          db: db,
+        final navBar = UserAdminNavBar(
+          onMenuToggle: toggleMenu,
+          isMenuOpen: _isMenuOpen,
           showMenuButton: !isDesktop,
+          onSettingsTap: () => db.setCurrentView('settings'),
         );
 
-        if (isDesktop) {
-          return Scaffold(
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            body: SafeArea(
-              child: Row(
-                children: [
-                  UserAdminSideMenu(
-                    animation: const AlwaysStoppedAnimation<double>(1.0),
-                    isOpen: true,
-                    currentView: db.currentView,
-                    onViewChanged: db.setCurrentView,
-                    onClose: () {},
-                    showCloseButton: false,
-                  ),
-                  Expanded(child: body),
-                ],
-              ),
+        final scaffold = Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          body: SafeArea(
+            child: Column(
+              children: [
+                navBar,
+                Expanded(
+                  child: isDesktop
+                      ? Row(
+                          children: [
+                            UserAdminSideMenu(
+                              animation:
+                                  const AlwaysStoppedAnimation<double>(1.0),
+                              isOpen: true,
+                              currentView: db.currentView,
+                              onViewChanged: db.setCurrentView,
+                              onClose: () {},
+                              onLogout: _logout,
+                              showCloseButton: false,
+                            ),
+                            Expanded(child: _buildContent(db.currentView)),
+                          ],
+                        )
+                      : _buildContent(db.currentView),
+                ),
+              ],
             ),
-          );
-        }
+          ),
+          bottomNavigationBar: isDesktop
+              ? null
+              : _buildBottomNav(
+                  currentView: db.currentView,
+                  onViewChanged: db.setCurrentView,
+                ),
+        );
+
+        if (isDesktop) return scaffold;
 
         return Stack(
           children: [
@@ -132,10 +151,7 @@ class _UserAdminScreenState extends State<UserAdminScreen>
               onHorizontalDragStart: _onHorizontalDragStart,
               onHorizontalDragUpdate: _onHorizontalDragUpdate,
               onHorizontalDragEnd: _onHorizontalDragEnd,
-              child: Scaffold(
-                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                body: SafeArea(child: body),
-              ),
+              child: scaffold,
             ),
             if (_isMenuOpen)
               GestureDetector(
@@ -143,14 +159,8 @@ class _UserAdminScreenState extends State<UserAdminScreen>
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   color: Colors.black
-                      .withValues(alpha: 0.28 * _menuAnimation.value),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(
-                      sigmaX: 2 * _menuAnimation.value,
-                      sigmaY: 2 * _menuAnimation.value,
-                    ),
-                    child: const SizedBox.expand(),
-                  ),
+                      .withValues(alpha: 0.24 * _menuAnimation.value),
+                  child: const SizedBox.expand(),
                 ),
               ),
             UserAdminSideMenu(
@@ -162,6 +172,7 @@ class _UserAdminScreenState extends State<UserAdminScreen>
                 closeMenu();
               },
               onClose: closeMenu,
+              onLogout: _logout,
             ),
           ],
         );
@@ -169,40 +180,44 @@ class _UserAdminScreenState extends State<UserAdminScreen>
     );
   }
 
-  Widget _buildMainContent({
-    required BuildContext context,
-    required UserAdminDatabaseProvider db,
-    required bool showMenuButton,
+  Widget _buildBottomNav({
+    required String currentView,
+    required ValueChanged<String> onViewChanged,
   }) {
-    final navBar = UserAdminNavBar(
-      onMenuToggle: toggleMenu,
-      isMenuOpen: _isMenuOpen,
-      showMenuButton: showMenuButton,
-    );
+    const views = ['dashboard', 'alerts', 'analytics', 'user', 'settings'];
+    final index = views.indexOf(currentView);
 
-    if (db.currentView == 'dashboard') {
-      return SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          children: [
-            navBar,
-            const UserAdminDashboardScreen(embeddedScroll: true),
-          ],
-        ),
-      );
-    }
-
-    return NestedScrollView(
-      headerSliverBuilder: (context, innerBoxIsScrolled) {
-        return [
-          SliverToBoxAdapter(child: navBar),
-        ];
-      },
-      body: _buildContent(db.currentView),
+    return BottomNavigationBar(
+      type: BottomNavigationBarType.fixed,
+      currentIndex: index < 0 ? 0 : index,
+      onTap: (i) => onViewChanged(views[i]),
+      items: const [
+        BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard), label: 'Dashboard'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.notifications), label: 'Alerts'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.analytics), label: 'Analytics'),
+        BottomNavigationBarItem(icon: Icon(Icons.people), label: 'User'),
+        BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
+      ],
     );
   }
 
-  Widget _buildContent(String view) {
+  String _normalizeView(String view) {
+    switch (view) {
+      case 'users':
+        return 'user';
+      case 'organizations':
+        return 'organization';
+      case 'config':
+        return 'settings';
+      default:
+        return view;
+    }
+  }
+
+  Widget _buildView(String view) {
     switch (view) {
       case 'dashboard':
         return const UserAdminDashboardScreen();
@@ -211,17 +226,32 @@ class _UserAdminScreenState extends State<UserAdminScreen>
       case 'analytics':
         return const UserAdminAnalyticsScreen();
       case 'user':
-      case 'users':
         return const UserAdminUsersScreen();
       case 'organization':
-      case 'organizations':
         return const UserAdminOrganizationsScreen();
       case 'settings':
-      case 'config':
         return const UserAdminSettingsScreen();
       default:
         return const UserAdminDashboardScreen();
     }
+  }
+
+  Widget _buildContent(String view) {
+    final normalized = _normalizeView(view);
+    if (!_openedViews.contains(normalized)) {
+      _openedViews.add(normalized);
+    }
+    return IndexedStack(
+      index: _openedViews.indexOf(normalized),
+      children: _openedViews
+          .map(
+            (openedView) => KeyedSubtree(
+              key: PageStorageKey<String>('user_admin_$openedView'),
+              child: _buildView(openedView),
+            ),
+          )
+          .toList(),
+    );
   }
 
   @override

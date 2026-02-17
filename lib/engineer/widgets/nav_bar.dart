@@ -1,199 +1,178 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-
-import '../../providers/theme_provider.dart';
 
 class EngineerNavBar extends StatelessWidget {
   final VoidCallback onMenuToggle;
   final bool isMenuOpen;
   final bool showMenuButton;
+  final VoidCallback onSettingsTap;
 
   const EngineerNavBar({
     super.key,
     required this.onMenuToggle,
     required this.isMenuOpen,
     this.showMenuButton = true,
+    required this.onSettingsTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final width = MediaQuery.of(context).size.width;
-    final veryCompact = width < 560;
-    final isCompact = width < 760;
-    final themeProvider = context.watch<ThemeProvider>();
+    final isCompact = width < 900;
+
+    final barColor = isLight
+        ? Theme.of(context).colorScheme.primary
+        : const Color(0xFF0f2a42);
+    const barTextColor = Color(0xFFEAF3FF);
 
     return Container(
-      margin: const EdgeInsets.all(18),
-      padding: EdgeInsets.symmetric(
-        horizontal: isCompact ? 10 : 16,
-        vertical: isCompact ? 8 : 10,
-      ),
+      height: 74,
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: isLight
-            ? Colors.white.withValues(alpha: 0.9)
-            : const Color(0xFF1a3148).withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(34),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: barColor,
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Row(
         children: [
-          if (showMenuButton)
-            GestureDetector(
+          if (showMenuButton) ...[
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
               onTap: onMenuToggle,
               child: Container(
-                width: 44,
-                height: 44,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
-                  color: isLight
-                      ? const Color(0xFFf0f5fd)
-                      : const Color(0xFF203a54),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Theme.of(context).dividerColor),
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.18)),
                 ),
                 child: Icon(
                   isMenuOpen ? Icons.close : Icons.menu,
-                  color: isLight
-                      ? const Color(0xFF0a1a2a)
-                      : const Color(0xFFe8f1fc),
+                  color: barTextColor,
                 ),
               ),
             ),
-          if (showMenuButton) const SizedBox(width: 12),
+            const SizedBox(width: 12),
+          ],
           Container(
-            width: 36,
-            height: 36,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Theme.of(context).colorScheme.primary,
-                  const Color(0xFF5f9eff),
-                ],
-              ),
+              color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.memory, color: Colors.white, size: 18),
+            child: const Icon(Icons.speed, color: Colors.white, size: 20),
           ),
-          if (!veryCompact) const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Expanded(
-            child: veryCompact
-                ? const SizedBox.shrink()
-                : RichText(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'MONITORING SYSTEM',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: barTextColor,
+                    fontSize: isCompact ? 17 : 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (!isCompact)
+                  Text(
+                    'INDUSTRIAL SENSOR MONITORING PORTAL',
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    text: TextSpan(
-                      text: 'TILT',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: isLight
-                            ? const Color(0xFF0a1a2a)
-                            : const Color(0xFFe8f1fc),
-                      ),
-                      children: [
-                        TextSpan(
-                          text: 'ENGINEER',
-                          style: TextStyle(
-                              color: Theme.of(context).colorScheme.primary),
-                        ),
-                      ],
+                    style: TextStyle(
+                      color: barTextColor.withValues(alpha: 0.82),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.4,
                     ),
                   ),
-          ),
-          if (veryCompact)
-            IconButton(
-              tooltip: themeProvider.isDarkMode ? 'Dark mode' : 'Light mode',
-              onPressed: () =>
-                  themeProvider.toggleTheme(!themeProvider.isDarkMode),
-              icon: Icon(
-                themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
-                size: 18,
-              ),
+              ],
             ),
-          if (!veryCompact)
-            Container(
-              decoration: BoxDecoration(
-                color:
-                    isLight ? const Color(0xFFf0f5fd) : const Color(0xFF203a54),
-                borderRadius: BorderRadius.circular(40),
-                border: Border.all(color: Theme.of(context).dividerColor),
-              ),
-              child: Row(
+          ),
+          if (!isCompact) ...[
+            IconButton(
+              tooltip: 'Notifications',
+              onPressed: () {},
+              icon: Stack(
                 children: [
-                  _buildThemeOption(
-                    context,
-                    icon: Icons.light_mode,
-                    label: 'Light',
-                    isActive: !themeProvider.isDarkMode,
-                    onTap: () => themeProvider.toggleTheme(false),
-                  ),
-                  _buildThemeOption(
-                    context,
-                    icon: Icons.dark_mode,
-                    label: 'Dark',
-                    isActive: themeProvider.isDarkMode,
-                    onTap: () => themeProvider.toggleTheme(true),
+                  Icon(Icons.notifications_none, color: barTextColor),
+                  Positioned(
+                    right: 1,
+                    top: 1,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE54C4C),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildThemeOption(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: isActive
-              ? Theme.of(context).colorScheme.primary
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(40),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 15,
-              color: isActive
-                  ? Colors.white
-                  : (isLight
-                      ? const Color(0xFF4a6b8a)
-                      : const Color(0xFF8aaac9)),
+            IconButton(
+              tooltip: 'Settings',
+              onPressed: onSettingsTap,
+              icon: Icon(Icons.settings_outlined, color: barTextColor),
             ),
-            if (MediaQuery.of(context).size.width > 900) ...[
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isActive
-                      ? Colors.white
-                      : (isLight
-                          ? const Color(0xFF4a6b8a)
-                          : const Color(0xFF8aaac9)),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+            const SizedBox(width: 10),
           ],
-        ),
+          if (!isCompact)
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'fahad.momin',
+                  style: TextStyle(
+                    color: barTextColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  'Engineer',
+                  style: TextStyle(
+                    color: barTextColor.withValues(alpha: 0.84),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          const SizedBox(width: 10),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              'F',
+              style: TextStyle(
+                color: barTextColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
