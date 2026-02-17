@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/engineer_database_provider.dart';
+import '../../shared/widgets/notifications_popup.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';
 import '../../screens/login_screen.dart';
@@ -23,6 +24,7 @@ class _EngineerScreenState extends State<EngineerScreen>
     with SingleTickerProviderStateMixin {
   bool _isMenuOpen = false;
   bool _dragActive = false;
+  String _currentView = 'dashboard';
   final List<String> _openedViews = ['dashboard'];
   late AnimationController _menuController;
   late Animation<double> _menuAnimation;
@@ -94,89 +96,110 @@ class _EngineerScreenState extends State<EngineerScreen>
     }
   }
 
+  void _setCurrentView(String view) {
+    final normalized = _normalizeView(view);
+    if (_currentView == normalized) return;
+    setState(() => _currentView = normalized);
+  }
+
+  List<AppNotificationItem> _notifications() {
+    final db = context.read<EngineerDatabaseProvider>();
+    final items = db.alerts.where((a) => !a.isResolved).toList()
+      ..sort((a, b) => b.triggeredAt.compareTo(a.triggeredAt));
+    return items
+        .take(8)
+        .map(
+          (a) => AppNotificationItem(
+            title: a.alertLevel.toUpperCase(),
+            message: a.message,
+            time: a.triggeredAt,
+          ),
+        )
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Consumer<EngineerDatabaseProvider>(
-      builder: (context, db, child) {
-        final isDesktop = MediaQuery.of(context).size.width >= 1100;
-        final navBar = EngineerNavBar(
-          onMenuToggle: toggleMenu,
-          isMenuOpen: _isMenuOpen,
-          showMenuButton: !isDesktop,
-          onSettingsTap: () => db.setCurrentView('settings'),
-        );
+    final isDesktop = MediaQuery.of(context).size.width >= 1100;
+    final notifications = _notifications();
+    final hasNotifications = notifications.isNotEmpty;
+    final navBar = EngineerNavBar(
+      onMenuToggle: toggleMenu,
+      isMenuOpen: _isMenuOpen,
+      showMenuButton: !isDesktop,
+      onSettingsTap: () => _setCurrentView('settings'),
+      notifications: notifications,
+      hasNotifications: hasNotifications,
+    );
 
-        final scaffold = Scaffold(
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          body: SafeArea(
-            child: Column(
-              children: [
-                navBar,
-                Expanded(
-                  child: isDesktop
-                      ? Row(
-                          children: [
-                            EngineerSideMenu(
-                              animation:
-                                  const AlwaysStoppedAnimation<double>(1.0),
-                              isOpen: true,
-                              currentView: db.currentView,
-                              onViewChanged: db.setCurrentView,
-                              onClose: () {},
-                              onLogout: _logout,
-                              showCloseButton: false,
-                            ),
-                            Expanded(child: _buildContent(db.currentView)),
-                          ],
-                        )
-                      : _buildContent(db.currentView),
-                ),
-              ],
-            ),
-          ),
-          bottomNavigationBar: isDesktop
-              ? null
-              : _buildBottomNav(
-                  currentView: db.currentView,
-                  onViewChanged: db.setCurrentView,
-                ),
-        );
-
-        if (isDesktop) return scaffold;
-
-        return Stack(
+    final scaffold = Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SafeArea(
+        child: Column(
           children: [
-            GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onHorizontalDragStart: _onHorizontalDragStart,
-              onHorizontalDragUpdate: _onHorizontalDragUpdate,
-              onHorizontalDragEnd: _onHorizontalDragEnd,
-              child: scaffold,
-            ),
-            if (_isMenuOpen)
-              GestureDetector(
-                onTap: closeMenu,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  color: Colors.black
-                      .withValues(alpha: 0.24 * _menuAnimation.value),
-                  child: const SizedBox.expand(),
-                ),
-              ),
-            EngineerSideMenu(
-              animation: _menuAnimation,
-              isOpen: _isMenuOpen,
-              currentView: db.currentView,
-              onViewChanged: (view) {
-                db.setCurrentView(view);
-                closeMenu();
-              },
-              onClose: closeMenu,
-              onLogout: _logout,
+            navBar,
+            Expanded(
+              child: isDesktop
+                  ? Row(
+                      children: [
+                        EngineerSideMenu(
+                          animation: const AlwaysStoppedAnimation<double>(1.0),
+                          isOpen: true,
+                          currentView: _currentView,
+                          onViewChanged: _setCurrentView,
+                          onClose: () {},
+                          onLogout: _logout,
+                          showCloseButton: false,
+                        ),
+                        Expanded(child: _buildContent(_currentView)),
+                      ],
+                    )
+                  : _buildContent(_currentView),
             ),
           ],
-        );
-      },
+        ),
+      ),
+      bottomNavigationBar: isDesktop
+          ? null
+          : _buildBottomNav(
+              currentView: _currentView,
+              onViewChanged: _setCurrentView,
+            ),
+    );
+
+    if (isDesktop) return scaffold;
+
+    return Stack(
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onHorizontalDragStart: _onHorizontalDragStart,
+          onHorizontalDragUpdate: _onHorizontalDragUpdate,
+          onHorizontalDragEnd: _onHorizontalDragEnd,
+          child: scaffold,
+        ),
+        if (_isMenuOpen)
+          GestureDetector(
+            onTap: closeMenu,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              color:
+                  Colors.black.withValues(alpha: 0.24 * _menuAnimation.value),
+              child: const SizedBox.expand(),
+            ),
+          ),
+        EngineerSideMenu(
+          animation: _menuAnimation,
+          isOpen: _isMenuOpen,
+          currentView: _currentView,
+          onViewChanged: (view) {
+            _setCurrentView(view);
+            closeMenu();
+          },
+          onClose: closeMenu,
+          onLogout: _logout,
+        ),
+      ],
     );
   }
 

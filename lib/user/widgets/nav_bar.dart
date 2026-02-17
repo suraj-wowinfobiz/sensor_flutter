@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../shared/widgets/notifications_popup.dart';
 
 class UserNavBar extends StatelessWidget {
   final VoidCallback onMenuToggle;
   final bool isMenuOpen;
   final bool showMenuButton;
   final VoidCallback onSettingsTap;
+  final List<AppNotificationItem> notifications;
+  final bool hasNotifications;
 
   const UserNavBar({
     super.key,
@@ -12,6 +15,8 @@ class UserNavBar extends StatelessWidget {
     required this.isMenuOpen,
     this.showMenuButton = true,
     required this.onSettingsTap,
+    this.notifications = const [],
+    this.hasNotifications = false,
   });
 
   @override
@@ -104,24 +109,83 @@ class UserNavBar extends StatelessWidget {
             ),
           ),
           if (!isCompact) ...[
-            IconButton(
+            PopupMenuButton<int>(
               tooltip: 'Notifications',
-              onPressed: () {},
-              icon: Stack(
-                children: [
-                  Icon(Icons.notifications_none, color: barTextColor),
-                  Positioned(
-                    right: 1,
-                    top: 1,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE54C4C),
-                        shape: BoxShape.circle,
+              offset: const Offset(0, 44),
+              constraints: const BoxConstraints(minWidth: 300, maxWidth: 360),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              itemBuilder: (context) {
+                if (notifications.isEmpty) {
+                  return [
+                    const PopupMenuItem<int>(
+                      enabled: false,
+                      height: 72,
+                      child: Center(
+                        child: Text(
+                          'No notifications',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
                       ),
                     ),
-                  ),
+                  ];
+                }
+
+                return notifications.take(6).map((item) {
+                  return PopupMenuItem<int>(
+                    enabled: false,
+                    height: 64,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 5),
+                          child: Icon(Icons.circle, size: 9),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                item.title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              Text(
+                                item.message,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList();
+              },
+              child: Stack(
+                children: [
+                  Icon(Icons.notifications_none, color: barTextColor),
+                  if (hasNotifications)
+                    Positioned(
+                      right: 1,
+                      top: 1,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFE54C4C),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
