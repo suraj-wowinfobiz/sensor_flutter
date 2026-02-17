@@ -3,29 +3,24 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../providers/database_provider.dart';
+import '../providers/user_admin_database_provider.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';
 import 'alerts_screen.dart';
 import 'analytics_screen.dart';
-import 'audit_screen.dart';
-import 'config_screen.dart';
 import 'dashboard_screen.dart';
-import 'devices_screen.dart';
 import 'organizations_screen.dart';
-import 'reports_screen.dart';
-import 'sensors_screen.dart';
-import 'thresholds_screen.dart';
+import 'settings_screen.dart';
 import 'users_screen.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class UserAdminScreen extends StatefulWidget {
+  const UserAdminScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<UserAdminScreen> createState() => _UserAdminScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
+class _UserAdminScreenState extends State<UserAdminScreen>
     with SingleTickerProviderStateMixin {
   bool _isMenuOpen = false;
   bool _dragActive = false;
@@ -94,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<DatabaseProvider>(
+    return Consumer<UserAdminDatabaseProvider>(
       builder: (context, db, child) {
         final isDesktop = MediaQuery.of(context).size.width >= 1100;
 
@@ -115,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen>
             body: SafeArea(
               child: Row(
                 children: [
-                  SideMenu(
+                  UserAdminSideMenu(
                     animation: const AlwaysStoppedAnimation<double>(1.0),
                     isOpen: true,
                     currentView: db.currentView,
@@ -158,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
               ),
-            SideMenu(
+            UserAdminSideMenu(
               animation: _menuAnimation,
               isOpen: _isMenuOpen,
               currentView: db.currentView,
@@ -176,10 +171,10 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildMainContent({
     required BuildContext context,
-    required DatabaseProvider db,
+    required UserAdminDatabaseProvider db,
     required bool showMenuButton,
   }) {
-    final navBar = NavBar(
+    final navBar = UserAdminNavBar(
       onMenuToggle: toggleMenu,
       isMenuOpen: _isMenuOpen,
       showMenuButton: showMenuButton,
@@ -191,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen>
         child: Column(
           children: [
             navBar,
-            const DashboardScreen(embeddedScroll: true),
+            const UserAdminDashboardScreen(embeddedScroll: true),
           ],
         ),
       );
@@ -210,30 +205,22 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildContent(String view) {
     switch (view) {
       case 'dashboard':
-        return const DashboardScreen();
-      case 'users':
-        return const UsersScreen();
-      case 'organizations':
-      case 'organization':
-        return const OrganizationsScreen();
-      case 'devices':
-        return const DevicesScreen();
-      case 'sensors':
-        return const SensorsScreen();
+        return const UserAdminDashboardScreen();
       case 'alerts':
-        return const AlertsScreen();
+        return const UserAdminAlertsScreen();
       case 'analytics':
-        return const AnalyticsScreen();
-      case 'reports':
-        return const ReportsScreen();
-      case 'thresholds':
-        return const ThresholdsScreen();
-      case 'audit':
-        return const AuditScreen();
+        return const UserAdminAnalyticsScreen();
+      case 'user':
+      case 'users':
+        return const UserAdminUsersScreen();
+      case 'organization':
+      case 'organizations':
+        return const UserAdminOrganizationsScreen();
+      case 'settings':
       case 'config':
-        return const ConfigScreen();
+        return const UserAdminSettingsScreen();
       default:
-        return const DashboardScreen();
+        return const UserAdminDashboardScreen();
     }
   }
 

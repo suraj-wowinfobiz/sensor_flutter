@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class SideMenu extends StatelessWidget {
+class UserAdminSideMenu extends StatelessWidget {
   final Animation<double> animation;
   final bool isOpen;
   final String currentView;
@@ -8,7 +8,7 @@ class SideMenu extends StatelessWidget {
   final VoidCallback onClose;
   final bool showCloseButton;
 
-  const SideMenu({
+  const UserAdminSideMenu({
     super.key,
     required this.animation,
     required this.isOpen,
@@ -70,7 +70,7 @@ class SideMenu extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Super Admin Panel',
+                        'User Admin Panel',
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 16,
@@ -112,18 +112,14 @@ class SideMenu extends StatelessWidget {
                       _buildMenuItem(
                           context, 'Dashboard', Icons.dashboard, 'dashboard'),
                       _buildMenuItem(
-                          context, 'Devices', Icons.devices, 'devices'),
-                      _buildMenuItem(
-                          context, 'Sensors', Icons.sensors, 'sensors'),
-                      _buildMenuItem(
                           context, 'Alerts', Icons.notifications, 'alerts'),
                       _buildMenuItem(
-                          context, 'Reports', Icons.assessment, 'reports'),
-                      _buildMenuItem(context, 'Users', Icons.people, 'users'),
+                          context, 'Analytics', Icons.analytics, 'analytics'),
+                      _buildMenuItem(context, 'User', Icons.people, 'user'),
                       _buildMenuItem(context, 'Organization', Icons.business,
                           'organization'),
                       _buildMenuItem(context, 'Settings',
-                          Icons.settings_applications, 'config'),
+                          Icons.settings_applications, 'settings'),
                     ]),
                   ],
                 ),

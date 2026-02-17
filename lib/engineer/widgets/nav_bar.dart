@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../providers/theme_provider.dart';
+import '../../providers/theme_provider.dart';
 
-class NavBar extends StatelessWidget {
+class EngineerNavBar extends StatelessWidget {
   final VoidCallback onMenuToggle;
   final bool isMenuOpen;
   final bool showMenuButton;
 
-  const NavBar({
+  const EngineerNavBar({
     super.key,
     required this.onMenuToggle,
     required this.isMenuOpen,
@@ -98,7 +98,7 @@ class NavBar extends StatelessWidget {
                       ),
                       children: [
                         TextSpan(
-                          text: 'SUPER ADMIN',
+                          text: 'ENGINEER',
                           style: TextStyle(
                               color: Theme.of(context).colorScheme.primary),
                         ),

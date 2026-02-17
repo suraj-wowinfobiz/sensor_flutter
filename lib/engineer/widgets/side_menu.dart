@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class SideMenu extends StatelessWidget {
+class EngineerSideMenu extends StatelessWidget {
   final Animation<double> animation;
   final bool isOpen;
   final String currentView;
@@ -8,7 +8,7 @@ class SideMenu extends StatelessWidget {
   final VoidCallback onClose;
   final bool showCloseButton;
 
-  const SideMenu({
+  const EngineerSideMenu({
     super.key,
     required this.animation,
     required this.isOpen,
@@ -70,7 +70,7 @@ class SideMenu extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Super Admin Panel',
+                        'Engineer Panel',
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 16,
@@ -118,12 +118,9 @@ class SideMenu extends StatelessWidget {
                       _buildMenuItem(
                           context, 'Alerts', Icons.notifications, 'alerts'),
                       _buildMenuItem(
-                          context, 'Reports', Icons.assessment, 'reports'),
-                      _buildMenuItem(context, 'Users', Icons.people, 'users'),
-                      _buildMenuItem(context, 'Organization', Icons.business,
-                          'organization'),
+                          context, 'Analytics', Icons.analytics, 'analytics'),
                       _buildMenuItem(context, 'Settings',
-                          Icons.settings_applications, 'config'),
+                          Icons.settings_applications, 'settings'),
                     ]),
                   ],
                 ),

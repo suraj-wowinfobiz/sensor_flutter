@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'providers/database_provider.dart';
 import 'providers/theme_provider.dart';
-import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,7 +59,7 @@ class MyApp extends StatelessWidget {
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
           return MaterialApp(
-            title: 'Industrial Tilt Admin',
+            title: 'Industrial Tilt Super Admin',
             debugShowCheckedModeBanner: false,
             theme: ThemeData.light().copyWith(
               scaffoldBackgroundColor: const Color(0xFFf4f9ff),
@@ -95,7 +95,7 @@ class MyApp extends StatelessWidget {
                 child: child ?? const SizedBox.shrink(),
               );
             },
-            home: const HomeScreen(),
+            home: const LoginScreen(),
           );
         },
       ),
