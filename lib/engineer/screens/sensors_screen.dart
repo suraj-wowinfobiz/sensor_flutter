@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../models/sensor.dart';
 import '../providers/engineer_database_provider.dart';
-import '../widgets/crud_modal.dart';
 
 class EngineerSensorsScreen extends StatefulWidget {
   const EngineerSensorsScreen({super.key});
@@ -17,7 +16,14 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
   String _serialNumber = '';
   String _deviceId = '';
   String _sensorTypeId = '';
+  String _sensorCodeInput = '';
+  String _macAddress = '';
+  String _channelNumber = '1';
+  String _organizationId = '';
+  String _latitude = '37.7749';
+  String _longitude = '-122.4194';
   bool _showFilters = false;
+  bool _isListView = false;
   String _searchQuery = '';
   String _statusFilter = 'all';
   String _typeFilter = 'all';
@@ -30,77 +36,342 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
 
   void _showSensorModal({Sensor? sensor}) {
     final db = Provider.of<EngineerDatabaseProvider>(context, listen: false);
+    final defaultDeviceId = db.devices.isNotEmpty ? db.devices.first.id : '';
+    final defaultTypeId =
+        db.sensorTypes.isNotEmpty ? db.sensorTypes.first.id : '';
+    final defaultOrgId = db.sites.isNotEmpty ? db.sites.first.id : '';
 
     if (sensor != null) {
+      final index = db.sensors.indexOf(sensor);
       _editingId = sensor.id;
       _serialNumber = sensor.serialNumber;
       _deviceId = sensor.deviceId;
       _sensorTypeId = sensor.sensorTypeId;
+      _sensorCodeInput = _sensorCodeFor(index < 0 ? 0 : index);
+      _macAddress =
+          '9E:55:DE:5E:${(56 + (index < 0 ? 0 : index)).toRadixString(16).padLeft(2, '0').toUpperCase()}:18';
+      _channelNumber = '${_channelFor(index < 0 ? 0 : index)}';
+      _organizationId = defaultOrgId;
     } else {
       _editingId = null;
-      _serialNumber = '';
-      _deviceId = db.devices.isNotEmpty ? db.devices.first.id : '';
-      _sensorTypeId = db.sensorTypes.isNotEmpty ? db.sensorTypes.first.id : '';
+      _sensorCodeInput =
+          'SEN-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      _serialNumber =
+          'SNMLQ${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
+      _macAddress = '9E:55:DE:5E:56:18';
+      _channelNumber = '1';
+      _deviceId = defaultDeviceId;
+      _sensorTypeId = defaultTypeId;
+      _organizationId = defaultOrgId;
     }
 
-    showDialog(
+    showGeneralDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
+      barrierDismissible: true,
+      barrierLabel: 'Sensor Form',
+      transitionDuration: const Duration(milliseconds: 120),
+      pageBuilder: (context, animation, secondaryAnimation) => StatefulBuilder(
         builder: (context, setState) {
-          return EngineerCrudModal(
-            title: sensor == null ? 'Add Sensor' : 'Edit Sensor',
-            fields: [
-              {
-                'label': 'Serial Number',
-                'value': _serialNumber,
-                'onChanged': (String value) =>
-                    setState(() => _serialNumber = value),
-                'keyboardType': TextInputType.text,
-              },
-              {
-                'label': 'Device',
-                'type': 'select',
-                'value': _deviceId,
-                'onChanged': (String? value) =>
-                    setState(() => _deviceId = value ?? _deviceId),
-                'options': db.devices
-                    .map((device) =>
-                        {'label': device.deviceCode, 'value': device.id})
-                    .toList(),
-              },
-              {
-                'label': 'Sensor Type',
-                'type': 'select',
-                'value': _sensorTypeId,
-                'onChanged': (String? value) =>
-                    setState(() => _sensorTypeId = value ?? _sensorTypeId),
-                'options': db.sensorTypes
-                    .map((type) => {'label': type.name, 'value': type.id})
-                    .toList(),
-              },
-            ],
-            onSave: () {
-              final db =
-                  Provider.of<EngineerDatabaseProvider>(context, listen: false);
-              if (_editingId == null) {
-                db.create('sensors', {
-                  'serial_number': _serialNumber,
-                  'device_id': _deviceId,
-                  'sensor_type_id': _sensorTypeId,
-                });
-              } else {
-                db.update('sensors', _editingId!, {
-                  'serial_number': _serialNumber,
-                  'device_id': _deviceId,
-                  'sensor_type_id': _sensorTypeId,
-                });
-              }
-              Navigator.pop(context);
-            },
-            onCancel: () => Navigator.pop(context),
+          return Dialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640, maxHeight: 740),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _editingId == null
+                                      ? 'Add New Sensor'
+                                      : 'Edit Sensor',
+                                  style: const TextStyle(
+                                      fontSize: 26,
+                                      fontWeight: FontWeight.w800),
+                                ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'Configure sensor parameters and device connection',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Color(0xFF4e6473)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _dialogTextField(
+                              label: 'Sensor ID',
+                              value: _sensorCodeInput,
+                              onChanged: (v) =>
+                                  setState(() => _sensorCodeInput = v),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: _dialogTextField(
+                              label: 'Serial Number',
+                              value: _serialNumber,
+                              onChanged: (v) =>
+                                  setState(() => _serialNumber = v),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _dialogTextField(
+                        label: 'MAC Address',
+                        value: _macAddress,
+                        onChanged: (v) => setState(() => _macAddress = v),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _dialogDropdown(
+                              label: 'Connected Device',
+                              value: _deviceId.isEmpty ? null : _deviceId,
+                              hint: 'Select a device',
+                              items: db.devices
+                                  .map((device) => DropdownMenuItem<String>(
+                                        value: device.id,
+                                        child: Text(device.deviceCode),
+                                      ))
+                                  .toList(),
+                              onChanged: (value) =>
+                                  setState(() => _deviceId = value ?? ''),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: _dialogTextField(
+                              label: 'Channel Number',
+                              value: _channelNumber,
+                              onChanged: (v) =>
+                                  setState(() => _channelNumber = v),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _dialogDropdown(
+                        label: 'Sensor Type',
+                        value: _sensorTypeId.isEmpty ? null : _sensorTypeId,
+                        hint: 'Select sensor type',
+                        items: db.sensorTypes
+                            .map((type) => DropdownMenuItem<String>(
+                                  value: type.id,
+                                  child: Text(type.name),
+                                ))
+                            .toList(),
+                        onChanged: (value) =>
+                            setState(() => _sensorTypeId = value ?? ''),
+                      ),
+                      const SizedBox(height: 12),
+                      _dialogDropdown(
+                        label: 'Organization',
+                        value: _organizationId.isEmpty ? null : _organizationId,
+                        hint: 'Select organization',
+                        items: db.sites
+                            .map((site) => DropdownMenuItem<String>(
+                                  value: site.id,
+                                  child: Text(site.name),
+                                ))
+                            .toList(),
+                        onChanged: (value) =>
+                            setState(() => _organizationId = value ?? ''),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Sensor GPS Coordinates (Optional)',
+                              style: TextStyle(
+                                  fontSize: 20, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _latitude = '37.7749';
+                                _longitude = '-122.4194';
+                              });
+                            },
+                            icon: const Icon(Icons.my_location, size: 18),
+                            label: const Text('Get Current Location'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _dialogTextField(
+                              label: 'Latitude',
+                              value: _latitude,
+                              onChanged: (v) => setState(() => _latitude = v),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: _dialogTextField(
+                              label: 'Longitude',
+                              value: _longitude,
+                              onChanged: (v) => setState(() => _longitude = v),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                final provider =
+                                    Provider.of<EngineerDatabaseProvider>(
+                                  context,
+                                  listen: false,
+                                );
+                                if (_editingId == null) {
+                                  provider.create('sensors', {
+                                    'serial_number': _serialNumber.trim(),
+                                    'device_id': _deviceId,
+                                    'sensor_type_id': _sensorTypeId,
+                                  });
+                                } else {
+                                  provider.update('sensors', _editingId!, {
+                                    'serial_number': _serialNumber.trim(),
+                                    'device_id': _deviceId,
+                                    'sensor_type_id': _sensorTypeId,
+                                  });
+                                }
+                                Navigator.pop(context);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                backgroundColor: const Color(0xFF0f729c),
+                                foregroundColor: Colors.white,
+                              ),
+                              child: Text(_editingId == null
+                                  ? 'Add Sensor'
+                                  : 'Save Sensor'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 14, horizontal: 22),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           );
         },
       ),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.98, end: 1.0).animate(animation),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _dialogTextField({
+    required String label,
+    required String value,
+    required ValueChanged<String> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 6),
+        TextFormField(
+          initialValue: value,
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFFF4F8FA),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _dialogDropdown({
+    required String label,
+    required String? value,
+    required String hint,
+    required List<DropdownMenuItem<String>> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          value: value,
+          hint: Text(hint),
+          items: items,
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFFF4F8FA),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -212,7 +483,9 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
                     context, db, sensors.length, db.sensors.length),
               ],
               const SizedBox(height: 18),
-              _buildGrid(context, db, sensors),
+              _isListView
+                  ? _buildList(context, db, sensors)
+                  : _buildGrid(context, db, sensors),
             ],
           ),
         );
@@ -255,6 +528,13 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
               label: 'Filters',
               icon: Icons.filter_list,
               onTap: () => setState(() => _showFilters = !_showFilters),
+            ),
+            _headerButton(
+              label: _isListView ? 'Cards' : 'List',
+              icon: _isListView
+                  ? Icons.grid_view_rounded
+                  : Icons.view_list_rounded,
+              onTap: () => setState(() => _isListView = !_isListView),
             ),
             _headerButton(
               label: 'Export',
@@ -506,7 +786,7 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
       isDense: true,
       filled: true,
       fillColor: const Color(0xFFF4F8FA),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
@@ -589,6 +869,124 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
               onDelete: () => db.delete('sensors', sensor.id),
             );
           },
+        );
+      },
+    );
+  }
+
+  Widget _buildList(
+    BuildContext context,
+    EngineerDatabaseProvider db,
+    List<Sensor> sensors,
+  ) {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: sensors.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final sensor = sensors[index];
+        final globalIndex = db.sensors.indexOf(sensor);
+        final safeIndex = globalIndex < 0 ? index : globalIndex;
+        final type = _sensorTypeLabel(sensor.sensorTypeId, db);
+        final deviceName = db.devices
+                .where((d) => d.id == sensor.deviceId)
+                .map((d) => d.deviceCode)
+                .firstOrNull ??
+            'Unassigned';
+        final siteName = db.sites
+                .where((s) =>
+                    s.id ==
+                    db.devices
+                        .where((d) => d.id == sensor.deviceId)
+                        .map((d) => d.siteId)
+                        .firstOrNull)
+                .map((s) => s.name)
+                .firstOrNull ??
+            'Location not set';
+        final status =
+            _inactiveSensors.contains(sensor.id) ? 'inactive' : 'active';
+        final statusColor = status == 'active'
+            ? const Color(0xFF0ca15f)
+            : const Color(0xFF8397a3);
+
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFc8d6dc)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(_iconForType(type),
+                      size: 20, color: const Color(0xFF5673d8)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${_sensorCodeFor(safeIndex)} • $type',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF152733),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      status,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 14,
+                runSpacing: 6,
+                children: [
+                  Text('Serial: ${sensor.serialNumber}'),
+                  Text('Device: $deviceName'),
+                  Text('Channel: ${_channelFor(safeIndex)}'),
+                  Text('Unit: ${_unitForType(type)}'),
+                  Text('Location: $siteName'),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => _showSensorModal(sensor: sensor),
+                    icon: const Icon(Icons.edit_outlined),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  IconButton(
+                    onPressed: () => _togglePower(sensor.id),
+                    icon: const Icon(Icons.power_settings_new),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  IconButton(
+                    onPressed: () => db.delete('sensors', sensor.id),
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+            ],
+          ),
         );
       },
     );

@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../models/device.dart';
 import '../providers/database_provider.dart';
-import '../widgets/crud_modal.dart';
 
 class DevicesScreen extends StatefulWidget {
   const DevicesScreen({super.key});
@@ -17,8 +16,16 @@ class _DevicesScreenState extends State<DevicesScreen> {
   String _deviceCode = '';
   String _siteId = '';
   String _zoneId = '';
-  String _status = 'active';
+  String _serialNumber = '';
+  String _macAddress = '';
+  String _ipUrl = '';
+  String _channelsCount = '4';
+  String _webhookUrl = 'https://api.example.com/webhook';
+  String _latitude = '37.7749';
+  String _longitude = '-122.4194';
+  bool _dataTransmissionEnabled = true;
   bool _showFilters = false;
+  bool _isListView = false;
   String _searchQuery = '';
   String _statusFilter = 'all';
   String _webhookFilter = 'all';
@@ -29,92 +36,379 @@ class _DevicesScreenState extends State<DevicesScreen> {
 
   void _showDeviceModal({Device? device}) {
     final db = Provider.of<DatabaseProvider>(context, listen: false);
+    final defaultSiteId = db.sites.isNotEmpty ? db.sites.first.id : '';
+    final defaultZoneId = db.zones.isNotEmpty ? db.zones.first.id : '';
 
     if (device != null) {
+      final index = db.devices.indexOf(device);
       _editingId = device.id;
       _deviceCode = device.deviceCode;
       _siteId = device.siteId;
       _zoneId = device.zoneId;
-      _status = device.status;
+      _serialNumber = _serialFor(index < 0 ? 0 : index);
+      _macAddress = _macFor(index < 0 ? 0 : index);
+      _ipUrl = _ipFor(index < 0 ? 0 : index);
+      _channelsCount =
+          '${db.sensors.where((s) => s.deviceId == device.id).length}';
+      if (_channelsCount == '0') _channelsCount = '4';
+      _latitude = '37.7749';
+      _longitude = '-122.4194';
+      _dataTransmissionEnabled = device.status == 'active';
     } else {
       _editingId = null;
-      _deviceCode = '';
-      _siteId = db.sites.isNotEmpty ? db.sites.first.id : '';
-      _zoneId = db.zones.isNotEmpty ? db.zones.first.id : '';
-      _status = 'active';
+      _deviceCode =
+          'DEV-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      _serialNumber =
+          'SNMLQ${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
+      _macAddress = _macFor(db.devices.length);
+      _ipUrl = _ipFor(db.devices.length);
+      _channelsCount = '4';
+      _siteId = defaultSiteId;
+      _zoneId = defaultZoneId;
+      _latitude = '37.7749';
+      _longitude = '-122.4194';
+      _dataTransmissionEnabled = true;
     }
 
-    showDialog(
+    showGeneralDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
+      barrierDismissible: true,
+      barrierLabel: 'Device Form',
+      transitionDuration: const Duration(milliseconds: 120),
+      pageBuilder: (context, animation, secondaryAnimation) => StatefulBuilder(
         builder: (context, setState) {
-          return CrudModal(
-            title: device == null ? 'Add Device' : 'Edit Device',
-            fields: [
-              {
-                'label': 'Device Code',
-                'value': _deviceCode,
-                'onChanged': (String value) =>
-                    setState(() => _deviceCode = value),
-                'keyboardType': TextInputType.text,
-              },
-              {
-                'label': 'Site',
-                'type': 'select',
-                'value': _siteId,
-                'onChanged': (String? value) =>
-                    setState(() => _siteId = value ?? _siteId),
-                'options': db.sites
-                    .map((site) => {'label': site.name, 'value': site.id})
-                    .toList(),
-              },
-              {
-                'label': 'Zone',
-                'type': 'select',
-                'value': _zoneId,
-                'onChanged': (String? value) =>
-                    setState(() => _zoneId = value ?? _zoneId),
-                'options': db.zones
-                    .map((zone) => {'label': zone.name, 'value': zone.id})
-                    .toList(),
-              },
-              {
-                'label': 'Status',
-                'type': 'select',
-                'value': _status,
-                'onChanged': (String? value) =>
-                    setState(() => _status = value ?? _status),
-                'options': const [
-                  {'label': 'Active', 'value': 'active'},
-                  {'label': 'Inactive', 'value': 'inactive'},
-                  {'label': 'Maintenance', 'value': 'maintenance'},
-                  {'label': 'Retired', 'value': 'retired'},
-                ],
-              },
-            ],
-            onSave: () {
-              final db = Provider.of<DatabaseProvider>(context, listen: false);
-              if (_editingId == null) {
-                db.create('devices', {
-                  'device_code': _deviceCode,
-                  'site_id': _siteId,
-                  'zone_id': _zoneId,
-                  'status': _status,
-                });
-              } else {
-                db.update('devices', _editingId!, {
-                  'device_code': _deviceCode,
-                  'site_id': _siteId,
-                  'zone_id': _zoneId,
-                  'status': _status,
-                });
-              }
-              Navigator.pop(context);
-            },
-            onCancel: () => Navigator.pop(context),
+          return Dialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640, maxHeight: 760),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _editingId == null
+                                      ? 'Add New Device'
+                                      : 'Edit Device',
+                                  style: const TextStyle(
+                                      fontSize: 26,
+                                      fontWeight: FontWeight.w800),
+                                ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'Configure device parameters and network settings',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Color(0xFF4e6473)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _dialogTextField(
+                              label: 'Device ID',
+                              value: _deviceCode,
+                              onChanged: (v) => setState(() => _deviceCode = v),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: _dialogTextField(
+                              label: 'Serial Number',
+                              value: _serialNumber,
+                              onChanged: (v) =>
+                                  setState(() => _serialNumber = v),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _dialogTextField(
+                              label: 'MAC Address',
+                              value: _macAddress,
+                              onChanged: (v) => setState(() => _macAddress = v),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: _dialogTextField(
+                              label: 'IP Address / URL',
+                              value: _ipUrl,
+                              onChanged: (v) => setState(() => _ipUrl = v),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _dialogTextField(
+                        label: 'Number of Channels',
+                        value: _channelsCount,
+                        onChanged: (v) => setState(() => _channelsCount = v),
+                      ),
+                      const SizedBox(height: 12),
+                      _dialogTextField(
+                        label: 'Webhook URL',
+                        value: _webhookUrl,
+                        onChanged: (v) => setState(() => _webhookUrl = v),
+                      ),
+                      const SizedBox(height: 12),
+                      _dialogDropdown(
+                        label: 'Organization *',
+                        value: _siteId.isEmpty ? null : _siteId,
+                        hint: 'Select organization',
+                        items: db.sites
+                            .map((site) => DropdownMenuItem<String>(
+                                  value: site.id,
+                                  child: Text(site.name),
+                                ))
+                            .toList(),
+                        onChanged: (value) => setState(() {
+                          _siteId = value ?? '';
+                          final firstZone = db.zones
+                              .where((z) => z.siteId == _siteId)
+                              .map((z) => z.id)
+                              .firstOrNull;
+                          _zoneId = firstZone ?? defaultZoneId;
+                        }),
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Device GPS Coordinates (Optional)',
+                              style: TextStyle(
+                                  fontSize: 23 > 21 ? 23 - 2 : 20,
+                                  fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _latitude = '37.7749';
+                                _longitude = '-122.4194';
+                              });
+                            },
+                            icon: const Icon(Icons.my_location, size: 18),
+                            label: const Text('Get Current Location'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _dialogTextField(
+                              label: 'Latitude',
+                              value: _latitude,
+                              onChanged: (v) => setState(() => _latitude = v),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: _dialogTextField(
+                              label: 'Longitude',
+                              value: _longitude,
+                              onChanged: (v) => setState(() => _longitude = v),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFFc8d6dd)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Data Transmission',
+                                    style: TextStyle(
+                                        fontSize: 30 > 22 ? 22 : 20,
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Enable device to send data',
+                                    style: TextStyle(color: Color(0xFF4e6473)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: _dataTransmissionEnabled,
+                              onChanged: (v) =>
+                                  setState(() => _dataTransmissionEnabled = v),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                final provider = Provider.of<DatabaseProvider>(
+                                  context,
+                                  listen: false,
+                                );
+                                final status = _dataTransmissionEnabled
+                                    ? 'active'
+                                    : 'inactive';
+                                if (_editingId == null) {
+                                  provider.create('devices', {
+                                    'device_code': _deviceCode.trim(),
+                                    'site_id': _siteId,
+                                    'zone_id': _zoneId,
+                                    'status': status,
+                                  });
+                                } else {
+                                  provider.update('devices', _editingId!, {
+                                    'device_code': _deviceCode.trim(),
+                                    'site_id': _siteId,
+                                    'zone_id': _zoneId,
+                                    'status': status,
+                                  });
+                                }
+                                Navigator.pop(context);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                backgroundColor: const Color(0xFF0f729c),
+                                foregroundColor: Colors.white,
+                              ),
+                              child: Text(
+                                _editingId == null
+                                    ? 'Add Device'
+                                    : 'Save Device',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 14, horizontal: 22),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           );
         },
       ),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.98, end: 1.0).animate(animation),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _dialogTextField({
+    required String label,
+    required String value,
+    required ValueChanged<String> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontWeight: FontWeight.w700, fontSize: 22 > 20 ? 20 : 18)),
+        const SizedBox(height: 6),
+        TextFormField(
+          initialValue: value,
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFFF4F8FA),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _dialogDropdown({
+    required String label,
+    required String? value,
+    required String hint,
+    required List<DropdownMenuItem<String>> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          value: value,
+          hint: Text(hint),
+          items: items,
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFFF4F8FA),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -194,7 +488,9 @@ class _DevicesScreenState extends State<DevicesScreen> {
                 _buildFiltersPanel(context, devices.length, db.devices.length),
               ],
               const SizedBox(height: 18),
-              _buildGrid(context, db, devices),
+              _isListView
+                  ? _buildList(context, db, devices)
+                  : _buildGrid(context, db, devices),
             ],
           ),
         );
@@ -237,6 +533,13 @@ class _DevicesScreenState extends State<DevicesScreen> {
               label: 'Filters',
               icon: Icons.filter_list,
               onTap: () => setState(() => _showFilters = !_showFilters),
+            ),
+            _headerButton(
+              label: _isListView ? 'Cards' : 'List',
+              icon: _isListView
+                  ? Icons.grid_view_rounded
+                  : Icons.view_list_rounded,
+              onTap: () => setState(() => _isListView = !_isListView),
             ),
             _headerButton(
               label: 'Export',
@@ -465,7 +768,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
       isDense: true,
       filled: true,
       fillColor: const Color(0xFFF4F8FA),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
@@ -539,6 +842,114 @@ class _DevicesScreenState extends State<DevicesScreen> {
               onDelete: () => db.delete('devices', device.id),
             );
           },
+        );
+      },
+    );
+  }
+
+  Widget _buildList(
+      BuildContext context, DatabaseProvider db, List<Device> devices) {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: devices.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final device = devices[index];
+        final globalIndex = db.devices.indexOf(device);
+        final safeIndex = globalIndex < 0 ? index : globalIndex;
+        final siteName = db.sites
+            .where((s) => s.id == device.siteId)
+            .map((s) => s.name)
+            .firstOrNull;
+        final zoneName = db.zones
+            .where((z) => z.id == device.zoneId)
+            .map((z) => z.name)
+            .firstOrNull;
+        final channels =
+            db.sensors.where((s) => s.deviceId == device.id).length;
+        final location = siteName ?? 'Location not set';
+        final statusColor = device.status == 'active'
+            ? const Color(0xFF0ca15f)
+            : const Color(0xFF8397a3);
+
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFc8d6dc)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.memory, size: 20, color: Color(0xFF0f729c)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${device.deviceCode} • ${_serialFor(safeIndex)}',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF152733),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      device.status,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 14,
+                runSpacing: 6,
+                children: [
+                  Text('MAC: ${_macFor(safeIndex)}'),
+                  Text('IP: ${_ipFor(safeIndex)}'),
+                  Text('Channels: ${channels == 0 ? 4 + index : channels}'),
+                  Text('Last Seen: ${_date(device.installedAt)}'),
+                  Text('Location: $location'),
+                  Text('Zone: ${zoneName ?? 'Unknown'}'),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => _showDeviceModal(device: device),
+                    icon: const Icon(Icons.edit_outlined),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  IconButton(
+                    onPressed: () => _togglePower(db, device),
+                    icon: const Icon(Icons.power_settings_new),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  IconButton(
+                    onPressed: () => db.delete('devices', device.id),
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+            ],
+          ),
         );
       },
     );
