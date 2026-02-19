@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../models/user.dart';
 import '../providers/user_admin_database_provider.dart';
-import '../widgets/crud_modal.dart';
 
 class UserAdminUsersScreen extends StatefulWidget {
   const UserAdminUsersScreen({super.key});
@@ -14,11 +13,15 @@ class UserAdminUsersScreen extends StatefulWidget {
 
 class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
   final TextEditingController _searchController = TextEditingController();
+  bool _isCardView = true;
   String _roleFilter = 'all';
   String _statusFilter = 'all';
   String _searchText = '';
 
   final Set<String> _restrictedUsers = {};
+  final Map<String, Set<String>> _userOrganizationAccess = {};
+  final Map<String, Set<String>> _userSiteAccess = {};
+  final Map<String, Set<String>> _userZoneAccess = {};
   String? _editingId;
   String _name = '';
   String _email = '';
@@ -30,7 +33,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     super.dispose();
   }
 
-  void _showUserModal({User? user}) {
+  Future<void> _showUserModal({User? user}) async {
     if (user != null) {
       _editingId = user.id;
       _name = user.name;
@@ -43,60 +46,400 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
       _role = 'operator';
     }
 
-    showDialog(
+    final nameController = TextEditingController(text: _name);
+    final emailController = TextEditingController(text: _email);
+    final roleController = TextEditingController(text: _role);
+    final organizationController = TextEditingController();
+
+    const templates = <Map<String, String>>[
+      {
+        'title': 'Full Organization Admin',
+        'name': 'New Org Admin',
+        'email': 'admin@example.com',
+        'role': 'admin',
+        'organization': 'Default Organization',
+      },
+      {
+        'title': 'Site Installation Engineer',
+        'name': 'New Site Engineer',
+        'email': 'engineer@example.com',
+        'role': 'engineer',
+        'organization': 'Field Operations',
+      },
+      {
+        'title': 'Monitoring Operator',
+        'name': 'New Monitoring User',
+        'email': 'operator@example.com',
+        'role': 'operator',
+        'organization': 'Monitoring Center',
+      },
+    ];
+    var useTemplateTab = user == null;
+    var selectedTemplate = 0;
+
+    String normalizeRole(String value) {
+      final lower = value.trim().toLowerCase();
+      if (lower == 'admin') return 'admin';
+      if (lower == 'engineer') return 'engineer';
+      return 'operator';
+    }
+
+    await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
-          return UserAdminCrudModal(
-            title: user == null ? 'Add User' : 'Edit User',
-            fields: [
-              {
-                'label': 'Name',
-                'value': _name,
-                'onChanged': (String value) => setState(() => _name = value),
-                'keyboardType': TextInputType.text,
-              },
-              {
-                'label': 'Email',
-                'value': _email,
-                'onChanged': (String value) => setState(() => _email = value),
-                'keyboardType': TextInputType.emailAddress,
-              },
-              {
-                'label': 'Role',
-                'type': 'select',
-                'value': _role,
-                'onChanged': (String? value) =>
-                    setState(() => _role = value ?? _role),
-                'options': const [
-                  {'label': 'Operator', 'value': 'operator'},
-                  {'label': 'Engineer', 'value': 'engineer'},
-                  {'label': 'Admin', 'value': 'admin'},
-                ],
-              },
-            ],
-            onSave: () {
-              final db = Provider.of<UserAdminDatabaseProvider>(context,
-                  listen: false);
-              if (_editingId == null) {
-                db.create('users', {
-                  'name': _name,
-                  'email': _email,
-                  'role': _role,
-                });
-              } else {
-                db.update('users', _editingId!, {
-                  'name': _name,
-                  'email': _email,
-                  'role': _role,
-                });
-              }
-              Navigator.pop(context);
-            },
-            onCancel: () => Navigator.pop(context),
+          final db =
+              Provider.of<UserAdminDatabaseProvider>(context, listen: false);
+
+          void saveUser() {
+            final name = nameController.text.trim();
+            final email = emailController.text.trim();
+            final role = normalizeRole(roleController.text);
+
+            if (name.isEmpty || email.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Name and email are required')),
+              );
+              return;
+            }
+
+            final payload = {
+              'name': name,
+              'email': email,
+              'role': role,
+            };
+
+            if (_editingId == null) {
+              db.create('users', payload);
+            } else {
+              db.update('users', _editingId!, payload);
+            }
+            Navigator.pop(context);
+          }
+
+          return Dialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 680, maxHeight: 760),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.auto_awesome,
+                            color: Color(0xFF0f729c), size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          user == null ? 'Create New User' : 'Edit User',
+                          style: const TextStyle(
+                            fontSize: 34 > 30 ? 34 - 4 : 30,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF142936),
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      user == null
+                          ? 'Choose a template for quick setup or configure manually'
+                          : 'Update user details and access role',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: Color(0xFF506775),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE7EFF3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _tabOption(
+                              active: useTemplateTab,
+                              icon: Icons.auto_awesome_outlined,
+                              label: 'Quick Templates',
+                              onTap: () =>
+                                  setState(() => useTemplateTab = true),
+                            ),
+                          ),
+                          Expanded(
+                            child: _tabOption(
+                              active: !useTemplateTab,
+                              icon: Icons.build_outlined,
+                              label: 'Manual Setup',
+                              onTap: () =>
+                                  setState(() => useTemplateTab = false),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (useTemplateTab) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE9F5FB),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFB8D9EA)),
+                        ),
+                        child: const Text(
+                          'Select a template to prefill manual setup.',
+                          style: TextStyle(
+                            color: Color(0xFF2B5368),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final compact = constraints.maxWidth < 620;
+                          return Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: List.generate(templates.length, (i) {
+                              final template = templates[i];
+                              final active = i == selectedTemplate;
+                              return InkWell(
+                                onTap: () => setState(() {
+                                  selectedTemplate = i;
+                                  nameController.text = template['name']!;
+                                  emailController.text = template['email']!;
+                                  roleController.text = template['role']!;
+                                  organizationController.text =
+                                      template['organization']!;
+                                  useTemplateTab = false;
+                                }),
+                                borderRadius: BorderRadius.circular(14),
+                                child: Container(
+                                  width: compact
+                                      ? constraints.maxWidth
+                                      : (constraints.maxWidth - 10) / 2,
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    gradient: active
+                                        ? const LinearGradient(
+                                            colors: [
+                                              Color(0xFFEAF5FC),
+                                              Color(0xFFF2F8FC)
+                                            ],
+                                          )
+                                        : null,
+                                    color:
+                                        active ? null : const Color(0xFFF7FBFD),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: active
+                                          ? const Color(0xFF88BFD9)
+                                          : const Color(0xFFD7E5EC),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        template['title']!,
+                                        style: const TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF152A36),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Prefill: ${template['role']}',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF4E6775),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                    if (!useTemplateTab) ...[
+                      const Text(
+                        'Full Name',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1b313d),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      _inputBox(
+                        child: TextField(
+                          controller: nameController,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                            hintText: 'John Doe',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Email',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1b313d),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      _inputBox(
+                        child: TextField(
+                          controller: emailController,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                            hintText: 'john@example.com',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Role',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1b313d),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      _inputBox(
+                        child: TextField(
+                          controller: roleController,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                            hintText: 'operator / engineer / admin',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Organization',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1b313d),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      _inputBox(
+                        child: TextField(
+                          controller: organizationController,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                            hintText: 'Organization name',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          const Spacer(),
+                          OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 10),
+                          FilledButton(
+                            onPressed: saveUser,
+                            child: Text(
+                              _editingId == null
+                                  ? 'Create User'
+                                  : 'Update User',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           );
         },
       ),
+    );
+
+    nameController.dispose();
+    emailController.dispose();
+    roleController.dispose();
+    organizationController.dispose();
+  }
+
+  Widget _tabOption({
+    required bool active,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: active ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: active ? const Color(0xFFC8D6DD) : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: const Color(0xFF203845)),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF203845),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _inputBox({required Widget child}) {
+    return Container(
+      height: 46,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFC8D6DD)),
+      ),
+      child: child,
     );
   }
 
@@ -144,51 +487,573 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     }).toList();
   }
 
+  Map<String, Set<String>> _defaultAccessForUser(
+    User user,
+    UserAdminDatabaseProvider db,
+  ) {
+    final index = db.users.indexOf(user).clamp(0, 9999);
+    final isAdmin = user.role == 'admin';
+    final isEngineer = user.role == 'engineer';
+
+    final organizationIds = isAdmin
+        ? db.organizations.map((o) => o.id).toSet()
+        : <String>{
+            if (db.organizations.isNotEmpty)
+              db.organizations[index % db.organizations.length].id,
+            if (isEngineer && db.organizations.length > 1)
+              db.organizations[(index + 1) % db.organizations.length].id,
+          };
+
+    final scopedSites = db.sites
+        .where((s) => organizationIds.contains(s.organizationId))
+        .toList();
+    final siteIds = isAdmin
+        ? scopedSites.map((s) => s.id).toSet()
+        : scopedSites
+            .skip(index % (scopedSites.isEmpty ? 1 : scopedSites.length))
+            .take(isEngineer ? 2 : 1)
+            .map((s) => s.id)
+            .toSet();
+
+    final scopedZones =
+        db.zones.where((z) => siteIds.contains(z.siteId)).toList();
+    final zoneIds = isAdmin
+        ? scopedZones.map((z) => z.id).toSet()
+        : scopedZones
+            .skip(index % (scopedZones.isEmpty ? 1 : scopedZones.length))
+            .take(isEngineer ? 3 : 2)
+            .map((z) => z.id)
+            .toSet();
+
+    return {
+      'organizations': organizationIds,
+      'sites': siteIds,
+      'zones': zoneIds,
+    };
+  }
+
   void _showAccessDialog(
       BuildContext context, User user, UserAdminDatabaseProvider db) {
-    final index = db.users.indexOf(user);
-    final site = db.sites.isNotEmpty
-        ? db.sites[index % db.sites.length].name
-        : 'No Site';
-    final zone = db.zones.isNotEmpty
-        ? db.zones[index % db.zones.length].name
-        : 'No Zone';
-    final sensors = db.sensors
-        .where((s) =>
-            db.devices
-                .where((d) => d.id == s.deviceId)
-                .map((d) => d.siteId)
-                .firstOrNull ==
-            db.sites.where((s) => s.name == site).map((s) => s.id).firstOrNull)
-        .take(3)
-        .map((s) => s.serialNumber)
-        .toList();
+    final defaultAccess = _defaultAccessForUser(user, db);
+    final defaultOrganizations = defaultAccess['organizations'] ?? <String>{};
+    final defaultSites = defaultAccess['sites'] ?? <String>{};
+    final defaultZones = defaultAccess['zones'] ?? <String>{};
+    Set<String> organizationIds = Set<String>.from(
+        _userOrganizationAccess[user.id] ?? defaultOrganizations);
+    Set<String> siteIds =
+        Set<String>.from(_userSiteAccess[user.id] ?? defaultSites);
+    Set<String> zoneIds =
+        Set<String>.from(_userZoneAccess[user.id] ?? defaultZones);
+    var editMode = false;
 
     showDialog<void>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text('${user.name} Access'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Role: ${user.role}'),
-            const SizedBox(height: 8),
-            Text('Site: $site'),
-            const SizedBox(height: 6),
-            Text('Zone: $zone'),
-            const SizedBox(height: 6),
-            Text('Sensors: ${sensors.isEmpty ? 'None' : sensors.join(', ')}'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final availableSites = db.sites
+              .where((s) => organizationIds.contains(s.organizationId))
+              .toList();
+          final availableZones =
+              db.zones.where((z) => siteIds.contains(z.siteId)).toList();
+
+          final organizations = db.organizations
+              .where((o) => organizationIds.contains(o.id))
+              .map((o) => o.name)
+              .toList();
+          final sites = db.sites
+              .where((s) => siteIds.contains(s.id))
+              .map((s) => s.name)
+              .toList();
+          final zones = db.zones
+              .where((z) => zoneIds.contains(z.id))
+              .map((z) => z.name)
+              .toList();
+
+          return AlertDialog(
+            title: Row(
+              children: [
+                Expanded(child: Text('${user.name} Access')),
+                TextButton.icon(
+                  onPressed: () => setDialogState(() => editMode = !editMode),
+                  icon: Icon(editMode ? Icons.visibility : Icons.edit_outlined),
+                  label: Text(editMode ? 'Preview' : 'Edit Access'),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 560,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Role: ${user.role[0].toUpperCase()}${user.role.substring(1)}',
+                    ),
+                    const SizedBox(height: 12),
+                    if (!editMode) ...[
+                      _accessPreviewSection(
+                        title: 'Organizations',
+                        icon: Icons.apartment_outlined,
+                        values: organizations,
+                      ),
+                      const SizedBox(height: 10),
+                      _accessPreviewSection(
+                        title: 'Sites',
+                        icon: Icons.business_outlined,
+                        values: sites,
+                      ),
+                      const SizedBox(height: 10),
+                      _accessPreviewSection(
+                        title: 'Zones',
+                        icon: Icons.location_on_outlined,
+                        values: zones,
+                      ),
+                    ] else ...[
+                      _editableAccessSection(
+                        title: 'Organizations',
+                        icon: Icons.apartment_outlined,
+                        options: db.organizations
+                            .map((o) => MapEntry(o.id, o.name))
+                            .toList(),
+                        selected: organizationIds,
+                        selectedLabels: organizations,
+                        onToggle: (id) => setDialogState(() {
+                          if (organizationIds.contains(id)) {
+                            organizationIds.remove(id);
+                          } else {
+                            organizationIds.add(id);
+                          }
+                          siteIds = siteIds
+                              .where((s) => db.sites.any((site) =>
+                                  site.id == s &&
+                                  organizationIds
+                                      .contains(site.organizationId)))
+                              .toSet();
+                          zoneIds = zoneIds
+                              .where((z) => db.zones.any((zone) =>
+                                  zone.id == z &&
+                                  siteIds.contains(zone.siteId)))
+                              .toSet();
+                        }),
+                        onViewAll: () async {
+                          final next = await _showAccessSelectorDialog(
+                            context: context,
+                            title: 'Select Organizations',
+                            options: db.organizations
+                                .map((o) => MapEntry(o.id, o.name))
+                                .toList(),
+                            selected: organizationIds,
+                          );
+                          if (next == null || !context.mounted) return;
+                          setDialogState(() {
+                            organizationIds = next;
+                            siteIds = siteIds
+                                .where((s) => db.sites.any((site) =>
+                                    site.id == s &&
+                                    organizationIds
+                                        .contains(site.organizationId)))
+                                .toSet();
+                            zoneIds = zoneIds
+                                .where((z) => db.zones.any((zone) =>
+                                    zone.id == z &&
+                                    siteIds.contains(zone.siteId)))
+                                .toSet();
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      _editableAccessSection(
+                        title: 'Sites',
+                        icon: Icons.business_outlined,
+                        options: availableSites
+                            .map((s) => MapEntry(s.id, s.name))
+                            .toList(),
+                        selected: siteIds,
+                        selectedLabels: sites,
+                        onToggle: (id) => setDialogState(() {
+                          if (siteIds.contains(id)) {
+                            siteIds.remove(id);
+                          } else {
+                            siteIds.add(id);
+                          }
+                          zoneIds = zoneIds
+                              .where((z) => db.zones.any((zone) =>
+                                  zone.id == z &&
+                                  siteIds.contains(zone.siteId)))
+                              .toSet();
+                        }),
+                        onViewAll: () async {
+                          final next = await _showAccessSelectorDialog(
+                            context: context,
+                            title: 'Select Sites',
+                            options: availableSites
+                                .map((s) => MapEntry(s.id, s.name))
+                                .toList(),
+                            selected: siteIds,
+                          );
+                          if (next == null || !context.mounted) return;
+                          setDialogState(() {
+                            siteIds = next;
+                            zoneIds = zoneIds
+                                .where((z) => db.zones.any((zone) =>
+                                    zone.id == z &&
+                                    siteIds.contains(zone.siteId)))
+                                .toSet();
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      _editableAccessSection(
+                        title: 'Zones',
+                        icon: Icons.location_on_outlined,
+                        options: availableZones
+                            .map((z) => MapEntry(z.id, z.name))
+                            .toList(),
+                        selected: zoneIds,
+                        selectedLabels: zones,
+                        onToggle: (id) => setDialogState(() {
+                          if (zoneIds.contains(id)) {
+                            zoneIds.remove(id);
+                          } else {
+                            zoneIds.add(id);
+                          }
+                        }),
+                        onViewAll: () async {
+                          final next = await _showAccessSelectorDialog(
+                            context: context,
+                            title: 'Select Zones',
+                            options: availableZones
+                                .map((z) => MapEntry(z.id, z.name))
+                                .toList(),
+                            selected: zoneIds,
+                          );
+                          if (next == null || !context.mounted) return;
+                          setDialogState(() {
+                            zoneIds = next;
+                          });
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              if (editMode)
+                FilledButton(
+                  onPressed: () {
+                    setState(() {
+                      _userOrganizationAccess[user.id] =
+                          Set<String>.from(organizationIds);
+                      _userSiteAccess[user.id] = Set<String>.from(siteIds);
+                      _userZoneAccess[user.id] = Set<String>.from(zoneIds);
+                    });
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Save Access'),
+                ),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _accessPreviewSection({
+    required String title,
+    required IconData icon,
+    required List<String> values,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F8FB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD5E3EA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: const Color(0xFF2C5B73)),
+              const SizedBox(width: 6),
+              Text(
+                '$title (${values.length})',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1F3948),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (values.isEmpty)
+            const Text(
+              'No allocation',
+              style: TextStyle(color: Color(0xFF607A88)),
+            )
+          else
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: values
+                  .map(
+                    (v) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE1EDF4),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        v,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF27485A),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _editableAccessSection({
+    required String title,
+    required IconData icon,
+    required List<MapEntry<String, String>> options,
+    required Set<String> selected,
+    required List<String> selectedLabels,
+    required ValueChanged<String> onToggle,
+    required Future<void> Function() onViewAll,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F8FB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD5E3EA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: const Color(0xFF2C5B73)),
+              const SizedBox(width: 6),
+              Text(
+                '$title (${selected.length})',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1F3948),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (options.isNotEmpty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton(
+                onPressed: onViewAll,
+                style: OutlinedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  side: const BorderSide(color: Color(0xFFB7CBD7)),
+                ),
+                child: const Text('View All'),
+              ),
+            ),
+          if (options.isNotEmpty) const SizedBox(height: 8),
+          if (options.isEmpty)
+            const Text(
+              'No options available',
+              style: TextStyle(color: Color(0xFF607A88)),
+            )
+          else if (options.length > 12)
+            SizedBox(
+              height: 148,
+              child: Scrollbar(
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: options
+                        .map(
+                          (option) => FilterChip(
+                            label: Text(option.value),
+                            selected: selected.contains(option.key),
+                            onSelected: (_) => onToggle(option.key),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ),
+            )
+          else
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: options
+                  .map(
+                    (option) => FilterChip(
+                      label: Text(option.value),
+                      selected: selected.contains(option.key),
+                      onSelected: (_) => onToggle(option.key),
+                    ),
+                  )
+                  .toList(),
+            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  selectedLabels.isEmpty
+                      ? 'No allocation'
+                      : selectedLabels.take(3).join(', '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFF607A88)),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Future<Set<String>?> _showAccessSelectorDialog({
+    required BuildContext context,
+    required String title,
+    required List<MapEntry<String, String>> options,
+    required Set<String> selected,
+  }) async {
+    final searchController = TextEditingController();
+    Set<String> tempSelected = Set<String>.from(selected);
+    String query = '';
+
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final normalized = query.toLowerCase();
+          final filtered = options.where((option) {
+            return option.value.toLowerCase().contains(normalized) ||
+                option.key.toLowerCase().contains(normalized);
+          }).toList();
+
+          return AlertDialog(
+            title: Text(title),
+            content: SizedBox(
+              width: 520,
+              height: 460,
+              child: Column(
+                children: [
+                  TextField(
+                    controller: searchController,
+                    onChanged: (value) =>
+                        setDialogState(() => query = value.trim()),
+                    decoration: InputDecoration(
+                      hintText: 'Search...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Text(
+                        '${tempSelected.length} selected',
+                        style: const TextStyle(
+                          color: Color(0xFF607A88),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () => setDialogState(() {
+                          tempSelected.clear();
+                        }),
+                        child: const Text('Clear'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No matching records',
+                              style: TextStyle(color: Color(0xFF607A88)),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: filtered.length,
+                            itemBuilder: (context, index) {
+                              final option = filtered[index];
+                              final checked = tempSelected.contains(option.key);
+                              return CheckboxListTile(
+                                dense: true,
+                                value: checked,
+                                title: Text(option.value),
+                                subtitle: Text(
+                                  option.key,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                onChanged: (_) {
+                                  setDialogState(() {
+                                    if (checked) {
+                                      tempSelected.remove(option.key);
+                                    } else {
+                                      tempSelected.add(option.key);
+                                    }
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(
+                    dialogContext, Set<String>.from(tempSelected)),
+                child: const Text('Apply'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    searchController.dispose();
+    return result;
   }
 
   @override
@@ -233,6 +1098,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
+                      _buildViewToggle(),
                       _headerButton(
                         label: 'Generate Sample Data',
                         icon: Icons.data_saver_on_outlined,
@@ -302,164 +1168,374 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              ...users.map((user) {
-                final restricted = _restrictedUsers.contains(user.id);
-                final userIndex = db.users.indexOf(user);
-                final site = db.sites.isNotEmpty
-                    ? db.sites[userIndex % db.sites.length].name
-                    : 'No Site';
-                final zone = db.zones.isNotEmpty
-                    ? db.zones[userIndex % db.zones.length].name
-                    : 'No Zone';
-                final sensorCodes = db.sensors
-                    .where((s) =>
-                        s.deviceId ==
-                        db.devices[userIndex % db.devices.length].id)
-                    .take(2)
-                    .map((s) => s.serialNumber)
-                    .toList();
+              if (_isCardView)
+                ...users.map((user) {
+                  final restricted = _restrictedUsers.contains(user.id);
+                  final userIndex = db.users.indexOf(user);
+                  final site = db.sites.isNotEmpty
+                      ? db.sites[userIndex % db.sites.length].name
+                      : 'No Site';
+                  final zone = db.zones.isNotEmpty
+                      ? db.zones[userIndex % db.zones.length].name
+                      : 'No Zone';
+                  final sensorCodes = db.sensors
+                      .where((s) =>
+                          s.deviceId ==
+                          db.devices[userIndex % db.devices.length].id)
+                      .take(2)
+                      .map((s) => s.serialNumber)
+                      .toList();
 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFFC8D6DD)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        radius: 22,
-                        backgroundColor: const Color(0xFFDCE7ED),
-                        child: Text(
-                          _shortName(user.name),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF203845),
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFC8D6DD)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          radius: 22,
+                          backgroundColor: const Color(0xFFDCE7ED),
+                          child: Text(
+                            _shortName(user.name),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF203845),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    user.name,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF102632),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      user.name,
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF102632),
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const Icon(Icons.check_circle,
-                                    size: 16, color: Color(0xFF0ca15f)),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              user.email,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF516875),
+                                  const Icon(Icons.check_circle,
+                                      size: 16, color: Color(0xFF0ca15f)),
+                                ],
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _tag(user.role[0].toUpperCase() +
-                                    user.role.substring(1)),
-                                _tag('Unknown'),
-                                _tag(
-                                  restricted ? 'Restricted' : 'Open',
-                                  icon: Icons.lock_outline,
+                              const SizedBox(height: 2),
+                              Text(
+                                user.email,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF516875),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            _accessBlock(
-                              title: 'Sites (1)',
-                              icon: Icons.business,
-                              color: const Color(0xFFE2F0F8),
-                              chips: [site],
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _tag(user.role[0].toUpperCase() +
+                                      user.role.substring(1)),
+                                  _tag('Unknown'),
+                                  _tag(
+                                    restricted ? 'Restricted' : 'Open',
+                                    icon: Icons.lock_outline,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              _accessBlock(
+                                title: 'Sites (1)',
+                                icon: Icons.business,
+                                color: const Color(0xFFE2F0F8),
+                                chips: [site],
+                              ),
+                              const SizedBox(height: 8),
+                              _accessBlock(
+                                title: 'Zones (1)',
+                                icon: Icons.location_on_outlined,
+                                color: const Color(0xFFE8EBF9),
+                                chips: [zone],
+                              ),
+                              const SizedBox(height: 8),
+                              _accessBlock(
+                                title: 'Sensors (${sensorCodes.length})',
+                                icon: Icons.sensors,
+                                color: const Color(0xFFE6F4EA),
+                                chips: sensorCodes.isEmpty
+                                    ? const ['No Sensors']
+                                    : sensorCodes,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          children: [
+                            _actionButton(
+                              label: 'View Access',
+                              icon: Icons.remove_red_eye_outlined,
+                              onTap: () => _showAccessDialog(context, user, db),
                             ),
                             const SizedBox(height: 8),
-                            _accessBlock(
-                              title: 'Zones (1)',
-                              icon: Icons.location_on_outlined,
-                              color: const Color(0xFFE8EBF9),
-                              chips: [zone],
+                            _iconAction(
+                              icon: Icons.lock_outline,
+                              onTap: () {
+                                setState(() {
+                                  if (restricted) {
+                                    _restrictedUsers.remove(user.id);
+                                  } else {
+                                    _restrictedUsers.add(user.id);
+                                  }
+                                });
+                              },
                             ),
                             const SizedBox(height: 8),
-                            _accessBlock(
-                              title: 'Sensors (${sensorCodes.length})',
-                              icon: Icons.sensors,
-                              color: const Color(0xFFE6F4EA),
-                              chips: sensorCodes.isEmpty
-                                  ? const ['No Sensors']
-                                  : sensorCodes,
+                            _iconAction(
+                              icon: Icons.edit_outlined,
+                              onTap: () => _showUserModal(user: user),
+                            ),
+                            const SizedBox(height: 8),
+                            _iconAction(
+                              icon: Icons.cancel_outlined,
+                              iconColor: const Color(0xFFD39A00),
+                              onTap: () {
+                                setState(() => _restrictedUsers.add(user.id));
+                              },
+                            ),
+                            const SizedBox(height: 8),
+                            _iconAction(
+                              icon: Icons.delete_outline,
+                              iconColor: Colors.red,
+                              onTap: () => db.delete('users', user.id),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        children: [
-                          _actionButton(
-                            label: 'View Access',
-                            icon: Icons.remove_red_eye_outlined,
-                            onTap: () => _showAccessDialog(context, user, db),
-                          ),
-                          const SizedBox(height: 8),
-                          _iconAction(
-                            icon: Icons.lock_outline,
-                            onTap: () {
-                              setState(() {
-                                if (restricted) {
-                                  _restrictedUsers.remove(user.id);
-                                } else {
-                                  _restrictedUsers.add(user.id);
-                                }
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 8),
-                          _iconAction(
-                            icon: Icons.edit_outlined,
-                            onTap: () => _showUserModal(user: user),
-                          ),
-                          const SizedBox(height: 8),
-                          _iconAction(
-                            icon: Icons.cancel_outlined,
-                            iconColor: const Color(0xFFD39A00),
-                            onTap: () {
-                              setState(() => _restrictedUsers.add(user.id));
-                            },
-                          ),
-                          const SizedBox(height: 8),
-                          _iconAction(
-                            icon: Icons.delete_outline,
-                            iconColor: Colors.red,
-                            onTap: () => db.delete('users', user.id),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              }),
+                      ],
+                    ),
+                  );
+                })
+              else
+                _buildUsersListView(context, db, users),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildViewToggle() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6EFF3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFC8D6DD)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _toggleOption(
+            active: _isCardView,
+            icon: Icons.grid_view_rounded,
+            onTap: () => setState(() => _isCardView = true),
+          ),
+          _toggleOption(
+            active: !_isCardView,
+            icon: Icons.view_list_rounded,
+            onTap: () => setState(() => _isCardView = false),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _toggleOption({
+    required bool active,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFF0f729c) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: active ? Colors.white : const Color(0xFF2a414e),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUsersListView(
+    BuildContext context,
+    UserAdminDatabaseProvider db,
+    List<User> users,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFC8D6DD)),
+      ),
+      child: Column(
+        children: users.map((user) {
+          final restricted = _restrictedUsers.contains(user.id);
+          final userIndex = db.users.indexOf(user);
+          final site = db.sites.isNotEmpty
+              ? db.sites[userIndex % db.sites.length].name
+              : 'No Site';
+          final zone = db.zones.isNotEmpty
+              ? db.zones[userIndex % db.zones.length].name
+              : 'No Zone';
+          final sensorCodes = db.sensors
+              .where((s) =>
+                  s.deviceId == db.devices[userIndex % db.devices.length].id)
+              .take(3)
+              .map((s) => s.serialNumber)
+              .toList();
+          final details = <String>[
+            'Role: ${user.role}',
+            'Status: ${restricted ? 'restricted' : 'active'}',
+            'Site: $site',
+            'Zone: $zone',
+            'Sensors: ${sensorCodes.isEmpty ? 'No Sensors' : sensorCodes.join(', ')}',
+          ];
+
+          return Container(
+            padding: const EdgeInsets.all(14),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Color(0xFFDCE5EA))),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: const Color(0xFFDCE7ED),
+                      child: Text(
+                        _shortName(user.name),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF203845),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF102632),
+                            ),
+                          ),
+                          Text(
+                            user.email,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF516875),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _tag(
+                      restricted ? 'Restricted' : 'Open',
+                      icon: Icons.lock_outline,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: details
+                      .map(
+                        (detail) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAF2F6),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFD0DEE6)),
+                          ),
+                          child: Text(
+                            detail,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF3E5765),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _actionButton(
+                      label: 'View Access',
+                      icon: Icons.remove_red_eye_outlined,
+                      onTap: () => _showAccessDialog(context, user, db),
+                    ),
+                    _iconAction(
+                      icon: Icons.lock_outline,
+                      onTap: () {
+                        setState(() {
+                          if (restricted) {
+                            _restrictedUsers.remove(user.id);
+                          } else {
+                            _restrictedUsers.add(user.id);
+                          }
+                        });
+                      },
+                    ),
+                    _iconAction(
+                      icon: Icons.edit_outlined,
+                      onTap: () => _showUserModal(user: user),
+                    ),
+                    _iconAction(
+                      icon: Icons.cancel_outlined,
+                      iconColor: const Color(0xFFD39A00),
+                      onTap: () {
+                        setState(() => _restrictedUsers.add(user.id));
+                      },
+                    ),
+                    _iconAction(
+                      icon: Icons.delete_outline,
+                      iconColor: Colors.red,
+                      onTap: () => db.delete('users', user.id),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 

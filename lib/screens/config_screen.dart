@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../shared/widgets/account_settings_panel.dart';
+import '../widgets/admin_account_settings_panel.dart';
 
 class ConfigScreen extends StatelessWidget {
   const ConfigScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const AccountSettingsPanel(
+    return const AdminAccountSettingsPanel(
       roleLabel: 'Super Admin',
-      userName: 'fahad.momin',
-      userEmail: 'fahad.momin@live.com',
+      userName: 'suraj.tiwari',
+      userEmail: 'suraj.tiwari@live.com',
     );
   }
 }

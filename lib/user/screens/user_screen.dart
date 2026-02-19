@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/user_database_provider.dart';
-import '../../shared/widgets/notifications_popup.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';
 import '../../screens/login_screen.dart';
 import 'alerts_screen.dart';
 import 'analytics_screen.dart';
 import 'dashboard_screen.dart';
+import 'devices_screen.dart';
+import 'sidebar_settings_screen.dart';
+import 'sensors_screen.dart';
 import 'settings_screen.dart';
 
 class UserScreen extends StatefulWidget {
@@ -23,6 +26,7 @@ class _UserScreenState extends State<UserScreen>
   bool _isMenuOpen = false;
   bool _dragActive = false;
   String _currentView = 'dashboard';
+  bool _showBottomNav = true;
   final List<String> _openedViews = ['dashboard'];
   late AnimationController _menuController;
   late Animation<double> _menuAnimation;
@@ -100,14 +104,33 @@ class _UserScreenState extends State<UserScreen>
     setState(() => _currentView = normalized);
   }
 
-  List<AppNotificationItem> _notifications() {
+  bool _onScroll(UserScrollNotification notification) {
+    if (MediaQuery.of(context).size.width >= 1100) return false;
+
+    if (notification.direction == ScrollDirection.reverse) {
+      if (_showBottomNav) {
+        setState(() {
+          _showBottomNav = false;
+        });
+      }
+    } else if (notification.direction == ScrollDirection.forward) {
+      if (!_showBottomNav) {
+        setState(() {
+          _showBottomNav = true;
+        });
+      }
+    }
+    return false;
+  }
+
+  List<UserNotificationItem> _notifications() {
     final db = context.read<UserDatabaseProvider>();
     final items = db.alerts.where((a) => !a.isResolved).toList()
       ..sort((a, b) => b.triggeredAt.compareTo(a.triggeredAt));
     return items
         .take(8)
         .map(
-          (a) => AppNotificationItem(
+          (a) => UserNotificationItem(
             title: a.alertLevel.toUpperCase(),
             message: a.message,
             time: a.triggeredAt,
@@ -124,8 +147,9 @@ class _UserScreenState extends State<UserScreen>
     final navBar = UserNavBar(
       onMenuToggle: toggleMenu,
       isMenuOpen: _isMenuOpen,
-      showMenuButton: !isDesktop,
-      onSettingsTap: () => _setCurrentView('settings'),
+      showMenuButton: false,
+      onTopSettingsTap: () => _setCurrentView('topbar_settings'),
+      onLogoutTap: _logout,
       notifications: notifications,
       hasNotifications: hasNotifications,
     );
@@ -135,29 +159,33 @@ class _UserScreenState extends State<UserScreen>
       body: SafeArea(
         child: Column(
           children: [
-            navBar,
+            if (isDesktop) navBar,
             Expanded(
-              child: isDesktop
-                  ? Row(
-                      children: [
-                        UserSideMenu(
-                          animation: const AlwaysStoppedAnimation<double>(1.0),
-                          isOpen: true,
-                          currentView: _currentView,
-                          onViewChanged: _setCurrentView,
-                          onClose: () {},
-                          onLogout: _logout,
-                          showCloseButton: false,
-                        ),
-                        Expanded(child: _buildContent(_currentView)),
-                      ],
-                    )
-                  : _buildContent(_currentView),
+              child: NotificationListener<UserScrollNotification>(
+                onNotification: _onScroll,
+                child: isDesktop
+                    ? Row(
+                        children: [
+                          UserSideMenu(
+                            animation:
+                                const AlwaysStoppedAnimation<double>(1.0),
+                            isOpen: true,
+                            currentView: _currentView,
+                            onViewChanged: _setCurrentView,
+                            onClose: () {},
+                            onLogout: _logout,
+                            showCloseButton: false,
+                          ),
+                          Expanded(child: _buildContent(_currentView)),
+                        ],
+                      )
+                    : _buildContent(_currentView),
+              ),
             ),
           ],
         ),
       ),
-      bottomNavigationBar: isDesktop
+      bottomNavigationBar: isDesktop || !_showBottomNav
           ? null
           : _buildBottomNav(
               currentView: _currentView,
@@ -205,8 +233,10 @@ class _UserScreenState extends State<UserScreen>
     required String currentView,
     required ValueChanged<String> onViewChanged,
   }) {
-    const views = ['dashboard', 'alerts', 'analytics', 'settings'];
-    final index = views.indexOf(currentView);
+    const views = ['dashboard', 'alerts', 'analytics', 'topbar_settings'];
+    final effectiveView =
+        currentView == 'menu_settings' ? 'topbar_settings' : currentView;
+    final index = views.indexOf(effectiveView);
 
     return BottomNavigationBar(
       type: BottomNavigationBarType.fixed,
@@ -227,7 +257,9 @@ class _UserScreenState extends State<UserScreen>
   String _normalizeView(String view) {
     switch (view) {
       case 'config':
-        return 'settings';
+        return 'topbar_settings';
+      case 'settings':
+        return 'topbar_settings';
       default:
         return view;
     }
@@ -241,8 +273,14 @@ class _UserScreenState extends State<UserScreen>
         return const UserAlertsScreen();
       case 'analytics':
         return const UserAnalyticsScreen();
-      case 'settings':
+      case 'devices':
+        return const UserDevicesScreen();
+      case 'sensors':
+        return const UserSensorsScreen();
+      case 'topbar_settings':
         return const UserSettingsScreen();
+      case 'menu_settings':
+        return const UserSidebarSettingsScreen();
       default:
         return const UserDashboardScreen();
     }

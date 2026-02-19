@@ -18,7 +18,14 @@ class _DevicesScreenState extends State<DevicesScreen> {
   String _siteId = '';
   String _zoneId = '';
   String _status = 'active';
+  bool _showFilters = false;
+  String _searchQuery = '';
   String _statusFilter = 'all';
+  String _webhookFilter = 'all';
+  String _organizationFilter = 'all';
+  String _siteFilter = 'all';
+  String _zoneFilter = 'all';
+  String _locationFilter = 'all';
 
   void _showDeviceModal({Device? device}) {
     final db = Provider.of<DatabaseProvider>(context, listen: false);
@@ -138,14 +145,43 @@ class _DevicesScreenState extends State<DevicesScreen> {
     });
   }
 
+  bool _hasWebhook(int index) => index.isEven;
+
+  bool _matchesFilters(DatabaseProvider db, Device device) {
+    final globalIndex = db.devices.indexOf(device);
+    final safeIndex = globalIndex < 0 ? 0 : globalIndex;
+    final serial = _serialFor(safeIndex).toLowerCase();
+    final mac = _macFor(safeIndex).toLowerCase();
+    final ip = _ipFor(safeIndex).toLowerCase();
+    final query = _searchQuery.trim().toLowerCase();
+
+    if (query.isNotEmpty) {
+      final matchesQuery = device.deviceCode.toLowerCase().contains(query) ||
+          serial.contains(query) ||
+          mac.contains(query) ||
+          ip.contains(query);
+      if (!matchesQuery) return false;
+    }
+
+    if (_statusFilter != 'all' && device.status != _statusFilter) {
+      return false;
+    }
+
+    if (_webhookFilter != 'all') {
+      final hasWebhook = _hasWebhook(safeIndex);
+      if (_webhookFilter == 'configured' && !hasWebhook) return false;
+      if (_webhookFilter == 'not_configured' && hasWebhook) return false;
+    }
+
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<DatabaseProvider>(
       builder: (context, db, child) {
-        final devices = db.devices
-            .where((d) =>
-                _statusFilter == 'all' ? true : d.status == _statusFilter)
-            .toList();
+        final devices =
+            db.devices.where((d) => _matchesFilters(db, d)).toList();
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
@@ -153,6 +189,10 @@ class _DevicesScreenState extends State<DevicesScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(context),
+              if (_showFilters) ...[
+                const SizedBox(height: 18),
+                _buildFiltersPanel(context, devices.length, db.devices.length),
+              ],
               const SizedBox(height: 18),
               _buildGrid(context, db, devices),
             ],
@@ -196,21 +236,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
             _headerButton(
               label: 'Filters',
               icon: Icons.filter_list,
-              onTap: () async {
-                final value = await showMenu<String>(
-                  context: context,
-                  position: const RelativeRect.fromLTRB(1000, 140, 24, 0),
-                  items: const [
-                    PopupMenuItem(value: 'all', child: Text('All')),
-                    PopupMenuItem(value: 'active', child: Text('Active')),
-                    PopupMenuItem(value: 'inactive', child: Text('Inactive')),
-                    PopupMenuItem(
-                        value: 'maintenance', child: Text('Maintenance')),
-                    PopupMenuItem(value: 'retired', child: Text('Retired')),
-                  ],
-                );
-                if (value != null) setState(() => _statusFilter = value);
-              },
+              onTap: () => setState(() => _showFilters = !_showFilters),
             ),
             _headerButton(
               label: 'Export',
@@ -268,6 +294,189 @@ class _DevicesScreenState extends State<DevicesScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFiltersPanel(
+      BuildContext context, int filteredCount, int totalCount) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFc8d6dc)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Filter Devices',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF243946),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            crossAxisAlignment: WrapCrossAlignment.end,
+            children: [
+              SizedBox(
+                width: 290,
+                child: TextField(
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                  decoration: _filterFieldDecoration(
+                    label: 'Search',
+                    hint: 'Device ID, Serial, MAC, IP...',
+                    icon: Icons.search,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 190,
+                child: DropdownButtonFormField<String>(
+                  value: _statusFilter,
+                  decoration: _filterFieldDecoration(label: 'Status'),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('All Statuses')),
+                    DropdownMenuItem(value: 'active', child: Text('Active')),
+                    DropdownMenuItem(
+                        value: 'inactive', child: Text('Inactive')),
+                    DropdownMenuItem(
+                        value: 'maintenance', child: Text('Maintenance')),
+                    DropdownMenuItem(value: 'retired', child: Text('Retired')),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _statusFilter = value ?? 'all'),
+                ),
+              ),
+              SizedBox(
+                width: 190,
+                child: DropdownButtonFormField<String>(
+                  value: _webhookFilter,
+                  decoration: _filterFieldDecoration(label: 'Webhook'),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('All')),
+                    DropdownMenuItem(
+                        value: 'configured', child: Text('Configured')),
+                    DropdownMenuItem(
+                        value: 'not_configured', child: Text('Not Configured')),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _webhookFilter = value ?? 'all'),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFe6eff3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Showing $filteredCount of $totalCount devices',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF324956),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: Color(0xFFd9e4ea)),
+          const SizedBox(height: 12),
+          const Text(
+            'LOCATION HIERARCHY',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF60717c),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            children: [
+              _hierarchyDropdown(
+                label: 'Organization',
+                value: _organizationFilter,
+                onChanged: (value) =>
+                    setState(() => _organizationFilter = value ?? 'all'),
+              ),
+              _hierarchyDropdown(
+                label: 'Site',
+                value: _siteFilter,
+                onChanged: (value) =>
+                    setState(() => _siteFilter = value ?? 'all'),
+              ),
+              _hierarchyDropdown(
+                label: 'Zone',
+                value: _zoneFilter,
+                onChanged: (value) =>
+                    setState(() => _zoneFilter = value ?? 'all'),
+              ),
+              _hierarchyDropdown(
+                label: 'Location',
+                value: _locationFilter,
+                onChanged: (value) =>
+                    setState(() => _locationFilter = value ?? 'all'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _hierarchyDropdown({
+    required String label,
+    required String value,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return SizedBox(
+      width: 190,
+      child: DropdownButtonFormField<String>(
+        value: value,
+        decoration: _filterFieldDecoration(label: label),
+        items: const [
+          DropdownMenuItem(value: 'all', child: Text('All')),
+        ],
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  InputDecoration _filterFieldDecoration({
+    required String label,
+    String? hint,
+    IconData? icon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: icon == null ? null : Icon(icon, size: 20),
+      isDense: true,
+      filled: true,
+      fillColor: const Color(0xFFF4F8FA),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF0f729c), width: 1.4),
       ),
     );
   }

@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../../shared/widgets/account_settings_panel.dart';
+import '../widgets/user_account_settings_panel.dart';
 
 class UserSettingsScreen extends StatelessWidget {
   const UserSettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const AccountSettingsPanel(
+    return const UserAccountSettingsPanel(
       roleLabel: 'User',
-      userName: 'fahad.momin',
-      userEmail: 'fahad.momin@live.com',
+      userName: 'suraj.tiwari',
+      userEmail: 'suraj.tiwari@live.com',
     );
   }
 }

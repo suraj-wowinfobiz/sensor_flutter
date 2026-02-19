@@ -17,7 +17,15 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
   String _serialNumber = '';
   String _deviceId = '';
   String _sensorTypeId = '';
+  bool _showFilters = false;
+  String _searchQuery = '';
+  String _statusFilter = 'all';
   String _typeFilter = 'all';
+  String _deviceFilter = 'all';
+  String _organizationFilter = 'all';
+  String _siteFilter = 'all';
+  String _zoneFilter = 'all';
+  String _locationFilter = 'all';
   final Set<String> _inactiveSensors = {};
 
   void _showSensorModal({Sensor? sensor}) {
@@ -148,21 +156,61 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
     });
   }
 
+  bool _matchesFilters(EngineerDatabaseProvider db, Sensor sensor) {
+    final globalIndex = db.sensors.indexOf(sensor);
+    final safeIndex = globalIndex < 0 ? 0 : globalIndex;
+    final type = _sensorTypeLabel(sensor.sensorTypeId, db);
+    final deviceName = db.devices
+            .where((d) => d.id == sensor.deviceId)
+            .map((d) => d.deviceCode)
+            .firstOrNull ??
+        '';
+    final sensorCode = _sensorCodeFor(safeIndex);
+    final query = _searchQuery.trim().toLowerCase();
+
+    if (query.isNotEmpty) {
+      final matchesQuery = sensorCode.toLowerCase().contains(query) ||
+          sensor.serialNumber.toLowerCase().contains(query) ||
+          deviceName.toLowerCase().contains(query) ||
+          type.toLowerCase().contains(query);
+      if (!matchesQuery) return false;
+    }
+
+    if (_statusFilter != 'all') {
+      final isActive = !_inactiveSensors.contains(sensor.id);
+      if (_statusFilter == 'active' && !isActive) return false;
+      if (_statusFilter == 'inactive' && isActive) return false;
+    }
+
+    if (_typeFilter != 'all' && sensor.sensorTypeId != _typeFilter) {
+      return false;
+    }
+
+    if (_deviceFilter != 'all' && sensor.deviceId != _deviceFilter) {
+      return false;
+    }
+
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<EngineerDatabaseProvider>(
       builder: (context, db, child) {
-        final sensors = db.sensors.where((s) {
-          if (_typeFilter == 'all') return true;
-          return s.sensorTypeId == _typeFilter;
-        }).toList();
+        final sensors =
+            db.sensors.where((s) => _matchesFilters(db, s)).toList();
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(context, db),
+              _buildHeader(context),
+              if (_showFilters) ...[
+                const SizedBox(height: 18),
+                _buildFiltersPanel(
+                    context, db, sensors.length, db.sensors.length),
+              ],
               const SizedBox(height: 18),
               _buildGrid(context, db, sensors),
             ],
@@ -172,7 +220,7 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, EngineerDatabaseProvider db) {
+  Widget _buildHeader(BuildContext context) {
     return Wrap(
       alignment: WrapAlignment.spaceBetween,
       runSpacing: 12,
@@ -206,22 +254,7 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
             _headerButton(
               label: 'Filters',
               icon: Icons.filter_list,
-              onTap: () async {
-                final value = await showMenu<String>(
-                  context: context,
-                  position: const RelativeRect.fromLTRB(1000, 140, 24, 0),
-                  items: [
-                    const PopupMenuItem(value: 'all', child: Text('All')),
-                    ...db.sensorTypes.map(
-                      (type) => PopupMenuItem(
-                        value: type.id,
-                        child: Text(type.name),
-                      ),
-                    ),
-                  ],
-                );
-                if (value != null) setState(() => _typeFilter = value);
-              },
+              onTap: () => setState(() => _showFilters = !_showFilters),
             ),
             _headerButton(
               label: 'Export',
@@ -279,6 +312,212 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFiltersPanel(
+    BuildContext context,
+    EngineerDatabaseProvider db,
+    int filteredCount,
+    int totalCount,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFc8d6dc)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Filter Sensors',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF243946),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            crossAxisAlignment: WrapCrossAlignment.end,
+            children: [
+              SizedBox(
+                width: 290,
+                child: TextField(
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                  decoration: _filterFieldDecoration(
+                    label: 'Search',
+                    hint: 'Sensor ID, Serial, MAC...',
+                    icon: Icons.search,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 190,
+                child: DropdownButtonFormField<String>(
+                  value: _statusFilter,
+                  decoration: _filterFieldDecoration(label: 'Status'),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('All Statuses')),
+                    DropdownMenuItem(value: 'active', child: Text('Active')),
+                    DropdownMenuItem(
+                        value: 'inactive', child: Text('Inactive')),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _statusFilter = value ?? 'all'),
+                ),
+              ),
+              SizedBox(
+                width: 190,
+                child: DropdownButtonFormField<String>(
+                  value: _typeFilter,
+                  decoration: _filterFieldDecoration(label: 'Sensor Type'),
+                  items: [
+                    const DropdownMenuItem(
+                        value: 'all', child: Text('All Types')),
+                    ...db.sensorTypes.map(
+                      (type) => DropdownMenuItem(
+                        value: type.id,
+                        child: Text(type.name),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _typeFilter = value ?? 'all'),
+                ),
+              ),
+              SizedBox(
+                width: 190,
+                child: DropdownButtonFormField<String>(
+                  value: _deviceFilter,
+                  decoration: _filterFieldDecoration(label: 'Device'),
+                  items: [
+                    const DropdownMenuItem(
+                        value: 'all', child: Text('All Devices')),
+                    ...db.devices.map(
+                      (device) => DropdownMenuItem(
+                        value: device.id,
+                        child: Text(device.deviceCode),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _deviceFilter = value ?? 'all'),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFe6eff3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Showing $filteredCount of $totalCount sensors',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF324956),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: Color(0xFFd9e4ea)),
+          const SizedBox(height: 12),
+          const Text(
+            'LOCATION HIERARCHY',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF60717c),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            children: [
+              _hierarchyDropdown(
+                label: 'Organization',
+                value: _organizationFilter,
+                onChanged: (value) =>
+                    setState(() => _organizationFilter = value ?? 'all'),
+              ),
+              _hierarchyDropdown(
+                label: 'Site',
+                value: _siteFilter,
+                onChanged: (value) =>
+                    setState(() => _siteFilter = value ?? 'all'),
+              ),
+              _hierarchyDropdown(
+                label: 'Zone',
+                value: _zoneFilter,
+                onChanged: (value) =>
+                    setState(() => _zoneFilter = value ?? 'all'),
+              ),
+              _hierarchyDropdown(
+                label: 'Location',
+                value: _locationFilter,
+                onChanged: (value) =>
+                    setState(() => _locationFilter = value ?? 'all'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _hierarchyDropdown({
+    required String label,
+    required String value,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return SizedBox(
+      width: 190,
+      child: DropdownButtonFormField<String>(
+        value: value,
+        decoration: _filterFieldDecoration(label: label),
+        items: const [
+          DropdownMenuItem(value: 'all', child: Text('All')),
+        ],
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  InputDecoration _filterFieldDecoration({
+    required String label,
+    String? hint,
+    IconData? icon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: icon == null ? null : Icon(icon, size: 20),
+      isDense: true,
+      filled: true,
+      fillColor: const Color(0xFFF4F8FA),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF0f729c), width: 1.4),
       ),
     );
   }

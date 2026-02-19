@@ -123,7 +123,7 @@ class SideMenu extends StatelessWidget {
                           context, 'Reports', Icons.assessment, 'reports'),
                       _buildMenuItem(context, 'Users', Icons.people, 'users'),
                       _buildMenuItem(context, 'Organization', Icons.business,
-                          'organization'),
+                          'organizations'),
                       _buildMenuItem(context, 'Settings',
                           Icons.settings_applications, 'config'),
                     ]),

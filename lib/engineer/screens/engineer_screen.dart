@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/engineer_database_provider.dart';
-import '../../shared/widgets/notifications_popup.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';
 import '../../screens/login_screen.dart';
@@ -25,6 +25,7 @@ class _EngineerScreenState extends State<EngineerScreen>
   bool _isMenuOpen = false;
   bool _dragActive = false;
   String _currentView = 'dashboard';
+  bool _showBottomNav = true;
   final List<String> _openedViews = ['dashboard'];
   late AnimationController _menuController;
   late Animation<double> _menuAnimation;
@@ -102,14 +103,27 @@ class _EngineerScreenState extends State<EngineerScreen>
     setState(() => _currentView = normalized);
   }
 
-  List<AppNotificationItem> _notifications() {
+  bool _onScroll(UserScrollNotification notification) {
+    if (MediaQuery.of(context).size.width >= 1100) return false;
+
+    if (notification.direction == ScrollDirection.reverse && _showBottomNav) {
+      setState(() => _showBottomNav = false);
+    } else if ((notification.direction == ScrollDirection.forward ||
+            notification.direction == ScrollDirection.idle) &&
+        !_showBottomNav) {
+      setState(() => _showBottomNav = true);
+    }
+    return false;
+  }
+
+  List<EngineerNotificationItem> _notifications() {
     final db = context.read<EngineerDatabaseProvider>();
     final items = db.alerts.where((a) => !a.isResolved).toList()
       ..sort((a, b) => b.triggeredAt.compareTo(a.triggeredAt));
     return items
         .take(8)
         .map(
-          (a) => AppNotificationItem(
+          (a) => EngineerNotificationItem(
             title: a.alertLevel.toUpperCase(),
             message: a.message,
             time: a.triggeredAt,
@@ -126,8 +140,9 @@ class _EngineerScreenState extends State<EngineerScreen>
     final navBar = EngineerNavBar(
       onMenuToggle: toggleMenu,
       isMenuOpen: _isMenuOpen,
-      showMenuButton: !isDesktop,
-      onSettingsTap: () => _setCurrentView('settings'),
+      showMenuButton: false,
+      onUserMenuSettingsTap: () => _setCurrentView('settings'),
+      onLogoutTap: _logout,
       notifications: notifications,
       hasNotifications: hasNotifications,
     );
@@ -137,29 +152,33 @@ class _EngineerScreenState extends State<EngineerScreen>
       body: SafeArea(
         child: Column(
           children: [
-            navBar,
+            if (isDesktop) navBar,
             Expanded(
-              child: isDesktop
-                  ? Row(
-                      children: [
-                        EngineerSideMenu(
-                          animation: const AlwaysStoppedAnimation<double>(1.0),
-                          isOpen: true,
-                          currentView: _currentView,
-                          onViewChanged: _setCurrentView,
-                          onClose: () {},
-                          onLogout: _logout,
-                          showCloseButton: false,
-                        ),
-                        Expanded(child: _buildContent(_currentView)),
-                      ],
-                    )
-                  : _buildContent(_currentView),
+              child: NotificationListener<UserScrollNotification>(
+                onNotification: _onScroll,
+                child: isDesktop
+                    ? Row(
+                        children: [
+                          EngineerSideMenu(
+                            animation:
+                                const AlwaysStoppedAnimation<double>(1.0),
+                            isOpen: true,
+                            currentView: _currentView,
+                            onViewChanged: _setCurrentView,
+                            onClose: () {},
+                            onLogout: _logout,
+                            showCloseButton: false,
+                          ),
+                          Expanded(child: _buildContent(_currentView)),
+                        ],
+                      )
+                    : _buildContent(_currentView),
+              ),
             ),
           ],
         ),
       ),
-      bottomNavigationBar: isDesktop
+      bottomNavigationBar: isDesktop || !_showBottomNav
           ? null
           : _buildBottomNav(
               currentView: _currentView,

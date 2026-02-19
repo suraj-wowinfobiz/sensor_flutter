@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/database_provider.dart';
-import '../shared/widgets/notifications_popup.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';
 import 'alerts_screen.dart';
@@ -107,14 +106,14 @@ class _AdminScreenState extends State<AdminScreen>
     setState(() => _currentView = normalized);
   }
 
-  List<AppNotificationItem> _notifications() {
+  List<AdminNotificationItem> _notifications() {
     final db = context.read<DatabaseProvider>();
     final items = db.alerts.where((a) => !a.isResolved).toList()
       ..sort((a, b) => b.triggeredAt.compareTo(a.triggeredAt));
     return items
         .take(8)
         .map(
-          (a) => AppNotificationItem(
+          (a) => AdminNotificationItem(
             title: a.alertLevel.toUpperCase(),
             message: a.message,
             time: a.triggeredAt,
@@ -133,6 +132,7 @@ class _AdminScreenState extends State<AdminScreen>
       isMenuOpen: _isMenuOpen,
       showMenuButton: !isDesktop,
       onSettingsTap: () => _setCurrentView('config'),
+      onLogoutTap: _logout,
       notifications: notifications,
       hasNotifications: hasNotifications,
     );

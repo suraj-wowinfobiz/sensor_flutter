@@ -19,14 +19,57 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
   String _compareMode = 'none';
   String _range = '24h';
   bool _paused = false;
+  bool _showFilters = false;
+  String _searchQuery = '';
+  String _statusFilter = 'all';
+  String _sensorTypeFilter = 'all';
+  String _deviceFilter = 'all';
+  String _organizationFilter = 'all';
+  String _siteFilter = 'all';
+  String _zoneFilter = 'all';
+  String _locationFilter = 'all';
+  final double _warningThreshold = 2.8;
+  final double _criticalThreshold = 4.0;
+  final double _emergencyThreshold = 5.2;
+  final String _warningSound = 'Soft Chime';
+  final String _criticalSound = 'Siren';
+  final String _emergencySound = 'Emergency Bell';
 
   @override
   Widget build(BuildContext context) {
     return Consumer<EngineerDatabaseProvider>(
       builder: (context, db, child) {
-        final sensors = db.sensors;
+        final filteredSensors = db.sensors.where((s) {
+          final search = _searchQuery.trim().toLowerCase();
+          final sensorType = db.sensorTypes
+                  .where((t) => t.id == s.sensorTypeId)
+                  .map((t) => t.name)
+                  .firstOrNull ??
+              '';
+          final deviceCode = db.devices
+                  .where((d) => d.id == s.deviceId)
+                  .map((d) => d.deviceCode)
+                  .firstOrNull ??
+              '';
+          final status = _levelForReading(s.lastReading);
+
+          final matchesSearch = search.isEmpty ||
+              s.serialNumber.toLowerCase().contains(search) ||
+              sensorType.toLowerCase().contains(search) ||
+              deviceCode.toLowerCase().contains(search);
+
+          final matchesStatus =
+              _statusFilter == 'all' || status == _statusFilter;
+          final matchesType =
+              _sensorTypeFilter == 'all' || s.sensorTypeId == _sensorTypeFilter;
+          final matchesDevice =
+              _deviceFilter == 'all' || s.deviceId == _deviceFilter;
+
+          return matchesSearch && matchesStatus && matchesType && matchesDevice;
+        }).toList();
+
         final selected =
-            sensors.where((s) => s.id == _selectedSensorId).firstOrNull;
+            filteredSensors.where((s) => s.id == _selectedSensorId).firstOrNull;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
@@ -63,15 +106,14 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                   _headerButton(
                     label: 'Filters',
                     icon: Icons.filter_list,
-                    onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content:
-                              Text('Use filters below to refine analytics')),
-                    ),
+                    onTap: () => setState(() => _showFilters = !_showFilters),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
+              if (_showFilters)
+                _buildFilterPanel(context, db, filteredSensors.length),
+              if (_showFilters) const SizedBox(height: 16),
               LayoutBuilder(
                 builder: (context, constraints) {
                   final width = constraints.maxWidth;
@@ -88,7 +130,7 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                           value: _selectedSensorId,
                           hint: 'Select a sensor',
                           width: 210,
-                          items: sensors
+                          items: filteredSensors
                               .map((s) => DropdownMenuItem(
                                     value: s.id,
                                     child: Text(s.serialNumber),
@@ -235,6 +277,8 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
+                    _buildThresholdLegend(),
+                    const SizedBox(height: 10),
                     if (selected == null)
                       const Expanded(
                         child: Center(
@@ -283,6 +327,27 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                                 LineChartData(
                                   minY: -3,
                                   maxY: 6,
+                                  extraLinesData:
+                                      ExtraLinesData(horizontalLines: [
+                                    HorizontalLine(
+                                      y: _warningThreshold,
+                                      color: const Color(0xFFD39A00),
+                                      strokeWidth: 1.8,
+                                      dashArray: const [6, 4],
+                                    ),
+                                    HorizontalLine(
+                                      y: _criticalThreshold,
+                                      color: const Color(0xFFE54C4C),
+                                      strokeWidth: 1.8,
+                                      dashArray: const [6, 4],
+                                    ),
+                                    HorizontalLine(
+                                      y: _emergencyThreshold,
+                                      color: const Color(0xFF7A4FD6),
+                                      strokeWidth: 1.8,
+                                      dashArray: const [6, 4],
+                                    ),
+                                  ]),
                                   gridData: FlGridData(
                                     show: true,
                                     drawVerticalLine: false,
@@ -360,6 +425,303 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildFilterPanel(
+    BuildContext context,
+    EngineerDatabaseProvider db,
+    int filteredCount,
+  ) {
+    final isCompact = MediaQuery.of(context).size.width < 1180;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFC8D6DD)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Filter Sensors',
+            style: TextStyle(
+              fontSize: 28 > 20 ? 20 : 20,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1A303D),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              SizedBox(
+                width: isCompact ? double.infinity : 280,
+                child: _inputFilter(
+                  label: 'Search',
+                  child: TextField(
+                    onChanged: (value) => setState(() => _searchQuery = value),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      hintText: 'Sensor ID, Serial, MAC...',
+                      prefixIcon: Icon(Icons.search, size: 20),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: isCompact ? 220 : 180,
+                child: _selectFilter(
+                  label: 'Status',
+                  value: _statusFilter,
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('All Statuses')),
+                    DropdownMenuItem(value: 'normal', child: Text('Normal')),
+                    DropdownMenuItem(value: 'warning', child: Text('Warning')),
+                    DropdownMenuItem(
+                      value: 'critical',
+                      child: Text('Critical'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'emergency',
+                      child: Text('Emergency'),
+                    ),
+                  ],
+                  onChanged: (v) => setState(() => _statusFilter = v ?? 'all'),
+                ),
+              ),
+              SizedBox(
+                width: isCompact ? 220 : 180,
+                child: _selectFilter(
+                  label: 'Sensor Type',
+                  value: _sensorTypeFilter,
+                  items: [
+                    const DropdownMenuItem(
+                      value: 'all',
+                      child: Text('All Types'),
+                    ),
+                    ...db.sensorTypes.map(
+                      (t) => DropdownMenuItem(
+                        value: t.id,
+                        child: Text(t.name),
+                      ),
+                    ),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => _sensorTypeFilter = v ?? 'all'),
+                ),
+              ),
+              SizedBox(
+                width: isCompact ? 220 : 180,
+                child: _selectFilter(
+                  label: 'Device',
+                  value: _deviceFilter,
+                  items: [
+                    const DropdownMenuItem(
+                      value: 'all',
+                      child: Text('All Devices'),
+                    ),
+                    ...db.devices.map(
+                      (d) => DropdownMenuItem(
+                        value: d.id,
+                        child: Text(d.deviceCode),
+                      ),
+                    ),
+                  ],
+                  onChanged: (v) => setState(() => _deviceFilter = v ?? 'all'),
+                ),
+              ),
+              if (!isCompact)
+                _countText(
+                    filteredCount: filteredCount, total: db.sensors.length),
+            ],
+          ),
+          if (isCompact) ...[
+            const SizedBox(height: 10),
+            _countText(filteredCount: filteredCount, total: db.sensors.length),
+          ],
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFD1DCE2)),
+          const SizedBox(height: 10),
+          const Text(
+            'LOCATION HIERARCHY',
+            style: TextStyle(
+              fontSize: 12,
+              letterSpacing: 0.4,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF5A707E),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              SizedBox(
+                width: isCompact ? 220 : 180,
+                child: _selectFilter(
+                  label: 'Organization',
+                  value: _organizationFilter,
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'all',
+                      child: Text('All Organizations'),
+                    ),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => _organizationFilter = v ?? 'all'),
+                ),
+              ),
+              SizedBox(
+                width: isCompact ? 220 : 180,
+                child: _selectFilter(
+                  label: 'Site',
+                  value: _siteFilter,
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('All Sites')),
+                  ],
+                  onChanged: (v) => setState(() => _siteFilter = v ?? 'all'),
+                ),
+              ),
+              SizedBox(
+                width: isCompact ? 220 : 180,
+                child: _selectFilter(
+                  label: 'Zone',
+                  value: _zoneFilter,
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('All Zones')),
+                  ],
+                  onChanged: (v) => setState(() => _zoneFilter = v ?? 'all'),
+                ),
+              ),
+              SizedBox(
+                width: isCompact ? 220 : 180,
+                child: _selectFilter(
+                  label: 'Location',
+                  value: _locationFilter,
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'all',
+                      child: Text('All Locations'),
+                    ),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => _locationFilter = v ?? 'all'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _levelForReading(double reading) {
+    if (reading >= _emergencyThreshold) return 'emergency';
+    if (reading >= _criticalThreshold) return 'critical';
+    if (reading >= _warningThreshold) return 'warning';
+    return 'normal';
+  }
+
+  Widget _buildThresholdLegend() {
+    Widget item(String label, Color color, double value, String sound) {
+      return Container(
+        margin: const EdgeInsets.only(right: 8, bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
+        ),
+        child: Text(
+          '$label ${value.toStringAsFixed(1)}°  |  $sound',
+          style: TextStyle(
+            fontSize: 12,
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
+    return Wrap(
+      children: [
+        item('Warning', const Color(0xFFD39A00), _warningThreshold,
+            _warningSound),
+        item('Critical', const Color(0xFFE54C4C), _criticalThreshold,
+            _criticalSound),
+        item(
+          'Emergency',
+          const Color(0xFF7A4FD6),
+          _emergencyThreshold,
+          _emergencySound,
+        ),
+      ],
+    );
+  }
+
+  Widget _countText({required int filteredCount, required int total}) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 26),
+      child: Text(
+        'Showing $filteredCount of $total sensors',
+        style: const TextStyle(
+          fontSize: 16,
+          color: Color(0xFF48606E),
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  Widget _inputFilter({required String label, required Widget child}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF4D6472),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFC8D6DD)),
+          ),
+          child: child,
+        ),
+      ],
+    );
+  }
+
+  Widget _selectFilter({
+    required String label,
+    required String value,
+    required List<DropdownMenuItem<String>> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return _inputFilter(
+      label: label,
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          onChanged: onChanged,
+          items: items,
+        ),
+      ),
     );
   }
 

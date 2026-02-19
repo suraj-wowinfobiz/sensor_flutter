@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 enum _SettingsTab { profile, notifications, access, security }
 
-class AccountSettingsPanel extends StatefulWidget {
+class AdminAccountSettingsPanel extends StatefulWidget {
   final String roleLabel;
   final String userName;
   final String userEmail;
 
-  const AccountSettingsPanel({
+  const AdminAccountSettingsPanel({
     super.key,
     required this.roleLabel,
     required this.userName,
@@ -15,10 +15,11 @@ class AccountSettingsPanel extends StatefulWidget {
   });
 
   @override
-  State<AccountSettingsPanel> createState() => _AccountSettingsPanelState();
+  State<AdminAccountSettingsPanel> createState() =>
+      _AdminAccountSettingsPanelState();
 }
 
-class _AccountSettingsPanelState extends State<AccountSettingsPanel> {
+class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
   _SettingsTab _activeTab = _SettingsTab.profile;
   bool _emailNotifications = true;
   bool _smsNotifications = false;
@@ -245,8 +246,8 @@ class _AccountSettingsPanelState extends State<AccountSettingsPanel> {
 
   Widget _buildInputGrid(BuildContext context) {
     final fields = const [
-      ('Full Name', 'fahad.momin'),
-      ('Email', 'fahad.momin@live.com'),
+      ('Full Name', 'suraj.tiwari'),
+      ('Email', 'suraj.tiwari@live.com'),
       ('Phone Number', '+1 (555) 000-0000'),
       ('Job Title', 'Senior Engineer'),
       ('Department', 'Engineering'),

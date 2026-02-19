@@ -1,12 +1,24 @@
 import 'package:flutter/material.dart';
-import '../shared/widgets/notifications_popup.dart';
+
+class AdminNotificationItem {
+  final String title;
+  final String message;
+  final DateTime time;
+
+  const AdminNotificationItem({
+    required this.title,
+    required this.message,
+    required this.time,
+  });
+}
 
 class NavBar extends StatelessWidget {
   final VoidCallback onMenuToggle;
   final bool isMenuOpen;
   final bool showMenuButton;
   final VoidCallback onSettingsTap;
-  final List<AppNotificationItem> notifications;
+  final VoidCallback onLogoutTap;
+  final List<AdminNotificationItem> notifications;
   final bool hasNotifications;
 
   const NavBar({
@@ -15,6 +27,7 @@ class NavBar extends StatelessWidget {
     required this.isMenuOpen,
     this.showMenuButton = true,
     required this.onSettingsTap,
+    required this.onLogoutTap,
     this.notifications = const [],
     this.hasNotifications = false,
   });
@@ -32,11 +45,11 @@ class NavBar extends StatelessWidget {
 
     return Container(
       height: 74,
-      margin: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: barColor,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.zero,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.15),
@@ -189,51 +202,82 @@ class NavBar extends StatelessWidget {
                 ],
               ),
             ),
-            IconButton(
-              tooltip: 'Settings',
-              onPressed: onSettingsTap,
-              icon: Icon(Icons.settings_outlined, color: barTextColor),
-            ),
             const SizedBox(width: 10),
           ],
-          if (!isCompact)
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  'fahad.momin',
-                  style: TextStyle(
-                    color: barTextColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
+          PopupMenuButton<String>(
+            tooltip: 'Profile Menu',
+            onSelected: (value) {
+              if (value == 'settings') {
+                onSettingsTap();
+              } else if (value == 'logout') {
+                onLogoutTap();
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem<String>(
+                value: 'settings',
+                child: Row(
+                  children: [
+                    Icon(Icons.settings_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text('Settings'),
+                  ],
                 ),
-                Text(
-                  'Super Admin',
-                  style: TextStyle(
-                    color: barTextColor.withValues(alpha: 0.84),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+              ),
+              PopupMenuItem<String>(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, size: 18),
+                    SizedBox(width: 8),
+                    Text('Logout'),
+                  ],
+                ),
+              ),
+            ],
+            child: Row(
+              children: [
+                if (!isCompact)
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'suraj.tiwari',
+                        style: TextStyle(
+                          color: barTextColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'Super Admin',
+                        style: TextStyle(
+                          color: barTextColor.withValues(alpha: 0.84),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    'F',
+                    style: TextStyle(
+                      color: barTextColor,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
-            ),
-          const SizedBox(width: 10),
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              'F',
-              style: TextStyle(
-                color: barTextColor,
-                fontWeight: FontWeight.w700,
-              ),
             ),
           ),
         ],

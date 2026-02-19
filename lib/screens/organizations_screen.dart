@@ -402,6 +402,13 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFFc8d6dc)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x11000000),
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -409,11 +416,24 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: const BoxDecoration(
+              color: Color(0xFFF5FAFD),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(18),
+                topRight: Radius.circular(18),
+              ),
               border: Border(bottom: BorderSide(color: Color(0xFFd7e2e8))),
             ),
             child: Row(
               children: [
-                Icon(icon, size: 18, color: const Color(0xFF1271a0)),
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDBEDF8),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(icon, size: 17, color: const Color(0xFF1271a0)),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -563,17 +583,29 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF5F8),
+                  color: const Color(0xFFF4F8FB),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFD6E2E8)),
+                  border: Border.all(color: const Color(0xFFCFDFE7)),
                 ),
-                child: Text(
-                  loc,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF1f3642),
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.place_outlined,
+                      size: 15,
+                      color: Color(0xFF4C7084),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        loc,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF1f3642),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ))
           .toList(),
@@ -591,21 +623,27 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFE6EFF3),
+          color: const Color(0xFF0F729C),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFC8D6DD)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x22117AA8),
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: const Color(0xFF203845)),
+            Icon(icon, size: 16, color: Colors.white),
             const SizedBox(width: 6),
             Text(
               label,
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF203845),
+                color: Colors.white,
               ),
             ),
           ],
@@ -618,9 +656,9 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F8),
+        color: const Color(0xFFF3F8FC),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFD0DCE3)),
+        border: Border.all(color: const Color(0xFFD6E3EA)),
       ),
       child: Text(
         label,
@@ -658,81 +696,158 @@ class _ListTileCard extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFFE8F3F9) : const Color(0xFFF7FBFD),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? const Color(0xFF9FC8DD) : const Color(0xFFD9E6EE),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: Stack(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              gradient: selected
+                  ? const LinearGradient(
+                      colors: [Color(0xFFDDEFFA), Color(0xFFEAF6FD)],
+                    )
+                  : const LinearGradient(
+                      colors: [Color(0xFFF8FCFE), Color(0xFFF4FAFD)],
+                    ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected
+                    ? const Color(0xFF7FB3CF)
+                    : const Color(0xFFD9E6EE),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF142936),
-                      fontSize: 14,
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? const Color(0xFF1478A6)
+                            : const Color(0xFF9DB2BF),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF142936),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    _actionIcon(
+                      icon: Icons.edit_outlined,
+                      color: const Color(0xFF2E4B5B),
+                      onTap: onEdit,
+                    ),
+                    const SizedBox(width: 6),
+                    _actionIcon(
+                      icon: Icons.delete_outline,
+                      color: const Color(0xFFD33A3A),
+                      onTap: onDelete,
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    if (selected) ...[
+                      Container(
+                        width: 14,
+                        height: 2,
+                        margin: const EdgeInsets.only(right: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF7FB3CF),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                    ],
+                    Expanded(
+                      child: Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF5D7381),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (badge != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDDEBF3),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      badge!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF264655),
+                      ),
                     ),
                   ),
-                ),
-                InkWell(
-                  onTap: onEdit,
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(Icons.edit_outlined,
-                        size: 16, color: Color(0xFF2E4B5B)),
-                  ),
-                ),
-                InkWell(
-                  onTap: onDelete,
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
-                    child:
-                        Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                  ),
-                ),
+                ],
               ],
             ),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF5D7381),
-                fontSize: 13,
+          ),
+          if (selected)
+            Positioned(
+              left: 0,
+              top: 14,
+              bottom: 22,
+              child: Container(
+                width: 3,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8ABED7),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x8038A3CF),
+                      blurRadius: 8,
+                      offset: Offset(0, 0),
+                    ),
+                  ],
+                ),
               ),
             ),
-            if (badge != null) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDDEBF3),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  badge!,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF264655),
-                  ),
-                ),
-              ),
-            ],
-          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _actionIcon({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF1F6),
+          borderRadius: BorderRadius.circular(8),
         ),
+        child: Icon(icon, size: 14, color: color),
       ),
     );
   }
@@ -748,12 +863,30 @@ class _EmptyHint extends StatelessWidget {
     return SizedBox(
       height: 220,
       child: Center(
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 16,
-            color: Color(0xFF5D7381),
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEAF3F8),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.account_tree_outlined,
+                color: Color(0xFF5B7686),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              text,
+              style: const TextStyle(
+                fontSize: 16,
+                color: Color(0xFF5D7381),
+              ),
+            ),
+          ],
         ),
       ),
     );

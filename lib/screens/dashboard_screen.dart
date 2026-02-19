@@ -149,28 +149,29 @@ class DashboardScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 720;
+              final titleRow = Row(
                 children: [
                   const Icon(Icons.trending_up, color: Color(0xFF5f78de)),
                   const SizedBox(width: 10),
-                  Text(
-                    'Real-Time Tilt Monitoring - All Sensors',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: _titleColor(context),
+                  Expanded(
+                    child: Text(
+                      'Real-Time Tilt Monitoring - All Sensors',
+                      maxLines: compact ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: _titleColor(context),
+                      ),
                     ),
                   ),
                 ],
-              ),
-              Wrap(
+              );
+
+              final controls = Wrap(
                 spacing: 8,
                 children: [
                   _chip('Pause', icon: Icons.pause, selected: false),
@@ -179,8 +180,27 @@ class DashboardScreen extends StatelessWidget {
                   _chip('1D'),
                   _chip('7D'),
                 ],
-              ),
-            ],
+              );
+
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    titleRow,
+                    const SizedBox(height: 10),
+                    controls,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: titleRow),
+                  const SizedBox(width: 10),
+                  controls,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 14),
           SizedBox(
