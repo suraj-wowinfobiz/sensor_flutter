@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../shared/models/threshold_rule.dart';
 import '../providers/database_provider.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -149,29 +150,29 @@ class DashboardScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 720;
-              final titleRow = Row(
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.trending_up, color: Color(0xFF5f78de)),
                   const SizedBox(width: 10),
-                  Expanded(
+                  Flexible(
                     child: Text(
-                      'Real-Time Tilt Monitoring - All Sensors',
-                      maxLines: compact ? 2 : 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: _titleColor(context),
-                      ),
+                    'Real-Time Tilt Monitoring - All Sensors',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: _titleColor(context),
                     ),
-                  ),
+                  ),)
                 ],
-              );
-
-              final controls = Wrap(
+              ),
+              Wrap(
                 spacing: 8,
                 children: [
                   _chip('Pause', icon: Icons.pause, selected: false),
@@ -180,27 +181,8 @@ class DashboardScreen extends StatelessWidget {
                   _chip('1D'),
                   _chip('7D'),
                 ],
-              );
-
-              if (compact) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    titleRow,
-                    const SizedBox(height: 10),
-                    controls,
-                  ],
-                );
-              }
-
-              return Row(
-                children: [
-                  Expanded(child: titleRow),
-                  const SizedBox(width: 10),
-                  controls,
-                ],
-              );
-            },
+              ),
+            ],
           ),
           const SizedBox(height: 14),
           SizedBox(
@@ -380,21 +362,12 @@ class DashboardScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                extraLinesData: ExtraLinesData(horizontalLines: [
-                  HorizontalLine(
-                    y: 1.95,
-                    color: Colors.red,
-                    strokeWidth: 1.5,
-                    dashArray: [6, 4],
-                    label: HorizontalLineLabel(
-                      show: true,
-                      alignment: Alignment.topRight,
-                      style: const TextStyle(
-                          color: Colors.red, fontWeight: FontWeight.w600),
-                      labelResolver: (_) => 'Threshold: 2°',
-                    ),
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: _thresholdLinesForGraph(
+                    context,
+                    ThresholdGraphTarget.dashboardRealtime,
                   ),
-                ]),
+                ),
                 lineBarsData: [
                   LineChartBarData(
                     spots: List.generate(30, (i) {
@@ -593,21 +566,12 @@ class DashboardScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                extraLinesData: ExtraLinesData(horizontalLines: [
-                  HorizontalLine(
-                    y: 2.5,
-                    color: Colors.red,
-                    strokeWidth: 1.5,
-                    dashArray: [6, 4],
-                    label: HorizontalLineLabel(
-                      show: true,
-                      alignment: Alignment.topRight,
-                      style: const TextStyle(
-                          color: Colors.red, fontWeight: FontWeight.w600),
-                      labelResolver: (_) => 'Critical Threshold',
-                    ),
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: _thresholdLinesForGraph(
+                    context,
+                    ThresholdGraphTarget.dashboardThresholdMonitoring,
                   ),
-                ]),
+                ),
                 barGroups: List.generate(7, (i) {
                   final value = [1.2, 0.8, 1.8, 1.5, 1.1, 1.6, 0.9][i];
                   final color = (value >= 1.6)
@@ -1356,6 +1320,31 @@ class DashboardScreen extends StatelessWidget {
     return Theme.of(context).brightness == Brightness.light
         ? const Color(0xFF1c2a33)
         : const Color(0xFFd4e4ef);
+  }
+
+  List<HorizontalLine> _thresholdLinesForGraph(
+    BuildContext context,
+    ThresholdGraphTarget target,
+  ) {
+    final db = context.watch<DatabaseProvider>();
+    final rules = db.thresholdRulesForGraph(target);
+
+    return rules
+        .map(
+          (rule) => HorizontalLine(
+            y: rule.value,
+            color: rule.color,
+            strokeWidth: 1.5,
+            dashArray: [6, 4],
+            label: HorizontalLineLabel(
+              show: true,
+              alignment: Alignment.topRight,
+              style: TextStyle(color: rule.color, fontWeight: FontWeight.w600),
+              labelResolver: (_) => '${rule.label}: ${rule.value.toStringAsFixed(1)}°',
+            ),
+          ),
+        )
+        .toList();
   }
 }
 

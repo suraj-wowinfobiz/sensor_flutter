@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../shared/models/threshold_rule.dart';
 import '../providers/user_admin_database_provider.dart';
 
 class UserAdminDashboardScreen extends StatelessWidget {
@@ -168,8 +169,7 @@ class UserAdminDashboardScreen extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       color: _titleColor(context),
                     ),
-                  ),
-                  )
+                  ),)
                 ],
               ),
               Wrap(
@@ -362,21 +362,12 @@ class UserAdminDashboardScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                extraLinesData: ExtraLinesData(horizontalLines: [
-                  HorizontalLine(
-                    y: 1.95,
-                    color: Colors.red,
-                    strokeWidth: 1.5,
-                    dashArray: [6, 4],
-                    label: HorizontalLineLabel(
-                      show: true,
-                      alignment: Alignment.topRight,
-                      style: const TextStyle(
-                          color: Colors.red, fontWeight: FontWeight.w600),
-                      labelResolver: (_) => 'Threshold: 2°',
-                    ),
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: _thresholdLinesForGraph(
+                    context,
+                    ThresholdGraphTarget.dashboardRealtime,
                   ),
-                ]),
+                ),
                 lineBarsData: [
                   LineChartBarData(
                     spots: List.generate(30, (i) {
@@ -575,21 +566,12 @@ class UserAdminDashboardScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                extraLinesData: ExtraLinesData(horizontalLines: [
-                  HorizontalLine(
-                    y: 2.5,
-                    color: Colors.red,
-                    strokeWidth: 1.5,
-                    dashArray: [6, 4],
-                    label: HorizontalLineLabel(
-                      show: true,
-                      alignment: Alignment.topRight,
-                      style: const TextStyle(
-                          color: Colors.red, fontWeight: FontWeight.w600),
-                      labelResolver: (_) => 'Critical Threshold',
-                    ),
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: _thresholdLinesForGraph(
+                    context,
+                    ThresholdGraphTarget.dashboardThresholdMonitoring,
                   ),
-                ]),
+                ),
                 barGroups: List.generate(7, (i) {
                   final value = [1.2, 0.8, 1.8, 1.5, 1.1, 1.6, 0.9][i];
                   final color = (value >= 1.6)
@@ -1338,6 +1320,31 @@ class UserAdminDashboardScreen extends StatelessWidget {
     return Theme.of(context).brightness == Brightness.light
         ? const Color(0xFF1c2a33)
         : const Color(0xFFd4e4ef);
+  }
+
+  List<HorizontalLine> _thresholdLinesForGraph(
+    BuildContext context,
+    ThresholdGraphTarget target,
+  ) {
+    final db = context.watch<UserAdminDatabaseProvider>();
+    final rules = db.thresholdRulesForGraph(target);
+
+    return rules
+        .map(
+          (rule) => HorizontalLine(
+            y: rule.value,
+            color: rule.color,
+            strokeWidth: 1.5,
+            dashArray: [6, 4],
+            label: HorizontalLineLabel(
+              show: true,
+              alignment: Alignment.topRight,
+              style: TextStyle(color: rule.color, fontWeight: FontWeight.w600),
+              labelResolver: (_) => '${rule.label}: ${rule.value.toStringAsFixed(1)}°',
+            ),
+          ),
+        )
+        .toList();
   }
 }
 

@@ -15,6 +15,7 @@ import '../models/threshold_profile.dart';
 import '../models/threshold_value.dart';
 import '../models/user.dart';
 import '../models/zone.dart';
+import '../../shared/models/threshold_rule.dart';
 
 class UserDatabaseProvider extends ChangeNotifier {
   late List<Organization> organizations;
@@ -32,6 +33,45 @@ class UserDatabaseProvider extends ChangeNotifier {
   late Config config;
 
   String currentView = 'dashboard';
+  int _thresholdRuleSeed = 4;
+  final List<ThresholdRule> _thresholdRules = [
+    const ThresholdRule(
+      id: 'warning',
+      label: 'Warning',
+      value: 2.8,
+      sound: 'Soft Chime',
+      color: Color(0xFFD39A00),
+      graphTargets: {
+        ThresholdGraphTarget.analyticsMain,
+        ThresholdGraphTarget.dashboardRealtime,
+        ThresholdGraphTarget.dashboardThresholdMonitoring,
+      },
+    ),
+    const ThresholdRule(
+      id: 'critical',
+      label: 'Critical',
+      value: 4.0,
+      sound: 'Siren',
+      color: Color(0xFFE54C4C),
+      graphTargets: {
+        ThresholdGraphTarget.analyticsMain,
+        ThresholdGraphTarget.dashboardRealtime,
+        ThresholdGraphTarget.dashboardThresholdMonitoring,
+      },
+    ),
+    const ThresholdRule(
+      id: 'emergency',
+      label: 'Emergency',
+      value: 5.2,
+      sound: 'Emergency Bell',
+      color: Color(0xFF7A4FD6),
+      graphTargets: {
+        ThresholdGraphTarget.analyticsMain,
+        ThresholdGraphTarget.dashboardRealtime,
+        ThresholdGraphTarget.dashboardThresholdMonitoring,
+      },
+    ),
+  ];
 
   UserDatabaseProvider() {
     _initializeData();
@@ -507,6 +547,38 @@ class UserDatabaseProvider extends ChangeNotifier {
   }
 
   List<Alert> getActiveAlerts() => alerts.where((a) => !a.isResolved).toList();
+
+  String nextThresholdRuleId() => 'custom_${_thresholdRuleSeed++}';
+
+  List<ThresholdRule> get thresholdRules =>
+      List<ThresholdRule>.unmodifiable(_thresholdRules);
+
+  List<ThresholdRule> get sortedThresholdRules {
+    final sorted = List<ThresholdRule>.from(_thresholdRules)
+      ..sort((a, b) => a.value.compareTo(b.value));
+    return sorted;
+  }
+
+  List<ThresholdRule> thresholdRulesForGraph(ThresholdGraphTarget target) {
+    return sortedThresholdRules
+        .where((rule) => rule.graphTargets.contains(target))
+        .toList();
+  }
+
+  void saveThresholdRule(ThresholdRule rule) {
+    final index = _thresholdRules.indexWhere((r) => r.id == rule.id);
+    if (index == -1) {
+      _thresholdRules.add(rule);
+    } else {
+      _thresholdRules[index] = rule;
+    }
+    notifyListeners();
+  }
+
+  void deleteThresholdRule(String id) {
+    _thresholdRules.removeWhere((rule) => rule.id == id);
+    notifyListeners();
+  }
 
   int getStats(String type) {
     switch (type) {
