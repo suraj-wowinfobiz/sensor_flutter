@@ -119,8 +119,7 @@ class _EngineerAccountSettingsPanelState
         child: Row(
           children: tabs.map((item) {
             final isActive = _activeTab == item.$1;
-            return InkWell(
-              borderRadius: BorderRadius.circular(12),
+            return GestureDetector(
               onTap: () => setState(() => _activeTab = item.$1),
               child: Container(
                 width: 180,

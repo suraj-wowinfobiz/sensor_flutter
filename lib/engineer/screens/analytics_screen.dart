@@ -28,12 +28,30 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
   String _siteFilter = 'all';
   String _zoneFilter = 'all';
   String _locationFilter = 'all';
-  final double _warningThreshold = 2.8;
-  final double _criticalThreshold = 4.0;
-  final double _emergencyThreshold = 5.2;
-  final String _warningSound = 'Soft Chime';
-  final String _criticalSound = 'Siren';
-  final String _emergencySound = 'Emergency Bell';
+  int _thresholdSeed = 4;
+  final List<_ThresholdConfig> _thresholds = [
+    const _ThresholdConfig(
+      id: 'warning',
+      label: 'Warning',
+      value: 2.8,
+      sound: 'Soft Chime',
+      color: Color(0xFFD39A00),
+    ),
+    const _ThresholdConfig(
+      id: 'critical',
+      label: 'Critical',
+      value: 4.0,
+      sound: 'Siren',
+      color: Color(0xFFE54C4C),
+    ),
+    const _ThresholdConfig(
+      id: 'emergency',
+      label: 'Emergency',
+      value: 5.2,
+      sound: 'Emergency Bell',
+      color: Color(0xFF7A4FD6),
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -75,6 +93,7 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
             children: [
               Wrap(
                 alignment: WrapAlignment.spaceBetween,
@@ -235,9 +254,7 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
               ),
               const SizedBox(height: 16),
               Container(
-                width: double.infinity,
-                constraints: const BoxConstraints(minHeight: 560),
-                padding: const EdgeInsets.all(18),
+                width: double.infinity,                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(18),
@@ -245,6 +262,7 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Row(
                       children: [
@@ -279,8 +297,11 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                     const SizedBox(height: 14),
                     _buildThresholdLegend(),
                     const SizedBox(height: 10),
+                    _buildThresholdManager(context),
+                    const SizedBox(height: 10),
                     if (selected == null)
-                      const Expanded(
+                      const SizedBox(
+                        height: 400,
                         child: Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -291,7 +312,7 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                               Text(
                                 'Select a sensor to view analytics',
                                 style: TextStyle(
-                                  fontSize: 34 > 30 ? 34 - 4 : 30,
+                                  fontSize: 30,
                                   fontWeight: FontWeight.w700,
                                   color: Color(0xFF4A6270),
                                 ),
@@ -309,9 +330,9 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                         ),
                       )
                     else
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               'Sensor: ${selected.serialNumber}  |  Last reading: ${selected.lastReading.toStringAsFixed(2)}°',
@@ -322,32 +343,25 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            Expanded(
+                            SizedBox(
+                              height: 400,
                               child: LineChart(
                                 LineChartData(
                                   minY: -3,
                                   maxY: 6,
                                   extraLinesData:
-                                      ExtraLinesData(horizontalLines: [
-                                    HorizontalLine(
-                                      y: _warningThreshold,
-                                      color: const Color(0xFFD39A00),
-                                      strokeWidth: 1.8,
-                                      dashArray: const [6, 4],
-                                    ),
-                                    HorizontalLine(
-                                      y: _criticalThreshold,
-                                      color: const Color(0xFFE54C4C),
-                                      strokeWidth: 1.8,
-                                      dashArray: const [6, 4],
-                                    ),
-                                    HorizontalLine(
-                                      y: _emergencyThreshold,
-                                      color: const Color(0xFF7A4FD6),
-                                      strokeWidth: 1.8,
-                                      dashArray: const [6, 4],
-                                    ),
-                                  ]),
+                                      ExtraLinesData(
+                                    horizontalLines: _sortedThresholds
+                                        .map(
+                                          (threshold) => HorizontalLine(
+                                            y: threshold.value,
+                                            color: threshold.color,
+                                            strokeWidth: 1.8,
+                                            dashArray: const [6, 4],
+                                          ),
+                                        )
+                                        .toList(),
+                                  ),
                                   gridData: FlGridData(
                                     show: true,
                                     drawVerticalLine: false,
@@ -416,7 +430,7 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                               ),
                             ),
                           ],
-                        ),
+                    
                       ),
                   ],
                 ),
@@ -445,6 +459,7 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
             'Filter Sensors',
@@ -479,19 +494,7 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                 child: _selectFilter(
                   label: 'Status',
                   value: _statusFilter,
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('All Statuses')),
-                    DropdownMenuItem(value: 'normal', child: Text('Normal')),
-                    DropdownMenuItem(value: 'warning', child: Text('Warning')),
-                    DropdownMenuItem(
-                      value: 'critical',
-                      child: Text('Critical'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'emergency',
-                      child: Text('Emergency'),
-                    ),
-                  ],
+                  items: _statusFilterItems(),
                   onChanged: (v) => setState(() => _statusFilter = v ?? 'all'),
                 ),
               ),
@@ -621,11 +624,34 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
     );
   }
 
+  List<_ThresholdConfig> get _sortedThresholds {
+    final sorted = List<_ThresholdConfig>.from(_thresholds)
+      ..sort((a, b) => a.value.compareTo(b.value));
+    return sorted;
+  }
+
   String _levelForReading(double reading) {
-    if (reading >= _emergencyThreshold) return 'emergency';
-    if (reading >= _criticalThreshold) return 'critical';
-    if (reading >= _warningThreshold) return 'warning';
+    for (final threshold in _sortedThresholds.reversed) {
+      if (reading >= threshold.value) return threshold.key;
+    }
     return 'normal';
+  }
+
+  List<DropdownMenuItem<String>> _statusFilterItems() {
+    final items = <DropdownMenuItem<String>>[
+      const DropdownMenuItem(value: 'all', child: Text('All Statuses')),
+      const DropdownMenuItem(value: 'normal', child: Text('Normal')),
+    ];
+
+    for (final threshold in _sortedThresholds) {
+      items.add(
+        DropdownMenuItem(
+          value: threshold.key,
+          child: Text(threshold.label),
+        ),
+      );
+    }
+    return items;
   }
 
   Widget _buildThresholdLegend() {
@@ -651,18 +677,393 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
 
     return Wrap(
       children: [
-        item('Warning', const Color(0xFFD39A00), _warningThreshold,
-            _warningSound),
-        item('Critical', const Color(0xFFE54C4C), _criticalThreshold,
-            _criticalSound),
-        item(
-          'Emergency',
-          const Color(0xFF7A4FD6),
-          _emergencyThreshold,
-          _emergencySound,
+        ..._sortedThresholds.map(
+          (threshold) => item(
+            threshold.label,
+            threshold.color,
+            threshold.value,
+            threshold.sound,
+          ),
         ),
       ],
     );
+  }
+
+  Widget _buildThresholdManager(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F8FA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD6E2E9)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Threshold Rules',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1D3340),
+                ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => _showThresholdDialog(context),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Add Threshold'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_thresholds.isEmpty)
+            const Text(
+              'No thresholds configured. Add at least one threshold rule.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF607684)),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _sortedThresholds.map((threshold) {
+                return Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: threshold.color.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: threshold.color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${threshold.label} ${threshold.value.toStringAsFixed(1)}°',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1A313D),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        threshold.sound,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF5F7481),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      InkWell(
+                        onTap: () => _showThresholdDialog(
+                          context,
+                          existing: threshold,
+                        ),
+                        child: const Icon(
+                          Icons.edit_outlined,
+                          size: 16,
+                          color: Color(0xFF305162),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            _thresholds.removeWhere((t) => t.id == threshold.id);
+                            _syncStatusFilter();
+                          });
+                        },
+                        child: const Icon(
+                          Icons.delete_outline,
+                          size: 16,
+                          color: Color(0xFFB33A3A),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showThresholdDialog(
+    BuildContext context, {
+    _ThresholdConfig? existing,
+  }) {
+    final labelController = TextEditingController(text: existing?.label ?? '');
+    final valueController = TextEditingController(
+      text: existing != null ? existing.value.toStringAsFixed(1) : '',
+    );
+    final soundController = TextEditingController(text: existing?.sound ?? '');
+    final colorHexController = TextEditingController(
+      text: existing != null ? _toHexColor(existing.color) : '#4C8BF5',
+    );
+
+    final presetColors = <String, Color>{
+      'Amber': const Color(0xFFD39A00),
+      'Red': const Color(0xFFE54C4C),
+      'Purple': const Color(0xFF7A4FD6),
+      'Blue': const Color(0xFF4C8BF5),
+      'Green': const Color(0xFF17A56F),
+      'Orange': const Color(0xFFF08A24),
+      'Custom': _parseHexColor(colorHexController.text) ??
+          (existing?.color ?? const Color(0xFF4C8BF5)),
+    };
+
+    String selectedColorName = existing == null
+        ? 'Blue'
+        : (presetColors.entries
+                .firstWhere(
+                  (entry) => entry.value.toARGB32() == existing.color.toARGB32(),
+                  orElse: () => const MapEntry('Custom', Color(0xFF4C8BF5)),
+                )
+                .key);
+
+    Color selectedColor = selectedColorName == 'Custom'
+        ? (existing?.color ?? const Color(0xFF4C8BF5))
+        : presetColors[selectedColorName]!;
+    String? errorText;
+
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(existing == null ? 'Add Threshold' : 'Edit Threshold'),
+              content: SingleChildScrollView(
+                child: SizedBox(
+                  width: 360,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: labelController,
+                        decoration: const InputDecoration(
+                          labelText: 'Label',
+                          hintText: 'Example: High Vibration',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: valueController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                          signed: false,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Threshold Value (°)',
+                          hintText: 'Example: 3.8',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: soundController,
+                        decoration: const InputDecoration(
+                          labelText: 'Alert Sound',
+                          hintText: 'Example: Short Siren',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedColorName,
+                        decoration:
+                            const InputDecoration(labelText: 'Threshold Color'),
+                        items: presetColors.keys
+                            .map(
+                              (name) => DropdownMenuItem<String>(
+                                value: name,
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: presetColors[name],
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(name),
+                                  ],
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setDialogState(() {
+                            selectedColorName = value;
+                            if (value != 'Custom') {
+                              selectedColor = presetColors[value]!;
+                              colorHexController.text = _toHexColor(selectedColor);
+                            } else {
+                              selectedColor = _parseHexColor(
+                                    colorHexController.text,
+                                  ) ??
+                                  selectedColor;
+                            }
+                          });
+                        },
+                      ),
+                      if (selectedColorName == 'Custom') ...[
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: colorHexController,
+                          decoration: const InputDecoration(
+                            labelText: 'Custom Hex Color',
+                            hintText: '#RRGGBB',
+                          ),
+                          onChanged: (value) {
+                            setDialogState(() {
+                              final parsed = _parseHexColor(value);
+                              if (parsed != null) selectedColor = parsed;
+                            });
+                          },
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Text(
+                            'Preview:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF49616F),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: selectedColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (errorText != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          errorText!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFFB33A3A),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final label = labelController.text.trim();
+                    final sound = soundController.text.trim();
+                    final value = double.tryParse(valueController.text.trim());
+                    final customColor = _parseHexColor(colorHexController.text);
+                    final resolvedColor = selectedColorName == 'Custom'
+                        ? customColor
+                        : selectedColor;
+
+                    if (label.isEmpty) {
+                      setDialogState(
+                        () => errorText = 'Label is required.',
+                      );
+                      return;
+                    }
+                    if (value == null) {
+                      setDialogState(
+                        () => errorText = 'Threshold value must be a number.',
+                      );
+                      return;
+                    }
+                    if (sound.isEmpty) {
+                      setDialogState(
+                        () => errorText = 'Alert sound is required.',
+                      );
+                      return;
+                    }
+                    if (resolvedColor == null) {
+                      setDialogState(
+                        () => errorText =
+                            'Color must be valid (example: #FF8800).',
+                      );
+                      return;
+                    }
+
+                    final threshold = _ThresholdConfig(
+                      id: existing?.id ?? 'custom_${_thresholdSeed++}',
+                      label: label,
+                      value: value,
+                      sound: sound,
+                      color: resolvedColor,
+                    );
+
+                    setState(() {
+                      if (existing == null) {
+                        _thresholds.add(threshold);
+                      } else {
+                        final index =
+                            _thresholds.indexWhere((t) => t.id == existing.id);
+                        if (index != -1) _thresholds[index] = threshold;
+                      }
+                      _syncStatusFilter();
+                    });
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _syncStatusFilter() {
+    if (_statusFilter == 'all' || _statusFilter == 'normal') return;
+    final stillExists = _thresholds.any((t) => t.key == _statusFilter);
+    if (!stillExists) _statusFilter = 'all';
+  }
+
+  Color? _parseHexColor(String input) {
+    final cleaned = input.trim().replaceAll('#', '');
+    if (cleaned.length != 6) return null;
+    final value = int.tryParse(cleaned, radix: 16);
+    if (value == null) return null;
+    return Color(0xFF000000 | value);
+  }
+
+  String _toHexColor(Color color) {
+    final rgb = color.toARGB32() & 0x00FFFFFF;
+    return '#${rgb.toRadixString(16).padLeft(6, '0').toUpperCase()}';
   }
 
   Widget _countText({required int filteredCount, required int total}) {
@@ -797,9 +1198,8 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
     required IconData icon,
     required VoidCallback onTap,
   }) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
@@ -825,4 +1225,26 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
       ),
     );
   }
+}
+
+class _ThresholdConfig {
+  const _ThresholdConfig({
+    required this.id,
+    required this.label,
+    required this.value,
+    required this.sound,
+    required this.color,
+  });
+
+  final String id;
+  final String label;
+  final double value;
+  final String sound;
+  final Color color;
+
+  String get key => label
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+      .replaceAll(RegExp(r'^_+|_+$'), '');
 }

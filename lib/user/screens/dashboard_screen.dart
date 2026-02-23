@@ -160,12 +160,14 @@ class UserDashboardScreen extends StatelessWidget {
                 children: [
                   const Icon(Icons.trending_up, color: Color(0xFF5f78de)),
                   const SizedBox(width: 10),
-                  Text(
-                    'Real-Time Tilt Monitoring - All Sensors',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: _titleColor(context),
+                  Flexible(
+                    child: Text(
+                      'Real-Time Tilt Monitoring - All Sensors',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: _titleColor(context),
+                      ),
                     ),
                   ),
                 ],
