@@ -232,7 +232,14 @@ class _UserAdminScreenState extends State<UserAdminScreen>
     required String currentView,
     required ValueChanged<String> onViewChanged,
   }) {
-    const views = ['dashboard', 'alerts', 'analytics', 'user', 'settings'];
+    const views = [
+      'dashboard',
+      'alerts',
+      'analytics',
+      'user',
+      'organization',
+      'settings',
+    ];
     final index = views.indexOf(currentView);
 
     return BottomNavigationBar(
@@ -247,6 +254,8 @@ class _UserAdminScreenState extends State<UserAdminScreen>
         BottomNavigationBarItem(
             icon: Icon(Icons.analytics), label: 'Analytics'),
         BottomNavigationBarItem(icon: Icon(Icons.people), label: 'User'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.business), label: 'Organization'),
         BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
       ],
     );

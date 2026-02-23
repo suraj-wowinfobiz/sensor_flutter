@@ -226,7 +226,14 @@ class _EngineerScreenState extends State<EngineerScreen>
     required String currentView,
     required ValueChanged<String> onViewChanged,
   }) {
-    const views = ['dashboard', 'devices', 'sensors', 'alerts', 'settings'];
+    const views = [
+      'dashboard',
+      'devices',
+      'sensors',
+      'alerts',
+      'analytics',
+      'settings',
+    ];
     final index = views.indexOf(currentView);
 
     return BottomNavigationBar(
@@ -240,6 +247,8 @@ class _EngineerScreenState extends State<EngineerScreen>
         BottomNavigationBarItem(icon: Icon(Icons.sensors), label: 'Sensors'),
         BottomNavigationBarItem(
             icon: Icon(Icons.notifications), label: 'Alerts'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.analytics), label: 'Analytics'),
         BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
       ],
     );

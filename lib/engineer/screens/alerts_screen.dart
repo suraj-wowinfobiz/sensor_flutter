@@ -110,7 +110,7 @@ class EngineerAlertsScreen extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: 14,
           mainAxisSpacing: 14,
-          childAspectRatio: width >= 1000 ? 2.8 : 3.4,
+          childAspectRatio: width >= 1000 ? 2.8 : 2.6,
           children: [
             _summaryCard(
                 'Active Alerts', '$activeCount', const Color(0xFF071d28)),
@@ -125,11 +125,28 @@ class EngineerAlertsScreen extends StatelessWidget {
   Widget _summaryCard(String label, String value, Color valueColor) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxHeight < 80;
-        final cardPadding = compact ? 10.0 : 18.0;
-        final labelSize = compact ? 13.0 : 15.0;
-        final valueSize = compact ? 24.0 : 30.0;
-        final gap = compact ? 6.0 : 12.0;
+        final ultraCompact = constraints.maxHeight < 70;
+        final compact = constraints.maxHeight < 90;
+        final cardPadding = ultraCompact
+            ? 6.0
+            : compact
+                ? 10.0
+                : 18.0;
+        final labelSize = ultraCompact
+            ? 12.0
+            : compact
+                ? 13.0
+                : 15.0;
+        final valueSize = ultraCompact
+            ? 18.0
+            : compact
+                ? 24.0
+                : 30.0;
+        final gap = ultraCompact
+            ? 2.0
+            : compact
+                ? 6.0
+                : 12.0;
 
         return Container(
           padding: EdgeInsets.all(cardPadding),

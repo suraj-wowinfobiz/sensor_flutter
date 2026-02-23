@@ -110,7 +110,7 @@ class UserAdminAlertsScreen extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: 14,
           mainAxisSpacing: 14,
-          childAspectRatio: width >= 1000 ? 2.8 : 3.4,
+          childAspectRatio: width >= 1000 ? 2.8 : 2.6,
           children: [
             _summaryCard(
                 'Active Alerts', '$activeCount', const Color(0xFF071d28)),
@@ -123,43 +123,80 @@ class UserAdminAlertsScreen extends StatelessWidget {
   }
 
   Widget _summaryCard(String label, String value, Color valueColor) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFc8d6dc)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final ultraCompact = constraints.maxHeight < 70;
+        final compact = constraints.maxHeight < 90;
+        final cardPadding = ultraCompact
+            ? 6.0
+            : compact
+                ? 10.0
+                : 18.0;
+        final labelSize = ultraCompact
+            ? 12.0
+            : compact
+                ? 13.0
+                : 15.0;
+        final valueSize = ultraCompact
+            ? 18.0
+            : compact
+                ? 24.0
+                : 30.0;
+        final gap = ultraCompact
+            ? 2.0
+            : compact
+                ? 6.0
+                : 12.0;
+
+        return Container(
+          padding: EdgeInsets.all(cardPadding),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFc8d6dc)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF1a303c),
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: labelSize,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1a303c),
+                  ),
+                ),
+              ),
+              SizedBox(height: gap),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: valueSize,
+                      fontWeight: FontWeight.w800,
+                      color: valueColor,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 40 > 30 ? 40 - 10 : 30,
-              fontWeight: FontWeight.w800,
-              color: valueColor,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

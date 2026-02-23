@@ -1115,57 +1115,133 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFC8D6DD)),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (v) =>
-                            setState(() => _searchText = v.trim()),
-                        decoration: const InputDecoration(
-                          contentPadding: EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
-                          border: InputBorder.none,
-                          hintText: 'Search by name or email...',
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isNarrow = constraints.maxWidth < 720;
+                  if (!isNarrow) {
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFC8D6DD)),
+                            ),
+                            child: TextField(
+                              controller: _searchController,
+                              onChanged: (v) =>
+                                  setState(() => _searchText = v.trim()),
+                              decoration: const InputDecoration(
+                                contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
+                                border: InputBorder.none,
+                                hintText: 'Search by name or email...',
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        _dropdown(
+                          value: _roleFilter,
+                          width: 160,
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'all', child: Text('All Roles')),
+                            DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                            DropdownMenuItem(
+                                value: 'engineer', child: Text('Engineer')),
+                            DropdownMenuItem(
+                                value: 'operator', child: Text('Operator')),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => _roleFilter = value!),
+                        ),
+                        const SizedBox(width: 10),
+                        _dropdown(
+                          value: _statusFilter,
+                          width: 160,
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'all', child: Text('All Status')),
+                            DropdownMenuItem(
+                                value: 'active', child: Text('Active')),
+                            DropdownMenuItem(
+                                value: 'restricted', child: Text('Restricted')),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => _statusFilter = value!),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Column(
+                    children: [
+                      Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFC8D6DD)),
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: (v) =>
+                              setState(() => _searchText = v.trim()),
+                          decoration: const InputDecoration(
+                            contentPadding:
+                                EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            border: InputBorder.none,
+                            hintText: 'Search by name or email...',
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  _dropdown(
-                    value: _roleFilter,
-                    width: 160,
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('All Roles')),
-                      DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                      DropdownMenuItem(
-                          value: 'engineer', child: Text('Engineer')),
-                      DropdownMenuItem(
-                          value: 'operator', child: Text('Operator')),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _dropdown(
+                              value: _roleFilter,
+                              width: double.infinity,
+                              items: const [
+                                DropdownMenuItem(
+                                    value: 'all', child: Text('All Roles')),
+                                DropdownMenuItem(
+                                    value: 'admin', child: Text('Admin')),
+                                DropdownMenuItem(
+                                    value: 'engineer', child: Text('Engineer')),
+                                DropdownMenuItem(
+                                    value: 'operator', child: Text('Operator')),
+                              ],
+                              onChanged: (value) =>
+                                  setState(() => _roleFilter = value!),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _dropdown(
+                              value: _statusFilter,
+                              width: double.infinity,
+                              items: const [
+                                DropdownMenuItem(
+                                    value: 'all', child: Text('All Status')),
+                                DropdownMenuItem(
+                                    value: 'active', child: Text('Active')),
+                                DropdownMenuItem(
+                                    value: 'restricted',
+                                    child: Text('Restricted')),
+                              ],
+                              onChanged: (value) =>
+                                  setState(() => _statusFilter = value!),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
-                    onChanged: (value) => setState(() => _roleFilter = value!),
-                  ),
-                  const SizedBox(width: 10),
-                  _dropdown(
-                    value: _statusFilter,
-                    width: 160,
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('All Status')),
-                      DropdownMenuItem(value: 'active', child: Text('Active')),
-                      DropdownMenuItem(
-                          value: 'restricted', child: Text('Restricted')),
-                    ],
-                    onChanged: (value) =>
-                        setState(() => _statusFilter = value!),
-                  ),
-                ],
+                  );
+                },
               ),
               const SizedBox(height: 16),
               if (_isCardView)

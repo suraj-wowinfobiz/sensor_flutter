@@ -114,15 +114,11 @@ class UserSideMenu extends StatelessWidget {
                       _buildMenuItem(
                           context, 'Dashboard', Icons.dashboard, 'dashboard'),
                       _buildMenuItem(
-                          context, 'Devices', Icons.devices, 'devices'),
-                      _buildMenuItem(
-                          context, 'Sensors', Icons.sensors, 'sensors'),
-                      _buildMenuItem(
                           context, 'Alerts', Icons.notifications, 'alerts'),
                       _buildMenuItem(
                           context, 'Analytics', Icons.analytics, 'analytics'),
-                      _buildMenuItem(context, 'Sidebar Settings',
-                          Icons.settings_applications, 'menu_settings'),
+                      _buildMenuItem(context, 'Settings',
+                          Icons.settings_applications, 'settings'),
                     ]),
                   ],
                 ),

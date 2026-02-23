@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../shared/models/threshold_rule.dart';
 import '../providers/engineer_database_provider.dart';
+import '../screens/engineer_login_screen.dart';
 
 enum _SettingsTab { profile, notifications, access, security, thresholds }
 
@@ -246,6 +247,53 @@ class _EngineerAccountSettingsPanelState
           ),
           const SizedBox(height: 18),
           _buildInputGrid(context),
+          const SizedBox(height: 18),
+          _buildProfileLogoutFooter(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileLogoutFooter(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: const Color(0xFFF8EDED),
+        border: Border.all(color: const Color(0xFFE54C4C).withValues(alpha: 0.32)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Account Session',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFE54C4C),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text('Logout from your account on this device.'),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFE54C4C),
+              ),
+              onPressed: () {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (_) => const EngineerLoginScreen(),
+                  ),
+                  (route) => false,
+                );
+              },
+              icon: const Icon(Icons.logout),
+              label: const Text('Logout'),
+            ),
+          ),
         ],
       ),
     );
@@ -506,6 +554,7 @@ class _EngineerAccountSettingsPanelState
   }
 
   Widget _buildSecurityTab(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 1100;
     return _sectionContainer(
       context,
       child: Column(
@@ -579,6 +628,55 @@ class _EngineerAccountSettingsPanelState
               ],
             ),
           ),
+          if (isMobile) ...[
+            const SizedBox(height: 18),
+            _buildMobileLogoutSection(context),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileLogoutSection(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: const Color(0xFFF8EDED),
+        border: Border.all(color: const Color(0xFFE54C4C).withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Session',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFE54C4C),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text('Sign out from this device.'),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (_) => const EngineerLoginScreen(),
+                  ),
+                  (route) => false,
+                );
+              },
+              icon: const Icon(Icons.logout, color: Color(0xFFE54C4C)),
+              label: const Text(
+                'Logout',
+                style: TextStyle(color: Color(0xFFE54C4C)),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -596,19 +694,44 @@ class _EngineerAccountSettingsPanelState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Text(
-                'Threshold Configuration',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-              ),
-              const Spacer(),
-              FilledButton.icon(
-                onPressed: () => _showThresholdDialog(context, db: db),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Threshold'),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 520;
+              if (!isNarrow) {
+                return Row(
+                  children: [
+                    const Text(
+                      'Threshold Configuration',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                    ),
+                    const Spacer(),
+                    FilledButton.icon(
+                      onPressed: () => _showThresholdDialog(context, db: db),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Threshold'),
+                    ),
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Threshold Configuration',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => _showThresholdDialog(context, db: db),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Threshold'),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 4),
           Text(
@@ -639,7 +762,10 @@ class _EngineerAccountSettingsPanelState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Container(
                           width: 10,
@@ -649,7 +775,6 @@ class _EngineerAccountSettingsPanelState
                             shape: BoxShape.circle,
                           ),
                         ),
-                        const SizedBox(width: 8),
                         Text(
                           '${rule.label} (${rule.value.toStringAsFixed(1)}°)',
                           style: const TextStyle(
@@ -657,7 +782,6 @@ class _EngineerAccountSettingsPanelState
                             fontSize: 16,
                           ),
                         ),
-                        const Spacer(),
                         Text(
                           rule.sound,
                           style: TextStyle(
@@ -665,7 +789,6 @@ class _EngineerAccountSettingsPanelState
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(width: 8),
                         IconButton(
                           onPressed: () =>
                               _showThresholdDialog(context, db: db, existing: rule),

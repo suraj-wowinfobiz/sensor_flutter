@@ -202,11 +202,6 @@ class UserNavBar extends StatelessWidget {
                 ],
               ),
             ),
-            IconButton(
-              tooltip: 'Settings',
-              onPressed: onTopSettingsTap,
-              icon: Icon(Icons.settings_outlined, color: barTextColor),
-            ),
             const SizedBox(width: 10),
           ],
           PopupMenuButton<String>(

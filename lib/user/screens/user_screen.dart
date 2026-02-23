@@ -10,7 +10,6 @@ import 'analytics_screen.dart';
 import 'dashboard_screen.dart';
 import 'devices_screen.dart';
 import 'user_login_screen.dart';
-import 'sidebar_settings_screen.dart';
 import 'sensors_screen.dart';
 import 'settings_screen.dart';
 
@@ -148,7 +147,7 @@ class _UserScreenState extends State<UserScreen>
       onMenuToggle: toggleMenu,
       isMenuOpen: _isMenuOpen,
       showMenuButton: false,
-      onTopSettingsTap: () => _setCurrentView('topbar_settings'),
+      onTopSettingsTap: () => _setCurrentView('settings'),
       onLogoutTap: _logout,
       notifications: notifications,
       hasNotifications: hasNotifications,
@@ -233,10 +232,8 @@ class _UserScreenState extends State<UserScreen>
     required String currentView,
     required ValueChanged<String> onViewChanged,
   }) {
-    const views = ['dashboard', 'alerts', 'analytics', 'topbar_settings'];
-    final effectiveView =
-        currentView == 'menu_settings' ? 'topbar_settings' : currentView;
-    final index = views.indexOf(effectiveView);
+    const views = ['dashboard', 'alerts', 'analytics', 'settings'];
+    final index = views.indexOf(currentView);
 
     return BottomNavigationBar(
       type: BottomNavigationBarType.fixed,
@@ -257,9 +254,9 @@ class _UserScreenState extends State<UserScreen>
   String _normalizeView(String view) {
     switch (view) {
       case 'config':
-        return 'topbar_settings';
+        return 'settings';
       case 'settings':
-        return 'topbar_settings';
+        return 'settings';
       default:
         return view;
     }
@@ -277,10 +274,8 @@ class _UserScreenState extends State<UserScreen>
         return const UserDevicesScreen();
       case 'sensors':
         return const UserSensorsScreen();
-      case 'topbar_settings':
+      case 'settings':
         return const UserSettingsScreen();
-      case 'menu_settings':
-        return const UserSidebarSettingsScreen();
       default:
         return const UserDashboardScreen();
     }
