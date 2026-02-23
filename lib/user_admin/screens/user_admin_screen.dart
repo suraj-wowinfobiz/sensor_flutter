@@ -5,12 +5,12 @@ import 'package:provider/provider.dart';
 import '../providers/user_admin_database_provider.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';
-import '../../screens/login_screen.dart';
 import 'alerts_screen.dart';
 import 'analytics_screen.dart';
 import 'dashboard_screen.dart';
 import 'organizations_screen.dart';
 import 'settings_screen.dart';
+import 'user_admin_login_screen.dart';
 import 'users_screen.dart';
 
 class UserAdminScreen extends StatefulWidget {
@@ -65,7 +65,7 @@ class _UserAdminScreenState extends State<UserAdminScreen>
 
   void _logout() {
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(builder: (_) => const UserAdminLoginScreen()),
       (route) => false,
     );
   }

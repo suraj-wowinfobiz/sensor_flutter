@@ -1,36 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart' as p;
 
-import '../user/providers/user_database_provider.dart';
+import '../user/providers/user_riverpod_provider.dart';
 import '../user/screens/user_screen.dart';
 
-class UserPage extends StatefulWidget {
+class UserPage extends ConsumerWidget {
   const UserPage({super.key});
 
   @override
-  State<UserPage> createState() => _UserPageState();
-}
-
-class _UserPageState extends State<UserPage> {
-  late final UserDatabaseProvider _databaseProvider;
-
-  @override
-  void initState() {
-    super.initState();
-    _databaseProvider = UserDatabaseProvider();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _databaseProvider,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final db = ref.watch(userDatabaseChangeNotifierProvider);
+    return p.ChangeNotifierProvider.value(
+      value: db,
       child: const UserScreen(),
     );
-  }
-
-  @override
-  void dispose() {
-    _databaseProvider.dispose();
-    super.dispose();
   }
 }

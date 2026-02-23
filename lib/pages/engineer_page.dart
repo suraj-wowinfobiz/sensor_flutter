@@ -1,36 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart' as p;
 
-import '../engineer/providers/engineer_database_provider.dart';
+import '../engineer/providers/engineer_riverpod_provider.dart';
 import '../engineer/screens/engineer_screen.dart';
 
-class EngineerPage extends StatefulWidget {
+class EngineerPage extends ConsumerWidget {
   const EngineerPage({super.key});
 
   @override
-  State<EngineerPage> createState() => _EngineerPageState();
-}
-
-class _EngineerPageState extends State<EngineerPage> {
-  late final EngineerDatabaseProvider _databaseProvider;
-
-  @override
-  void initState() {
-    super.initState();
-    _databaseProvider = EngineerDatabaseProvider();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _databaseProvider,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final db = ref.watch(engineerDatabaseChangeNotifierProvider);
+    return p.ChangeNotifierProvider.value(
+      value: db,
       child: const EngineerScreen(),
     );
-  }
-
-  @override
-  void dispose() {
-    _databaseProvider.dispose();
-    super.dispose();
   }
 }

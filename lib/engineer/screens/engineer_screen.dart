@@ -5,12 +5,12 @@ import 'package:provider/provider.dart';
 import '../providers/engineer_database_provider.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';
-import '../../screens/login_screen.dart';
 import 'alerts_screen.dart';
 import 'analytics_screen.dart';
 import 'settings_screen.dart';
 import 'dashboard_screen.dart';
 import 'devices_screen.dart';
+import 'engineer_login_screen.dart';
 import 'sensors_screen.dart';
 
 class EngineerScreen extends StatefulWidget {
@@ -65,7 +65,7 @@ class _EngineerScreenState extends State<EngineerScreen>
 
   void _logout() {
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(builder: (_) => const EngineerLoginScreen()),
       (route) => false,
     );
   }
