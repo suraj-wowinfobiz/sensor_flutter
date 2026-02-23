@@ -47,6 +47,7 @@ class UserAdminAlertsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Consumer<UserAdminDatabaseProvider>(
       builder: (context, db, child) {
         final activeAlerts = db.alerts.where((a) => !a.isResolved).toList();
@@ -71,9 +72,14 @@ class UserAdminAlertsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 2),
-              const Text(
+              Text(
                 'Monitor and manage system alerts',
-                style: TextStyle(fontSize: 15, color: Color(0xFF4e6473)),
+                style: TextStyle(
+                  fontSize: 15,
+                  color: isLight
+                      ? const Color(0xFF4e6473)
+                      : const Color(0xFF9db7d2),
+                ),
               ),
               const SizedBox(height: 18),
               _buildSummaryCards(
@@ -103,6 +109,11 @@ class UserAdminAlertsScreen extends StatelessWidget {
             : width >= 700
                 ? 2
                 : 1;
+        final aspectRatio = crossAxisCount == 3
+            ? 2.2
+            : crossAxisCount == 2
+                ? 2.5
+                : 3.0;
 
         return GridView.count(
           crossAxisCount: crossAxisCount,
@@ -110,93 +121,84 @@ class UserAdminAlertsScreen extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: 14,
           mainAxisSpacing: 14,
-          childAspectRatio: width >= 1000 ? 2.8 : 2.6,
+          childAspectRatio: aspectRatio,
           children: [
             _summaryCard(
-                'Active Alerts', '$activeCount', const Color(0xFF071d28)),
-            _summaryCard('Critical', '$criticalCount', const Color(0xFFef2e38)),
-            _summaryCard('Warnings', '$warningCount', const Color(0xFFd39a00)),
+              context,
+              'Active Alerts',
+              '$activeCount',
+              Theme.of(context).brightness == Brightness.light
+                  ? const Color(0xFF071d28)
+                  : const Color(0xFFD8E8F5),
+            ),
+            _summaryCard(
+              context,
+              'Critical',
+              '$criticalCount',
+              const Color(0xFFef2e38),
+            ),
+            _summaryCard(
+              context,
+              'Warnings',
+              '$warningCount',
+              const Color(0xFFd39a00),
+            ),
           ],
         );
       },
     );
   }
 
-  Widget _summaryCard(String label, String value, Color valueColor) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final ultraCompact = constraints.maxHeight < 70;
-        final compact = constraints.maxHeight < 90;
-        final cardPadding = ultraCompact
-            ? 6.0
-            : compact
-                ? 10.0
-                : 18.0;
-        final labelSize = ultraCompact
-            ? 12.0
-            : compact
-                ? 13.0
-                : 15.0;
-        final valueSize = ultraCompact
-            ? 18.0
-            : compact
-                ? 24.0
-                : 30.0;
-        final gap = ultraCompact
-            ? 2.0
-            : compact
-                ? 6.0
-                : 12.0;
-
-        return Container(
-          padding: EdgeInsets.all(cardPadding),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFc8d6dc)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
+  Widget _summaryCard(
+    BuildContext context,
+    String label,
+    String value,
+    Color valueColor,
+  ) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Theme.of(context).dividerColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isLight ? 0.04 : 0.16),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: labelSize,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1a303c),
-                  ),
-                ),
-              ),
-              SizedBox(height: gap),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    value,
-                    style: TextStyle(
-                      fontSize: valueSize,
-                      fontWeight: FontWeight.w800,
-                      color: valueColor,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color:
+                  isLight ? const Color(0xFF1a303c) : const Color(0xFFD8E8F5),
+            ),
           ),
-        );
-      },
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.w800,
+                color: valueColor,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -205,32 +207,38 @@ class UserAdminAlertsScreen extends StatelessWidget {
     UserAdminDatabaseProvider db,
     List<Alert> activeAlerts,
   ) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFc8d6dc)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Active Alerts',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF132733),
+              color:
+                  isLight ? const Color(0xFF132733) : const Color(0xFFD8E8F5),
             ),
           ),
           const SizedBox(height: 14),
           if (activeAlerts.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Text(
                 'No active alerts',
-                style: TextStyle(color: Color(0xFF60717c)),
+                style: TextStyle(
+                  color: isLight
+                      ? const Color(0xFF60717c)
+                      : const Color(0xFF9FB4C6),
+                ),
               ),
             ),
           ...activeAlerts.map((alert) {
@@ -239,9 +247,10 @@ class UserAdminAlertsScreen extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFF2F6F8),
+                color:
+                    isLight ? const Color(0xFFF2F6F8) : const Color(0xFF223B4E),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFD7E2E8)),
+                border: Border.all(color: Theme.of(context).dividerColor),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,18 +271,22 @@ class UserAdminAlertsScreen extends StatelessWidget {
                       children: [
                         Text(
                           alert.message,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF1a2f3b),
+                            color: isLight
+                                ? const Color(0xFF1a2f3b)
+                                : const Color(0xFFE2EDF8),
                           ),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           'Triggered: ${_formatDate(alert.triggeredAt)}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
-                            color: Color(0xFF506775),
+                            color: isLight
+                                ? const Color(0xFF506775)
+                                : const Color(0xFF9FB4C6),
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -282,10 +295,12 @@ class UserAdminAlertsScreen extends StatelessWidget {
                           runSpacing: 8,
                           children: [
                             _actionButton(
+                              context,
                               label: 'Acknowledge',
                               onTap: () => db.resolveAlert(alert.id),
                             ),
                             _actionButton(
+                              context,
                               label: 'View Details',
                               onTap: () => _showDetails(context, alert),
                             ),
@@ -322,25 +337,27 @@ class UserAdminAlertsScreen extends StatelessWidget {
     );
   }
 
-  Widget _actionButton({
+  Widget _actionButton(
+    context, {
     required String label,
     required VoidCallback onTap,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFE7EFF3),
+          color: isLight ? const Color(0xFFE7EFF3) : const Color(0xFF243E52),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFC8D6DD)),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
-            color: Color(0xFF203845),
+            color: isLight ? const Color(0xFF203845) : const Color(0xFFD8E8F5),
             fontWeight: FontWeight.w700,
           ),
         ),

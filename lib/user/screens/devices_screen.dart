@@ -29,6 +29,8 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
           return matchesSearch && matchesStatus;
         }).toList();
         final isLight = Theme.of(context).brightness == Brightness.light;
+        final secondaryTextColor =
+            isLight ? const Color(0xFF4e6473) : const Color(0xFF9db7d2);
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
@@ -52,10 +54,12 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
                           ),
                         ),
                         const SizedBox(height: 2),
-                        const Text(
+                        Text(
                           'Monitor gateway devices',
-                          style:
-                              TextStyle(fontSize: 15, color: Color(0xFF4e6473)),
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: secondaryTextColor,
+                          ),
                         ),
                       ],
                     ),
@@ -90,12 +94,13 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
   }
 
   Widget _buildViewToggle() {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFE6EFF3),
+        color: isLight ? const Color(0xFFE6EFF3) : const Color(0xFF243E52),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -120,25 +125,28 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
     required IconData icon,
     required VoidCallback onTap,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final buttonTextColor =
+        isLight ? const Color(0xFF18313F) : const Color(0xFFD7E8F6);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFFE6EFF3),
+          color: isLight ? const Color(0xFFE6EFF3) : const Color(0xFF243E52),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFC8D6DD)),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: const Color(0xFF18313F)),
+            Icon(icon, size: 18, color: buttonTextColor),
             const SizedBox(width: 8),
             Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFF18313F),
+              style: TextStyle(
+                color: buttonTextColor,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -153,23 +161,25 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
     UserDatabaseProvider db,
     int filteredCount,
   ) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Filter Devices',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF1A303D),
+              color:
+                  isLight ? const Color(0xFF1A303D) : const Color(0xFFD8E8F5),
             ),
           ),
           const SizedBox(height: 12),
@@ -215,9 +225,11 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
                 padding: const EdgeInsets.only(top: 26),
                 child: Text(
                   'Showing $filteredCount of ${db.devices.length} devices',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    color: Color(0xFF48606E),
+                    color: isLight
+                        ? const Color(0xFF48606E)
+                        : const Color(0xFF9FB4C6),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -230,14 +242,15 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
   }
 
   Widget _field(String label, Widget child) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
-            color: Color(0xFF4D6472),
+            color: isLight ? const Color(0xFF4D6472) : const Color(0xFF9FB4C6),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -246,9 +259,9 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
           height: 40,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isLight ? Colors.white : const Color(0xFF243E52),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFC8D6DD)),
+            border: Border.all(color: Theme.of(context).dividerColor),
           ),
           child: child,
         ),
@@ -280,6 +293,7 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
     required IconData icon,
     required VoidCallback onTap,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -292,7 +306,9 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
         child: Icon(
           icon,
           size: 18,
-          color: active ? Colors.white : const Color(0xFF2a414e),
+          color: active
+              ? Colors.white
+              : (isLight ? const Color(0xFF2a414e) : const Color(0xFFD7E8F6)),
         ),
       ),
     );
@@ -323,22 +339,25 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
           itemBuilder: (context, index) {
             final device = devices[index];
             final active = device.status == 'active';
+            final isLight = Theme.of(context).brightness == Brightness.light;
             return Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFC8D6DD)),
+                border: Border.all(color: Theme.of(context).dividerColor),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     device.deviceCode,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF162f3a),
+                      color: isLight
+                          ? const Color(0xFF162f3a)
+                          : const Color(0xFFE2EDF8),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -346,9 +365,11 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
                   const Spacer(),
                   Text(
                     'Installed: ${device.installedAt.day}/${device.installedAt.month}/${device.installedAt.year}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF4e6473),
+                      color: isLight
+                          ? const Color(0xFF4e6473)
+                          : const Color(0xFF9DB7D2),
                     ),
                   ),
                 ],
@@ -365,10 +386,11 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         children: devices.map((device) {
+          final isLight = Theme.of(context).brightness == Brightness.light;
           final active = device.status == 'active';
           final installedAt =
               '${device.installedAt.day}/${device.installedAt.month}/${device.installedAt.year}';
@@ -382,9 +404,9 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
           ];
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
-                bottom: BorderSide(color: Color(0xFFDCE5EA)),
+                bottom: BorderSide(color: Theme.of(context).dividerColor),
               ),
             ),
             child: Column(
@@ -402,9 +424,11 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
                     Expanded(
                       child: Text(
                         device.deviceCode,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF1a2f3b),
+                          color: isLight
+                              ? const Color(0xFF1a2f3b)
+                              : const Color(0xFFE2EDF8),
                         ),
                       ),
                     ),
@@ -423,15 +447,21 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEAF2F6),
+                            color: isLight
+                                ? const Color(0xFFEAF2F6)
+                                : const Color(0xFF253F52),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFD0DEE6)),
+                            border: Border.all(
+                              color: Theme.of(context).dividerColor,
+                            ),
                           ),
                           child: Text(
                             detail,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF3E5765),
+                              color: isLight
+                                  ? const Color(0xFF3E5765)
+                                  : const Color(0xFFBBD0E0),
                               fontWeight: FontWeight.w600,
                             ),
                           ),

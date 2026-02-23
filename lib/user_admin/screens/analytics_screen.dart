@@ -67,12 +67,13 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
 
         final selected =
             filteredSensors.where((s) => s.id == _selectedSensorId).firstOrNull;
+        final isLight = Theme.of(context).brightness == Brightness.light;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Wrap(
                 alignment: WrapAlignment.spaceBetween,
@@ -94,10 +95,14 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      const Text(
+                      Text(
                         'Real-time sensor data visualization and comparison',
-                        style:
-                            TextStyle(fontSize: 15, color: Color(0xFF4e6473)),
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: isLight
+                              ? const Color(0xFF4e6473)
+                              : const Color(0xFF9db7d2),
+                        ),
                       ),
                     ],
                   ),
@@ -233,11 +238,12 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
               ),
               const SizedBox(height: 16),
               Container(
-                width: double.infinity,                padding: const EdgeInsets.all(18),
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xFFC8D6DD)),
+                  border: Border.all(color: Theme.of(context).dividerColor),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -245,12 +251,14 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
                   children: [
                     Row(
                       children: [
-                        const Text(
+                        Text(
                           'Real-Time Data Visualization',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF132733),
+                            color: isLight
+                                ? const Color(0xFF132733)
+                                : const Color(0xFFD8E8F5),
                           ),
                         ),
                         const Spacer(),
@@ -310,104 +318,99 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Sensor: ${selected.serialNumber}  |  Last reading: ${selected.lastReading.toStringAsFixed(2)}°',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF4F6573),
-                                fontWeight: FontWeight.w600,
-                              ),
+                        children: [
+                          Text(
+                            'Sensor: ${selected.serialNumber}  |  Last reading: ${selected.lastReading.toStringAsFixed(2)}°',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF4F6573),
+                              fontWeight: FontWeight.w600,
                             ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              height: 400,
-                              child: LineChart(
-                                LineChartData(
-                                  minY: -3,
-                                  maxY: 6,
-                                  extraLinesData:
-                                      ExtraLinesData(
-                                    horizontalLines: graphThresholds
-                                        .map(
-                                          (threshold) => HorizontalLine(
-                                            y: threshold.value,
-                                            color: threshold.color,
-                                            strokeWidth: 1.8,
-                                            dashArray: const [6, 4],
-                                          ),
-                                        )
-                                        .toList(),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 400,
+                            child: LineChart(
+                              LineChartData(
+                                minY: -3,
+                                maxY: 6,
+                                extraLinesData: ExtraLinesData(
+                                  horizontalLines: graphThresholds
+                                      .map(
+                                        (threshold) => HorizontalLine(
+                                          y: threshold.value,
+                                          color: threshold.color,
+                                          strokeWidth: 1.8,
+                                          dashArray: const [6, 4],
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                                gridData: FlGridData(
+                                  show: true,
+                                  drawVerticalLine: false,
+                                  horizontalInterval: 1,
+                                  getDrawingHorizontalLine: (_) =>
+                                      const FlLine(color: Color(0xFFD2DBE0)),
+                                ),
+                                borderData: FlBorderData(
+                                  show: true,
+                                  border: Border(
+                                    left: BorderSide(
+                                        color: Colors.blueGrey.shade200),
+                                    bottom: BorderSide(
+                                        color: Colors.blueGrey.shade200),
+                                    top: BorderSide.none,
+                                    right: BorderSide.none,
                                   ),
-                                  gridData: FlGridData(
-                                    show: true,
-                                    drawVerticalLine: false,
-                                    horizontalInterval: 1,
-                                    getDrawingHorizontalLine: (_) =>
-                                        const FlLine(color: Color(0xFFD2DBE0)),
+                                ),
+                                titlesData: const FlTitlesData(
+                                  topTitles: AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
                                   ),
-                                  borderData: FlBorderData(
-                                    show: true,
-                                    border: Border(
-                                      left: BorderSide(
-                                          color: Colors.blueGrey.shade200),
-                                      bottom: BorderSide(
-                                          color: Colors.blueGrey.shade200),
-                                      top: BorderSide.none,
-                                      right: BorderSide.none,
-                                    ),
+                                  rightTitles: AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
                                   ),
-                                  titlesData: const FlTitlesData(
-                                    topTitles: AxisTitles(
-                                      sideTitles: SideTitles(showTitles: false),
-                                    ),
-                                    rightTitles: AxisTitles(
-                                      sideTitles: SideTitles(showTitles: false),
-                                    ),
+                                ),
+                                lineBarsData: [
+                                  LineChartBarData(
+                                    spots: List.generate(40, (i) {
+                                      final base = selected.lastReading;
+                                      final noise =
+                                          (Random(i + 21).nextDouble() - 0.5) *
+                                              (_paused ? 0.2 : 1.3);
+                                      return FlSpot(i.toDouble(), base + noise);
+                                    }),
+                                    isCurved: true,
+                                    color: const Color(0xFF0f8f92),
+                                    barWidth: 2.5,
+                                    dotData: const FlDotData(show: false),
                                   ),
-                                  lineBarsData: [
+                                  if (_compareMode != 'none')
                                     LineChartBarData(
                                       spots: List.generate(40, (i) {
-                                        final base = selected.lastReading;
+                                        final offset =
+                                            _compareMode == 'both' ? 1.4 : 0.9;
                                         final noise =
-                                            (Random(i + 21).nextDouble() -
+                                            (Random(i + 77).nextDouble() -
                                                     0.5) *
-                                                (_paused ? 0.2 : 1.3);
+                                                1.1;
                                         return FlSpot(
-                                            i.toDouble(), base + noise);
+                                            i.toDouble(),
+                                            selected.lastReading +
+                                                offset +
+                                                noise);
                                       }),
                                       isCurved: true,
-                                      color: const Color(0xFF0f8f92),
-                                      barWidth: 2.5,
+                                      color: const Color(0xFF5973D8),
+                                      barWidth: 2.0,
                                       dotData: const FlDotData(show: false),
                                     ),
-                                    if (_compareMode != 'none')
-                                      LineChartBarData(
-                                        spots: List.generate(40, (i) {
-                                          final offset = _compareMode == 'both'
-                                              ? 1.4
-                                              : 0.9;
-                                          final noise =
-                                              (Random(i + 77).nextDouble() -
-                                                      0.5) *
-                                                  1.1;
-                                          return FlSpot(
-                                              i.toDouble(),
-                                              selected.lastReading +
-                                                  offset +
-                                                  noise);
-                                        }),
-                                        isCurved: true,
-                                        color: const Color(0xFF5973D8),
-                                        barWidth: 2.0,
-                                        dotData: const FlDotData(show: false),
-                                      ),
-                                  ],
-                                ),
+                                ],
                               ),
                             ),
-                          ],
-                    
+                          ),
+                        ],
                       ),
                   ],
                 ),
@@ -425,6 +428,7 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
     int filteredCount,
   ) {
     final isCompact = MediaQuery.of(context).size.width < 1180;
+    final isLight = Theme.of(context).brightness == Brightness.light;
 
     return Container(
       width: double.infinity,
@@ -432,18 +436,19 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
+          Text(
             'Filter Sensors',
             style: TextStyle(
               fontSize: 28 > 20 ? 20 : 20,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF1A303D),
+              color:
+                  isLight ? const Color(0xFF1A303D) : const Color(0xFFD8E8F5),
             ),
           ),
           const SizedBox(height: 14),
@@ -471,7 +476,8 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
                 child: _selectFilter(
                   label: 'Status',
                   value: _statusFilter,
-                  items: _statusFilterItems(db.thresholdRulesForGraph(ThresholdGraphTarget.analyticsMain)),
+                  items: _statusFilterItems(db.thresholdRulesForGraph(
+                      ThresholdGraphTarget.analyticsMain)),
                   onChanged: (v) => setState(() => _statusFilter = v ?? 'all'),
                 ),
               ),
@@ -526,15 +532,16 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
             _countText(filteredCount: filteredCount, total: db.sensors.length),
           ],
           const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFD1DCE2)),
+          Divider(height: 1, color: Theme.of(context).dividerColor),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'LOCATION HIERARCHY',
             style: TextStyle(
               fontSize: 12,
               letterSpacing: 0.4,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF5A707E),
+              color:
+                  isLight ? const Color(0xFF5A707E) : const Color(0xFF9FB4C6),
             ),
           ),
           const SizedBox(height: 10),
@@ -663,13 +670,14 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
   }
 
   Widget _countText({required int filteredCount, required int total}) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Padding(
       padding: const EdgeInsets.only(top: 26),
       child: Text(
         'Showing $filteredCount of $total sensors',
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 16,
-          color: Color(0xFF48606E),
+          color: isLight ? const Color(0xFF48606E) : const Color(0xFF9FB4C6),
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -677,15 +685,16 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
   }
 
   Widget _inputFilter({required String label, required Widget child}) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF4D6472),
+            color: isLight ? const Color(0xFF4D6472) : const Color(0xFF9FB4C6),
           ),
         ),
         const SizedBox(height: 6),
@@ -693,9 +702,9 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
           height: 40,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isLight ? Colors.white : const Color(0xFF243E52),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFC8D6DD)),
+            border: Border.all(color: Theme.of(context).dividerColor),
           ),
           child: child,
         ),
@@ -733,7 +742,7 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -748,10 +757,12 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
             width: 88,
             child: Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF1b313d),
+                color: Theme.of(context).brightness == Brightness.light
+                    ? const Color(0xFF1b313d)
+                    : const Color(0xFFD8E8F5),
               ),
             ),
           ),
@@ -768,14 +779,15 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
     required List<DropdownMenuItem<String>> items,
     required ValueChanged<String?> onChanged,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: width,
       height: 38,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isLight ? Colors.white : const Color(0xFF243E52),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -794,24 +806,27 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
     required IconData icon,
     required VoidCallback onTap,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final buttonTextColor =
+        isLight ? const Color(0xFF18313f) : const Color(0xFFD7E8F6);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFFE6EFF3),
+          color: isLight ? const Color(0xFFE6EFF3) : const Color(0xFF243E52),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFC8D6DD)),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: const Color(0xFF18313f)),
+            Icon(icon, size: 18, color: buttonTextColor),
             const SizedBox(width: 8),
             Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFF18313f),
+              style: TextStyle(
+                color: buttonTextColor,
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),

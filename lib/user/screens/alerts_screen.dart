@@ -47,6 +47,7 @@ class UserAlertsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Consumer<UserDatabaseProvider>(
       builder: (context, db, child) {
         final activeAlerts = db.alerts.where((a) => !a.isResolved).toList();
@@ -71,9 +72,14 @@ class UserAlertsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 2),
-              const Text(
+              Text(
                 'Monitor and manage system alerts',
-                style: TextStyle(fontSize: 15, color: Color(0xFF4e6473)),
+                style: TextStyle(
+                  fontSize: 15,
+                  color: isLight
+                      ? const Color(0xFF4e6473)
+                      : const Color(0xFF9db7d2),
+                ),
               ),
               const SizedBox(height: 18),
               _buildSummaryCards(
@@ -103,11 +109,6 @@ class UserAlertsScreen extends StatelessWidget {
             : width >= 700
                 ? 2
                 : 1;
-        final ratio = width < 420
-            ? 2.4
-            : width >= 1000
-                ? 2.8
-                : 3.2;
 
         return GridView.count(
           crossAxisCount: crossAxisCount,
@@ -115,28 +116,48 @@ class UserAlertsScreen extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: 14,
           mainAxisSpacing: 14,
-          childAspectRatio: ratio,
+          childAspectRatio: width >= 1000 ? 2.8 : 3.4,
           children: [
             _summaryCard(
-                'Active Alerts', '$activeCount', const Color(0xFF071d28)),
-            _summaryCard('Critical', '$criticalCount', const Color(0xFFef2e38)),
-            _summaryCard('Warnings', '$warningCount', const Color(0xFFd39a00)),
+              context,
+              'Active Alerts',
+              '$activeCount',
+              Theme.of(context).brightness == Brightness.light ? const Color(0xFF071d28) : const Color(0xFFD8E8F5),
+            ),
+            _summaryCard(
+              context,
+              'Critical',
+              '$criticalCount',
+              const Color(0xFFef2e38),
+            ),
+            _summaryCard(
+              context,
+              'Warnings',
+              '$warningCount',
+              const Color(0xFFd39a00),
+            ),
           ],
         );
       },
     );
   }
 
-  Widget _summaryCard(String label, String value, Color valueColor) {
+  Widget _summaryCard(
+    BuildContext context,
+    String label,
+    String value,
+    Color valueColor,
+  ) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFc8d6dc)),
+        border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: isLight ? 0.04 : 0.16),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -148,10 +169,12 @@ class UserAlertsScreen extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF1a303c),
+              color: isLight
+                  ? const Color(0xFF1a303c)
+                  : const Color(0xFFD8E8F5),
             ),
           ),
           const SizedBox(height: 12),
@@ -173,172 +196,129 @@ class UserAlertsScreen extends StatelessWidget {
     UserDatabaseProvider db,
     List<Alert> activeAlerts,
   ) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFc8d6dc)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Active Alerts',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF132733),
+              color: isLight
+                  ? const Color(0xFF132733)
+                  : const Color(0xFFD8E8F5),
             ),
           ),
           const SizedBox(height: 14),
           if (activeAlerts.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Text(
                 'No active alerts',
-                style: TextStyle(color: Color(0xFF60717c)),
+                style: TextStyle(
+                  color: isLight
+                      ? const Color(0xFF60717c)
+                      : const Color(0xFF9FB4C6),
+                ),
               ),
             ),
           ...activeAlerts.map((alert) {
             final isCritical = alert.alertLevel == 'critical';
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final compact = constraints.maxWidth < 700;
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF2F6F8),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFD7E2E8)),
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isLight
+                    ? const Color(0xFFF2F6F8)
+                    : const Color(0xFF223B4E),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Theme.of(context).dividerColor),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Icon(
+                      isCritical ? Icons.cancel : Icons.warning_amber_rounded,
+                      color: isCritical
+                          ? const Color(0xFFef2e38)
+                          : const Color(0xFFd39a00),
+                    ),
                   ),
-                  child: compact
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          alert.message,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: isLight
+                                ? const Color(0xFF1a2f3b)
+                                : const Color(0xFFE2EDF8),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Triggered: ${_formatDate(alert.triggeredAt)}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isLight
+                                ? const Color(0xFF506775)
+                                : const Color(0xFF9FB4C6),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
                           children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Icon(
-                                    isCritical
-                                        ? Icons.cancel
-                                        : Icons.warning_amber_rounded,
-                                    color: isCritical
-                                        ? const Color(0xFFef2e38)
-                                        : const Color(0xFFd39a00),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        alert.message,
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color(0xFF1a2f3b),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        'Triggered: ${_formatDate(alert.triggeredAt)}',
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          color: Color(0xFF506775),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                            _actionButton(context, 
+                              label: 'Acknowledge',
+                              onTap: () => db.resolveAlert(alert.id),
                             ),
-                            const SizedBox(height: 10),
-                            _severityBadge(isCritical, alert.alertLevel),
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _actionButton(
-                                  label: 'Acknowledge',
-                                  onTap: () => db.resolveAlert(alert.id),
-                                ),
-                                _actionButton(
-                                  label: 'View Details',
-                                  onTap: () => _showDetails(context, alert),
-                                ),
-                              ],
+                            _actionButton(context, 
+                              label: 'View Details',
+                              onTap: () => _showDetails(context, alert),
                             ),
-                          ],
-                        )
-                      : Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Icon(
-                                isCritical
-                                    ? Icons.cancel
-                                    : Icons.warning_amber_rounded,
-                                color: isCritical
-                                    ? const Color(0xFFef2e38)
-                                    : const Color(0xFFd39a00),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    alert.message,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF1a2f3b),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Triggered: ${_formatDate(alert.triggeredAt)}',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF506775),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: [
-                                      _actionButton(
-                                        label: 'Acknowledge',
-                                        onTap: () => db.resolveAlert(alert.id),
-                                      ),
-                                      _actionButton(
-                                        label: 'View Details',
-                                        onTap: () =>
-                                            _showDetails(context, alert),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            _severityBadge(isCritical, alert.alertLevel),
                           ],
                         ),
-                );
-              },
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isCritical
+                          ? const Color(0xFFef2e38)
+                          : const Color(0xFFd39a00),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      alert.alertLevel,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             );
           }),
         ],
@@ -346,43 +326,27 @@ class UserAlertsScreen extends StatelessWidget {
     );
   }
 
-  Widget _severityBadge(bool isCritical, String alertLevel) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: isCritical ? const Color(0xFFef2e38) : const Color(0xFFd39a00),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        alertLevel,
-        style: const TextStyle(
-          color: Colors.black,
-          fontWeight: FontWeight.w700,
-          fontSize: 12,
-        ),
-      ),
-    );
-  }
-
-  Widget _actionButton({
+  Widget _actionButton(context, {
     required String label,
     required VoidCallback onTap,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFE7EFF3),
+          color: isLight ? const Color(0xFFE7EFF3) : const Color(0xFF243E52),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFC8D6DD)),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
-            color: Color(0xFF203845),
+            color:
+                isLight ? const Color(0xFF203845) : const Color(0xFFD8E8F5),
             fontWeight: FontWeight.w700,
           ),
         ),

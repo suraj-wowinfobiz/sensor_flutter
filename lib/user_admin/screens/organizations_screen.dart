@@ -237,6 +237,7 @@ class _UserAdminOrganizationsScreenState
   Widget build(BuildContext context) {
     return Consumer<UserAdminDatabaseProvider>(
       builder: (context, db, child) {
+        final isLight = Theme.of(context).brightness == Brightness.light;
         _ensureSelections(db);
 
         final organizations = db.organizations;
@@ -275,10 +276,14 @@ class _UserAdminOrganizationsScreenState
                         ),
                       ),
                       const SizedBox(height: 2),
-                      const Text(
+                      Text(
                         'Manage organizations, sites, zones, and sensor locations',
-                        style:
-                            TextStyle(fontSize: 15, color: Color(0xFF4e6473)),
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: isLight
+                              ? const Color(0xFF4e6473)
+                              : const Color(0xFF9db7d2),
+                        ),
                       ),
                     ],
                   ),
@@ -398,15 +403,16 @@ class _UserAdminOrganizationsScreenState
     required Widget child,
     VoidCallback? onAdd,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       constraints: const BoxConstraints(minHeight: 600),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFc8d6dc)),
-        boxShadow: const [
+        border: Border.all(color: Theme.of(context).dividerColor),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x11000000),
+            color: Colors.black.withValues(alpha: isLight ? 0.07 : 0.16),
             blurRadius: 16,
             offset: Offset(0, 6),
           ),
@@ -417,13 +423,16 @@ class _UserAdminOrganizationsScreenState
         children: [
           Container(
             padding: const EdgeInsets.all(14),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF5FAFD),
+            decoration: BoxDecoration(
+              color:
+                  isLight ? const Color(0xFFF5FAFD) : const Color(0xFF1f3342),
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(18),
                 topRight: Radius.circular(18),
               ),
-              border: Border(bottom: BorderSide(color: Color(0xFFd7e2e8))),
+              border: Border(
+                bottom: BorderSide(color: Theme.of(context).dividerColor),
+              ),
             ),
             child: Row(
               children: [
@@ -431,19 +440,29 @@ class _UserAdminOrganizationsScreenState
                   width: 30,
                   height: 30,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFDBEDF8),
+                    color: isLight
+                        ? const Color(0xFFDBEDF8)
+                        : const Color(0xFF315066),
                     borderRadius: BorderRadius.circular(9),
                   ),
-                  child: Icon(icon, size: 17, color: const Color(0xFF1271a0)),
+                  child: Icon(
+                    icon,
+                    size: 17,
+                    color: isLight
+                        ? const Color(0xFF1271a0)
+                        : const Color(0xFFD7E8F6),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 20 > 18 ? 20 - 2 : 18,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF132733),
+                      color: isLight
+                          ? const Color(0xFF132733)
+                          : const Color(0xFFD8E8F5),
                     ),
                   ),
                 ),
@@ -455,11 +474,19 @@ class _UserAdminOrganizationsScreenState
                       width: 34,
                       height: 34,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE6EFF3),
+                        color: isLight
+                            ? const Color(0xFFE6EFF3)
+                            : const Color(0xFF243E52),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFC8D6DD)),
+                        border:
+                            Border.all(color: Theme.of(context).dividerColor),
                       ),
-                      child: const Icon(Icons.add, color: Color(0xFF203845)),
+                      child: Icon(
+                        Icons.add,
+                        color: isLight
+                            ? const Color(0xFF203845)
+                            : const Color(0xFFD7E8F6),
+                      ),
                     ),
                   ),
               ],
@@ -571,6 +598,7 @@ class _UserAdminOrganizationsScreenState
   }
 
   Widget _buildLocationsList(List<String> locations) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     if (_selectedZoneId == null) {
       return const _EmptyHint(text: 'Select a zone');
     }
@@ -585,24 +613,30 @@ class _UserAdminOrganizationsScreenState
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF4F8FB),
+                  color: isLight
+                      ? const Color(0xFFF4F8FB)
+                      : const Color(0xFF253F52),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFCFDFE7)),
+                  border: Border.all(color: Theme.of(context).dividerColor),
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.place_outlined,
                       size: 15,
-                      color: Color(0xFF4C7084),
+                      color: isLight
+                          ? const Color(0xFF4C7084)
+                          : const Color(0xFFBBD0E0),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         loc,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: Color(0xFF1f3642),
+                          color: isLight
+                              ? const Color(0xFF1f3642)
+                              : const Color(0xFFE2EDF8),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -655,19 +689,20 @@ class _UserAdminOrganizationsScreenState
   }
 
   Widget _infoChip(String label) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F8FC),
+        color: isLight ? const Color(0xFFF3F8FC) : const Color(0xFF243E52),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFD6E3EA)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w700,
-          color: Color(0xFF2B404D),
+          color: isLight ? const Color(0xFF2B404D) : const Color(0xFFD7E8F6),
         ),
       ),
     );
@@ -695,6 +730,7 @@ class _ListTileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -707,17 +743,23 @@ class _ListTileCard extends StatelessWidget {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               gradient: selected
-                  ? const LinearGradient(
-                      colors: [Color(0xFFDDEFFA), Color(0xFFEAF6FD)],
+                  ? LinearGradient(
+                      colors: isLight
+                          ? const [Color(0xFFDDEFFA), Color(0xFFEAF6FD)]
+                          : const [Color(0xFF2E4A5F), Color(0xFF294356)],
                     )
-                  : const LinearGradient(
-                      colors: [Color(0xFFF8FCFE), Color(0xFFF4FAFD)],
+                  : LinearGradient(
+                      colors: isLight
+                          ? const [Color(0xFFF8FCFE), Color(0xFFF4FAFD)]
+                          : const [Color(0xFF22394B), Color(0xFF1E3343)],
                     ),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: selected
-                    ? const Color(0xFF7FB3CF)
-                    : const Color(0xFFD9E6EE),
+                    ? (isLight
+                        ? const Color(0xFF7FB3CF)
+                        : const Color(0xFF5D89A3))
+                    : Theme.of(context).dividerColor,
               ),
             ),
             child: Column(
@@ -731,8 +773,12 @@ class _ListTileCard extends StatelessWidget {
                       margin: const EdgeInsets.only(right: 8),
                       decoration: BoxDecoration(
                         color: selected
-                            ? const Color(0xFF1478A6)
-                            : const Color(0xFF9DB2BF),
+                            ? (isLight
+                                ? const Color(0xFF1478A6)
+                                : const Color(0xFF88B6CF))
+                            : (isLight
+                                ? const Color(0xFF9DB2BF)
+                                : const Color(0xFF6E8797)),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -741,20 +787,24 @@ class _ListTileCard extends StatelessWidget {
                         title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF142936),
+                          color: isLight
+                              ? const Color(0xFF142936)
+                              : const Color(0xFFE2EDF8),
                           fontSize: 14,
                         ),
                       ),
                     ),
                     _actionIcon(
+                      context: context,
                       icon: Icons.edit_outlined,
                       color: const Color(0xFF2E4B5B),
                       onTap: onEdit,
                     ),
                     const SizedBox(width: 6),
                     _actionIcon(
+                      context: context,
                       icon: Icons.delete_outline,
                       color: const Color(0xFFD33A3A),
                       onTap: onDelete,
@@ -769,7 +819,9 @@ class _ListTileCard extends StatelessWidget {
                         height: 2,
                         margin: const EdgeInsets.only(right: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF7FB3CF),
+                          color: isLight
+                              ? const Color(0xFF7FB3CF)
+                              : const Color(0xFF88B6CF),
                           borderRadius: BorderRadius.circular(20),
                         ),
                       ),
@@ -779,8 +831,10 @@ class _ListTileCard extends StatelessWidget {
                         subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF5D7381),
+                        style: TextStyle(
+                          color: isLight
+                              ? const Color(0xFF5D7381)
+                              : const Color(0xFFBBD0E0),
                           fontSize: 13,
                         ),
                       ),
@@ -793,15 +847,19 @@ class _ListTileCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFDDEBF3),
+                      color: isLight
+                          ? const Color(0xFFDDEBF3)
+                          : const Color(0xFF2C475A),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       badge!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF264655),
+                        color: isLight
+                            ? const Color(0xFF264655)
+                            : const Color(0xFFD7E8F6),
                       ),
                     ),
                   ),
@@ -817,11 +875,15 @@ class _ListTileCard extends StatelessWidget {
               child: Container(
                 width: 3,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8ABED7),
+                  color: isLight
+                      ? const Color(0xFF8ABED7)
+                      : const Color(0xFF6FA7C5),
                   borderRadius: BorderRadius.circular(20),
-                  boxShadow: const [
+                  boxShadow: [
                     BoxShadow(
-                      color: Color(0x8038A3CF),
+                      color: isLight
+                          ? const Color(0x8038A3CF)
+                          : const Color(0x664A8BAE),
                       blurRadius: 8,
                       offset: Offset(0, 0),
                     ),
@@ -835,10 +897,12 @@ class _ListTileCard extends StatelessWidget {
   }
 
   Widget _actionIcon({
+    required BuildContext context,
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -846,7 +910,7 @@ class _ListTileCard extends StatelessWidget {
         width: 24,
         height: 24,
         decoration: BoxDecoration(
-          color: const Color(0xFFEAF1F6),
+          color: isLight ? const Color(0xFFEAF1F6) : const Color(0xFF2B4659),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, size: 14, color: color),
@@ -862,6 +926,7 @@ class _EmptyHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return SizedBox(
       height: 220,
       child: Center(
@@ -872,20 +937,23 @@ class _EmptyHint extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: const Color(0xFFEAF3F8),
+                color:
+                    isLight ? const Color(0xFFEAF3F8) : const Color(0xFF2B4659),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.account_tree_outlined,
-                color: Color(0xFF5B7686),
+                color:
+                    isLight ? const Color(0xFF5B7686) : const Color(0xFFBBD0E0),
               ),
             ),
             const SizedBox(height: 10),
             Text(
               text,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
-                color: Color(0xFF5D7381),
+                color:
+                    isLight ? const Color(0xFF5D7381) : const Color(0xFFBBD0E0),
               ),
             ),
           ],

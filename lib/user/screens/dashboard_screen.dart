@@ -163,23 +163,24 @@ class UserDashboardScreen extends StatelessWidget {
                   const SizedBox(width: 10),
                   Flexible(
                     child: Text(
-                    'Real-Time Tilt Monitoring - All Sensors',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: _titleColor(context),
+                      'Real-Time Tilt Monitoring - All Sensors',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: _titleColor(context),
+                      ),
                     ),
-                  ),)
+                  )
                 ],
               ),
               Wrap(
                 spacing: 8,
                 children: [
-                  _chip('Pause', icon: Icons.pause, selected: false),
-                  _chip('1H', selected: true),
-                  _chip('6H'),
-                  _chip('1D'),
-                  _chip('7D'),
+                  _chip(context, 'Pause', icon: Icons.pause, selected: false),
+                  _chip(context, '1H', selected: true),
+                  _chip(context, '6H'),
+                  _chip(context, '1D'),
+                  _chip(context, '7D'),
                 ],
               ),
             ],
@@ -222,8 +223,8 @@ class UserDashboardScreen extends StatelessWidget {
                       reservedSize: 34,
                       getTitlesWidget: (value, meta) => Text(
                         value.toInt().toString(),
-                        style: const TextStyle(
-                            fontSize: 11, color: Color(0xFF60717c)),
+                        style: TextStyle(
+                            fontSize: 11, color: _mutedTextColor(context)),
                       ),
                     ),
                   ),
@@ -238,8 +239,8 @@ class UserDashboardScreen extends StatelessWidget {
                         final second = (sec * 3) % 60;
                         return Text(
                           '14:${minute.toString().padLeft(2, '0')}:${second.toString().padLeft(2, '0')}',
-                          style: const TextStyle(
-                              fontSize: 10, color: Color(0xFF60717c)),
+                          style: TextStyle(
+                              fontSize: 10, color: _mutedTextColor(context)),
                         );
                       },
                     ),
@@ -355,8 +356,8 @@ class UserDashboardScreen extends StatelessWidget {
                         if (d % 7 != 0) return const SizedBox.shrink();
                         return Text(
                           '${d.toString().padLeft(2, '0')}/01',
-                          style: const TextStyle(
-                              fontSize: 10, color: Color(0xFF60717c)),
+                          style: TextStyle(
+                              fontSize: 10, color: _mutedTextColor(context)),
                         );
                       },
                     ),
@@ -485,8 +486,8 @@ class UserDashboardScreen extends StatelessWidget {
                       interval: 4,
                       getTitlesWidget: (value, meta) => Text(
                         value.toInt().toString(),
-                        style: const TextStyle(
-                            fontSize: 10, color: Color(0xFF60717c)),
+                        style: TextStyle(
+                            fontSize: 10, color: _mutedTextColor(context)),
                       ),
                     ),
                   ),
@@ -559,8 +560,8 @@ class UserDashboardScreen extends StatelessWidget {
                         angle: -0.7,
                         child: Text(
                           'TLT-${(value.toInt() + 1).toString().padLeft(3, '0')}',
-                          style: const TextStyle(
-                              fontSize: 10, color: Color(0xFF60717c)),
+                          style: TextStyle(
+                              fontSize: 10, color: _mutedTextColor(context)),
                         ),
                       ),
                     ),
@@ -718,7 +719,7 @@ class UserDashboardScreen extends StatelessWidget {
                 'Tilt Sensor Readings - Live Data',
                 Icons.show_chart_outlined,
               ),
-              _chip('Export', icon: Icons.upload_outlined),
+              _chip(context, 'Export', icon: Icons.upload_outlined),
             ],
           ),
           const SizedBox(height: 16),
@@ -730,21 +731,24 @@ class UserDashboardScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: DataTable(
-                headingRowColor:
-                    WidgetStateProperty.all(const Color(0xFFe3eaee)),
+                headingRowColor: WidgetStateProperty.all(
+                  Theme.of(context).brightness == Brightness.light
+                      ? const Color(0xFFe3eaee)
+                      : const Color(0xFF2A4154),
+                ),
                 dataRowMinHeight: 54,
                 dataRowMaxHeight: 54,
                 horizontalMargin: 10,
                 columnSpacing: 26,
-                columns: const [
-                  DataColumn(label: Text('Sensor ID')),
-                  DataColumn(label: Text('Location')),
-                  DataColumn(label: Text('Zone')),
-                  DataColumn(label: Text('X Axis (°)')),
-                  DataColumn(label: Text('Y Axis (°)')),
-                  DataColumn(label: Text('Total Tilt (°)')),
-                  DataColumn(label: Text('Status')),
-                  DataColumn(label: Text('Last Update')),
+                columns: [
+                  _tableHeading(context, 'Sensor ID'),
+                  _tableHeading(context, 'Location'),
+                  _tableHeading(context, 'Zone'),
+                  _tableHeading(context, 'X Axis (°)'),
+                  _tableHeading(context, 'Y Axis (°)'),
+                  _tableHeading(context, 'Total Tilt (°)'),
+                  _tableHeading(context, 'Status'),
+                  _tableHeading(context, 'Last Update'),
                 ],
                 rows: rows.map((r) {
                   final status = r[6];
@@ -787,6 +791,19 @@ class UserDashboardScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  DataColumn _tableHeading(BuildContext context, String label) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    return DataColumn(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          color: isLight ? const Color(0xFF203845) : const Color(0xFFD8E8F5),
+        ),
       ),
     );
   }
@@ -934,8 +951,9 @@ class UserDashboardScreen extends StatelessWidget {
                               }
                               return Text(
                                 timeLabels[idx],
-                                style: const TextStyle(
-                                    fontSize: 10, color: Color(0xFF60717c)),
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    color: _mutedTextColor(context)),
                               );
                             },
                           ),
@@ -1126,8 +1144,8 @@ class UserDashboardScreen extends StatelessWidget {
                           angle: -0.7,
                           child: Text(
                             sensors[idx],
-                            style: const TextStyle(
-                                fontSize: 10, color: Color(0xFF60717c)),
+                            style: TextStyle(
+                                fontSize: 10, color: _mutedTextColor(context)),
                           ),
                         );
                       },
@@ -1182,13 +1200,13 @@ class UserDashboardScreen extends StatelessWidget {
         children: [
           _panelTitle(context, 'Hourly Activity Heatmap', Icons.show_chart),
           const SizedBox(height: 10),
-          const Center(
+          Center(
             child: Text(
               'Hourly Activity Pattern - SEN-H002B',
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
-                color: Color(0xFF1e3039),
+                color: _titleColor(context),
               ),
             ),
           ),
@@ -1228,9 +1246,9 @@ class UserDashboardScreen extends StatelessWidget {
                       child: Center(
                         child: Text(
                           '${i}h',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF60717c),
+                            color: _mutedTextColor(context),
                           ),
                         ),
                       ),
@@ -1241,9 +1259,10 @@ class UserDashboardScreen extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Text(
+                    Text(
                       '0',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF60717c)),
+                      style: TextStyle(
+                          fontSize: 11, color: _mutedTextColor(context)),
                     ),
                     Container(
                       width: 320,
@@ -1257,8 +1276,8 @@ class UserDashboardScreen extends StatelessWidget {
                     ),
                     Text(
                       maxValue.toStringAsFixed(1),
-                      style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF60717c)),
+                      style: TextStyle(
+                          fontSize: 11, color: _mutedTextColor(context)),
                     ),
                   ],
                 ),
@@ -1274,7 +1293,7 @@ class UserDashboardScreen extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: const Color(0xFF5f707a), size: 22),
+        Icon(icon, color: _mutedTextColor(context), size: 22),
         const SizedBox(width: 8),
         Text(
           text,
@@ -1288,27 +1307,33 @@ class UserDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _chip(String label, {IconData? icon, bool selected = false}) {
+  Widget _chip(BuildContext context, String label,
+      {IconData? icon, bool selected = false}) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final bg = selected
+        ? (isLight ? const Color(0xFFdbe6ea) : const Color(0xFF2A4052))
+        : (isLight ? const Color(0xFFd6e1e6) : const Color(0xFF23394A));
+    final fg = isLight ? const Color(0xFF20333e) : const Color(0xFFD8E8F5);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: selected ? const Color(0xFFdbe6ea) : const Color(0xFFd6e1e6),
+        color: bg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFbfd0d8)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 16, color: const Color(0xFF20333e)),
+            Icon(icon, size: 16, color: fg),
             const SizedBox(width: 7),
           ],
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w700,
               fontSize: 18 > 14 ? 18 - 4 : 14,
-              color: Color(0xFF20333e),
+              color: fg,
             ),
           ),
         ],
@@ -1320,6 +1345,12 @@ class UserDashboardScreen extends StatelessWidget {
     return Theme.of(context).brightness == Brightness.light
         ? const Color(0xFF1c2a33)
         : const Color(0xFFd4e4ef);
+  }
+
+  Color _mutedTextColor(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.light
+        ? const Color(0xFF60717c)
+        : const Color(0xFF9FB4C6);
   }
 
   List<HorizontalLine> _thresholdLinesForGraph(
@@ -1340,7 +1371,8 @@ class UserDashboardScreen extends StatelessWidget {
               show: true,
               alignment: Alignment.topRight,
               style: TextStyle(color: rule.color, fontWeight: FontWeight.w600),
-              labelResolver: (_) => '${rule.label}: ${rule.value.toStringAsFixed(1)}°',
+              labelResolver: (_) =>
+                  '${rule.label}: ${rule.value.toStringAsFixed(1)}°',
             ),
           ),
         )
@@ -1359,16 +1391,17 @@ class _DashboardPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFc8d6dc)),
+        border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: isLight ? 0.04 : 0.16),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -1404,8 +1437,13 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final onDark = data.isHighlight ? Colors.white : const Color(0xFF1e3039);
-    final sub = data.isHighlight ? const Color(0xFFb5dbef) : data.tint;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final onDark = data.isHighlight
+        ? Colors.white
+        : (isLight ? const Color(0xFF1e3039) : const Color(0xFFE3EEF8));
+    final sub = data.isHighlight
+        ? const Color(0xFFb5dbef)
+        : (isLight ? data.tint : data.tint.withValues(alpha: 0.9));
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact =
@@ -1415,7 +1453,7 @@ class _MetricCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: data.isHighlight ? data.tint : Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFFc8d6dc)),
+            border: Border.all(color: Theme.of(context).dividerColor),
             boxShadow: [
               BoxShadow(
                 color: Colors.black
@@ -1500,6 +1538,9 @@ class _LegendItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textColor = Theme.of(context).brightness == Brightness.light
+        ? const Color(0xFF566872)
+        : const Color(0xFF9FB4C6);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1512,7 +1553,7 @@ class _LegendItem extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           label,
-          style: const TextStyle(fontSize: 14, color: Color(0xFF566872)),
+          style: TextStyle(fontSize: 14, color: textColor),
         ),
       ],
     );
@@ -1546,6 +1587,18 @@ class _MiniStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final titleColor =
+        isLight ? const Color(0xFF4d616d) : const Color(0xFFB8CBDA);
+    final valueColor =
+        isLight ? const Color(0xFF11212d) : const Color(0xFFE3EEF8);
+    final unitColor =
+        isLight ? const Color(0xFF5f707a) : const Color(0xFFA8BDCE);
+    final detailColor =
+        isLight ? const Color(0xFF60717c) : const Color(0xFF9FB4C6);
+    final badgeBg = isLight ? const Color(0xFFd7f2df) : const Color(0xFF1E4736);
+    final badgeBorder =
+        isLight ? const Color(0xFF9edbb2) : const Color(0xFF2E8E61);
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact =
@@ -1575,9 +1628,9 @@ class _MiniStatCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       data.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF4d616d),
+                        color: titleColor,
                         fontSize: 12,
                       ),
                     ),
@@ -1586,9 +1639,9 @@ class _MiniStatCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFd7f2df),
+                      color: badgeBg,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF9edbb2)),
+                      border: Border.all(color: badgeBorder),
                     ),
                     child: Text(
                       data.badge,
@@ -1610,7 +1663,7 @@ class _MiniStatCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: compact ? 22 : 30,
                       fontWeight: FontWeight.w800,
-                      color: const Color(0xFF11212d),
+                      color: valueColor,
                       height: 1,
                     ),
                   ),
@@ -1621,7 +1674,7 @@ class _MiniStatCard extends StatelessWidget {
                       data.unit,
                       style: TextStyle(
                         fontSize: compact ? 13 : 16,
-                        color: const Color(0xFF5f707a),
+                        color: unitColor,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1631,9 +1684,9 @@ class _MiniStatCard extends StatelessWidget {
               if (data.detail.isNotEmpty && !compact)
                 Text(
                   data.detail,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF60717c),
+                    color: detailColor,
                   ),
                 ),
             ],

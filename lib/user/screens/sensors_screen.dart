@@ -61,10 +61,14 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
                           ),
                         ),
                         const SizedBox(height: 2),
-                        const Text(
+                        Text(
                           'View live sensor readings',
-                          style:
-                              TextStyle(fontSize: 15, color: Color(0xFF4e6473)),
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: isLight
+                                ? const Color(0xFF4e6473)
+                                : const Color(0xFF9db7d2),
+                          ),
                         ),
                       ],
                     ),
@@ -73,8 +77,9 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _buildViewToggle(),
+                      _buildViewToggle(context),
                       _headerButton(
+                        context: context,
                         label: 'Filters',
                         icon: Icons.filter_list,
                         onTap: () =>
@@ -98,23 +103,26 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
     );
   }
 
-  Widget _buildViewToggle() {
+  Widget _buildViewToggle(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFE6EFF3),
+        color: isLight ? const Color(0xFFE6EFF3) : const Color(0xFF243E52),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           _toggleButton(
+            context: context,
             active: _isCardView,
             icon: Icons.grid_view_rounded,
             onTap: () => setState(() => _isCardView = true),
           ),
           _toggleButton(
+            context: context,
             active: !_isCardView,
             icon: Icons.view_list_rounded,
             onTap: () => setState(() => _isCardView = false),
@@ -125,29 +133,37 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
   }
 
   Widget _headerButton({
+    required BuildContext context,
     required String label,
     required IconData icon,
     required VoidCallback onTap,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFFE6EFF3),
+          color: isLight ? const Color(0xFFE6EFF3) : const Color(0xFF243E52),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFC8D6DD)),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: const Color(0xFF18313F)),
+            Icon(
+              icon,
+              size: 18,
+              color:
+                  isLight ? const Color(0xFF18313F) : const Color(0xFFD7E8F6),
+            ),
             const SizedBox(width: 8),
             Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFF18313F),
+              style: TextStyle(
+                color:
+                    isLight ? const Color(0xFF18313F) : const Color(0xFFD7E8F6),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -163,23 +179,25 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
     int filteredCount,
   ) {
     final compact = MediaQuery.of(context).size.width < 1000;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Filter Sensors',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF1A303D),
+              color:
+                  isLight ? const Color(0xFF1A303D) : const Color(0xFFD8E8F5),
             ),
           ),
           const SizedBox(height: 12),
@@ -190,6 +208,7 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
               SizedBox(
                 width: compact ? double.infinity : 280,
                 child: _field(
+                  context,
                   'Search',
                   TextField(
                     onChanged: (v) => setState(() => _searchQuery = v),
@@ -205,6 +224,7 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
               SizedBox(
                 width: 180,
                 child: _selectField(
+                  context: context,
                   label: 'Status',
                   value: 'all',
                   items: const [
@@ -216,6 +236,7 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
               SizedBox(
                 width: 180,
                 child: _selectField(
+                  context: context,
                   label: 'Sensor Type',
                   value: _typeFilter,
                   items: [
@@ -230,6 +251,7 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
               SizedBox(
                 width: 180,
                 child: _selectField(
+                  context: context,
                   label: 'Device',
                   value: _deviceFilter,
                   items: [
@@ -247,9 +269,11 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
                 padding: const EdgeInsets.only(top: 26),
                 child: Text(
                   'Showing $filteredCount of ${db.sensors.length} sensors',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    color: Color(0xFF48606E),
+                    color: isLight
+                        ? const Color(0xFF48606E)
+                        : const Color(0xFF9FB4C6),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -261,15 +285,16 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
     );
   }
 
-  Widget _field(String label, Widget child) {
+  Widget _field(BuildContext context, String label, Widget child) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
-            color: Color(0xFF4D6472),
+            color: isLight ? const Color(0xFF4D6472) : const Color(0xFF9FB4C6),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -278,9 +303,9 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
           height: 40,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isLight ? Colors.white : const Color(0xFF243E52),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFC8D6DD)),
+            border: Border.all(color: Theme.of(context).dividerColor),
           ),
           child: child,
         ),
@@ -289,12 +314,14 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
   }
 
   Widget _selectField({
+    required BuildContext context,
     required String label,
     required String value,
     required List<DropdownMenuItem<String>> items,
     required ValueChanged<String?> onChanged,
   }) {
     return _field(
+      context,
       label,
       DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -308,10 +335,12 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
   }
 
   Widget _toggleButton({
+    required BuildContext context,
     required bool active,
     required IconData icon,
     required VoidCallback onTap,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -324,7 +353,9 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
         child: Icon(
           icon,
           size: 18,
-          color: active ? Colors.white : const Color(0xFF2a414e),
+          color: active
+              ? Colors.white
+              : (isLight ? const Color(0xFF2a414e) : const Color(0xFFD7E8F6)),
         ),
       ),
     );
@@ -370,17 +401,19 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFC8D6DD)),
+                border: Border.all(color: Theme.of(context).dividerColor),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     sensor.serialNumber,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF162f3a),
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? const Color(0xFF162f3a)
+                          : const Color(0xFFE2EDF8),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -424,7 +457,7 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         children: sensors.map((sensor) {
@@ -452,9 +485,9 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
 
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
-                bottom: BorderSide(color: Color(0xFFDCE5EA)),
+                bottom: BorderSide(color: Theme.of(context).dividerColor),
               ),
             ),
             child: Column(
@@ -467,9 +500,12 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
                     Expanded(
                       child: Text(
                         sensor.serialNumber,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF1a2f3b),
+                          color:
+                              Theme.of(context).brightness == Brightness.light
+                                  ? const Color(0xFF1a2f3b)
+                                  : const Color(0xFFE2EDF8),
                         ),
                       ),
                     ),
@@ -505,15 +541,23 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEAF2F6),
+                            color:
+                                Theme.of(context).brightness == Brightness.light
+                                    ? const Color(0xFFEAF2F6)
+                                    : const Color(0xFF253F52),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFD0DEE6)),
+                            border: Border.all(
+                              color: Theme.of(context).dividerColor,
+                            ),
                           ),
                           child: Text(
                             detail,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF3E5765),
+                              color: Theme.of(context).brightness ==
+                                      Brightness.light
+                                  ? const Color(0xFF3E5765)
+                                  : const Color(0xFFBBD0E0),
                               fontWeight: FontWeight.w600,
                             ),
                           ),

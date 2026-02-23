@@ -494,6 +494,7 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Wrap(
       alignment: WrapAlignment.spaceBetween,
       runSpacing: 12,
@@ -514,9 +515,13 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
               ),
             ),
             const SizedBox(height: 2),
-            const Text(
+            Text(
               'Configure and monitor sensors',
-              style: TextStyle(fontSize: 15, color: Color(0xFF4e6473)),
+              style: TextStyle(
+                fontSize: 15,
+                color:
+                    isLight ? const Color(0xFF4e6473) : const Color(0xFF9db7d2),
+              ),
             ),
           ],
         ),
@@ -525,11 +530,13 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
           runSpacing: 8,
           children: [
             _headerButton(
+              context: context,
               label: 'Filters',
               icon: Icons.filter_list,
               onTap: () => setState(() => _showFilters = !_showFilters),
             ),
             _headerButton(
+              context: context,
               label: _isListView ? 'Cards' : 'List',
               icon: _isListView
                   ? Icons.grid_view_rounded
@@ -537,6 +544,7 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
               onTap: () => setState(() => _isListView = !_isListView),
             ),
             _headerButton(
+              context: context,
               label: 'Export',
               icon: Icons.upload_outlined,
               onTap: () {
@@ -546,6 +554,7 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
               },
             ),
             _headerButton(
+              context: context,
               label: 'Add',
               icon: Icons.add,
               primary: true,
@@ -558,34 +567,41 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
   }
 
   Widget _headerButton({
+    required BuildContext context,
     required String label,
     required IconData icon,
     required VoidCallback onTap,
     bool primary = false,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final bg = primary
+        ? const Color(0xFF0f729c)
+        : (isLight ? const Color(0xFFe6eff3) : const Color(0xFF243E52));
+    final border = primary
+        ? const Color(0xFF0f729c)
+        : (isLight ? const Color(0xFFc8d6dd) : Theme.of(context).dividerColor);
+    final fg = primary
+        ? Colors.white
+        : (isLight ? const Color(0xFF18313f) : const Color(0xFFD7E8F6));
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         decoration: BoxDecoration(
-          color: primary ? const Color(0xFF0f729c) : const Color(0xFFe6eff3),
+          color: bg,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: primary ? const Color(0xFF0f729c) : const Color(0xFFc8d6dd),
-          ),
+          border: Border.all(color: border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon,
-                size: 19,
-                color: primary ? Colors.white : const Color(0xFF18313f)),
+            Icon(icon, size: 19, color: fg),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                color: primary ? Colors.white : const Color(0xFF18313f),
+                color: fg,
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
@@ -602,23 +618,28 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
     int filteredCount,
     int totalCount,
   ) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final titleColor =
+        isLight ? const Color(0xFF243946) : const Color(0xFFD8E8F5);
+    final mutedColor =
+        isLight ? const Color(0xFF60717c) : const Color(0xFF9FB4C6);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFc8d6dc)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Filter Sensors',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF243946),
+              color: titleColor,
             ),
           ),
           const SizedBox(height: 16),
@@ -695,29 +716,33 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFe6eff3),
+                  color: isLight
+                      ? const Color(0xFFe6eff3)
+                      : const Color(0xFF243E52),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   'Showing $filteredCount of $totalCount sensors',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF324956),
+                    color: isLight
+                        ? const Color(0xFF324956)
+                        : const Color(0xFFD4E5F2),
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          const Divider(height: 1, color: Color(0xFFd9e4ea)),
+          Divider(height: 1, color: Theme.of(context).dividerColor),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'LOCATION HIERARCHY',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF60717c),
+              color: mutedColor,
             ),
           ),
           const SizedBox(height: 12),
@@ -779,21 +804,22 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
     String? hint,
     IconData? icon,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InputDecoration(
       labelText: label,
       hintText: hint,
       prefixIcon: icon == null ? null : Icon(icon, size: 20),
       isDense: true,
       filled: true,
-      fillColor: const Color(0xFFF4F8FA),
+      fillColor: isLight ? const Color(0xFFF4F8FA) : const Color(0xFF223B4E),
       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+        borderSide: BorderSide(color: Theme.of(context).dividerColor),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+        borderSide: BorderSide(color: Theme.of(context).dividerColor),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -915,23 +941,28 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFc8d6dc)),
+            border: Border.all(color: Theme.of(context).dividerColor),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(_iconForType(type),
-                      size: 20, color: const Color(0xFF5673d8)),
+                  Icon(
+                    _iconForType(type),
+                    size: 20,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       '${_sensorCodeFor(safeIndex)} • $type',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF152733),
+                        color: Theme.of(context).brightness == Brightness.light
+                            ? const Color(0xFF152733)
+                            : const Color(0xFFE2EDF8),
                       ),
                     ),
                   ),
@@ -1025,6 +1056,7 @@ class _SensorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = status == 'active';
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final statusColor =
         isActive ? const Color(0xFF0ca15f) : const Color(0xFF8397a3);
 
@@ -1033,10 +1065,10 @@ class _SensorCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFc8d6dc)),
+        border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: isLight ? 0.04 : 0.16),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -1051,10 +1083,16 @@ class _SensorCard extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFdfe3ef),
+                  color: isLight
+                      ? const Color(0xFFdfe3ef)
+                      : const Color(0xFF2A3F54),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: const Color(0xFF5673d8), size: 26),
+                child: Icon(
+                  icon,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 26,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1065,17 +1103,21 @@ class _SensorCard extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 30 > 22 ? 30 - 8 : 22,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF152733),
+                        color: isLight
+                            ? const Color(0xFF152733)
+                            : const Color(0xFFE2EDF8),
                       ),
                     ),
                     Text(
                       sensorType,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF60717c),
+                        color: isLight
+                            ? const Color(0xFF60717c)
+                            : const Color(0xFF9FB4C6),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1101,15 +1143,15 @@ class _SensorCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          _meta('Serial Number', serial),
+          _meta(context, 'Serial Number', serial),
           const SizedBox(height: 8),
-          _meta('Connected Device', connectedDevice),
+          _meta(context, 'Connected Device', connectedDevice),
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(child: _meta('Channel', '$channel')),
+              Expanded(child: _meta(context, 'Channel', '$channel')),
               const SizedBox(width: 10),
-              Expanded(child: _meta('Unit', unit)),
+              Expanded(child: _meta(context, 'Unit', unit)),
             ],
           ),
           const SizedBox(height: 10),
@@ -1117,21 +1159,29 @@ class _SensorCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFe9f0f4),
+              color:
+                  isLight ? const Color(0xFFe9f0f4) : const Color(0xFF233C4F),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
-                const Icon(Icons.location_on_outlined,
-                    size: 18, color: Color(0xFF2f83ad)),
+                Icon(
+                  Icons.location_on_outlined,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     location,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style:
-                        const TextStyle(color: Color(0xFF2c404d), fontSize: 13),
+                    style: TextStyle(
+                      color: isLight
+                          ? const Color(0xFF2c404d)
+                          : const Color(0xFFD3E4F2),
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
@@ -1140,11 +1190,16 @@ class _SensorCard extends StatelessWidget {
           const Spacer(),
           Row(
             children: [
-              _iconButton(icon: Icons.edit_outlined, onTap: onEdit),
-              const SizedBox(width: 8),
-              _iconButton(icon: Icons.power_settings_new, onTap: onPower),
+              _iconButton(
+                  context: context, icon: Icons.edit_outlined, onTap: onEdit),
               const SizedBox(width: 8),
               _iconButton(
+                  context: context,
+                  icon: Icons.power_settings_new,
+                  onTap: onPower),
+              const SizedBox(width: 8),
+              _iconButton(
+                context: context,
                 icon: Icons.delete_outline,
                 onTap: onDelete,
                 iconColor: Colors.red,
@@ -1156,15 +1211,16 @@ class _SensorCard extends StatelessWidget {
     );
   }
 
-  Widget _meta(String label, String value) {
+  Widget _meta(BuildContext context, String label, String value) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
-            color: Color(0xFF60717c),
+            color: isLight ? const Color(0xFF60717c) : const Color(0xFF9FB4C6),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -1173,9 +1229,9 @@ class _SensorCard extends StatelessWidget {
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
-            color: Color(0xFF152733),
+            color: isLight ? const Color(0xFF152733) : const Color(0xFFE2EDF8),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -1184,10 +1240,12 @@ class _SensorCard extends StatelessWidget {
   }
 
   Widget _iconButton({
+    required BuildContext context,
     required IconData icon,
     required VoidCallback onTap,
     Color iconColor = const Color(0xFF2f4654),
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -1195,9 +1253,9 @@ class _SensorCard extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: const Color(0xFFe6eff3),
+          color: isLight ? const Color(0xFFe6eff3) : const Color(0xFF243E52),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFc8d6dd)),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: Icon(icon, size: 20, color: iconColor),
       ),

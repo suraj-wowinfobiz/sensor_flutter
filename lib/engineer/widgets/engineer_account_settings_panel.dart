@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../providers/theme_provider.dart';
 import '../../shared/models/threshold_rule.dart';
 import '../providers/engineer_database_provider.dart';
 import '../screens/engineer_login_screen.dart';
 
-enum _SettingsTab { profile, notifications, access, security, thresholds }
+enum _SettingsTab {
+  profile,
+  preferences,
+  notifications,
+  access,
+  security,
+  thresholds
+}
 
 class EngineerAccountSettingsPanel extends StatefulWidget {
   final String roleLabel;
@@ -85,6 +93,8 @@ class _EngineerAccountSettingsPanelState
             _buildTabBar(context),
             const SizedBox(height: 18),
             if (_activeTab == _SettingsTab.profile) _buildProfileTab(context),
+            if (_activeTab == _SettingsTab.preferences)
+              _buildPreferencesTab(context),
             if (_activeTab == _SettingsTab.notifications)
               _buildNotificationsTab(context),
             if (_activeTab == _SettingsTab.access) _buildAccessTab(context),
@@ -100,6 +110,7 @@ class _EngineerAccountSettingsPanelState
   Widget _buildTabBar(BuildContext context) {
     final tabs = [
       (_SettingsTab.profile, Icons.person_outline, 'Profile'),
+      (_SettingsTab.preferences, Icons.palette_outlined, 'Preferences'),
       (_SettingsTab.notifications, Icons.notifications_none, 'Notifications'),
       (_SettingsTab.access, Icons.verified_user_outlined, 'Access'),
       (_SettingsTab.security, Icons.lock_outline, 'Security'),
@@ -254,14 +265,101 @@ class _EngineerAccountSettingsPanelState
     );
   }
 
+  Widget _buildAppearancePreferences(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final themeProvider = context.watch<ThemeProvider>();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).dividerColor),
+        color: isLight ? const Color(0xFFF6FAFC) : const Color(0xFF203A54),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color:
+                  isLight ? const Color(0xFFE6EFF5) : const Color(0xFF2B4A67),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
+              size: 20,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Appearance Preferences',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  themeProvider.isDarkMode
+                      ? 'Dark mode enabled'
+                      : 'Light mode enabled',
+                  style: TextStyle(
+                    color: isLight
+                        ? const Color(0xFF4f6b82)
+                        : const Color(0xFF9db7d2),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: themeProvider.isDarkMode,
+            onChanged: themeProvider.toggleTheme,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreferencesTab(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final subColor =
+        isLight ? const Color(0xFF4f6b82) : const Color(0xFF9db7d2);
+    return _sectionContainer(
+      context,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Preferences',
+            style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Customize app appearance and behavior',
+            style: TextStyle(color: subColor, fontSize: 15),
+          ),
+          const SizedBox(height: 14),
+          _buildAppearancePreferences(context),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProfileLogoutFooter(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: const Color(0xFFF8EDED),
-        border: Border.all(color: const Color(0xFFE54C4C).withValues(alpha: 0.32)),
+        color: isLight ? const Color(0xFFF8EDED) : const Color(0xFF3A2327),
+        border:
+            Border.all(color: const Color(0xFFE54C4C).withValues(alpha: 0.32)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -274,7 +372,13 @@ class _EngineerAccountSettingsPanelState
             ),
           ),
           const SizedBox(height: 6),
-          const Text('Logout from your account on this device.'),
+          Text(
+            'Logout from your account on this device.',
+            style: TextStyle(
+              color:
+                  isLight ? const Color(0xFF37434C) : const Color(0xFFC5D5E3),
+            ),
+          ),
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
@@ -638,13 +742,15 @@ class _EngineerAccountSettingsPanelState
   }
 
   Widget _buildMobileLogoutSection(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        color: const Color(0xFFF8EDED),
-        border: Border.all(color: const Color(0xFFE54C4C).withValues(alpha: 0.35)),
+        color: isLight ? const Color(0xFFF8EDED) : const Color(0xFF3A2327),
+        border:
+            Border.all(color: const Color(0xFFE54C4C).withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -657,7 +763,13 @@ class _EngineerAccountSettingsPanelState
             ),
           ),
           const SizedBox(height: 6),
-          const Text('Sign out from this device.'),
+          Text(
+            'Sign out from this device.',
+            style: TextStyle(
+              color:
+                  isLight ? const Color(0xFF37434C) : const Color(0xFFC5D5E3),
+            ),
+          ),
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
@@ -702,7 +814,8 @@ class _EngineerAccountSettingsPanelState
                   children: [
                     const Text(
                       'Threshold Configuration',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                     ),
                     const Spacer(),
                     FilledButton.icon(
@@ -790,8 +903,8 @@ class _EngineerAccountSettingsPanelState
                           ),
                         ),
                         IconButton(
-                          onPressed: () =>
-                              _showThresholdDialog(context, db: db, existing: rule),
+                          onPressed: () => _showThresholdDialog(context,
+                              db: db, existing: rule),
                           icon: const Icon(Icons.edit_outlined, size: 18),
                           tooltip: 'Edit threshold',
                         ),
@@ -875,11 +988,11 @@ class _EngineerAccountSettingsPanelState
     String selectedColorName = existing == null
         ? 'Blue'
         : (presetColors.entries
-                .firstWhere(
-                  (entry) => entry.value.toARGB32() == existing.color.toARGB32(),
-                  orElse: () => const MapEntry('Custom', Color(0xFF4C8BF5)),
-                )
-                .key);
+            .firstWhere(
+              (entry) => entry.value.toARGB32() == existing.color.toARGB32(),
+              orElse: () => const MapEntry('Custom', Color(0xFF4C8BF5)),
+            )
+            .key);
 
     Color selectedColor = selectedColorName == 'Custom'
         ? (existing?.color ?? const Color(0xFF4C8BF5))
@@ -892,7 +1005,8 @@ class _EngineerAccountSettingsPanelState
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text(existing == null ? 'Add Threshold' : 'Edit Threshold'),
+              title:
+                  Text(existing == null ? 'Add Threshold' : 'Edit Threshold'),
               content: SingleChildScrollView(
                 child: SizedBox(
                   width: 380,
@@ -957,7 +1071,8 @@ class _EngineerAccountSettingsPanelState
                             selectedColorName = value;
                             if (value != 'Custom') {
                               selectedColor = presetColors[value]!;
-                              colorHexController.text = _toHexColor(selectedColor);
+                              colorHexController.text =
+                                  _toHexColor(selectedColor);
                             }
                           });
                         },
@@ -1032,7 +1147,8 @@ class _EngineerAccountSettingsPanelState
                       return;
                     }
                     if (value == null) {
-                      setDialogState(() => errorText = 'Value must be numeric.');
+                      setDialogState(
+                          () => errorText = 'Value must be numeric.');
                       return;
                     }
                     if (sound.isEmpty) {

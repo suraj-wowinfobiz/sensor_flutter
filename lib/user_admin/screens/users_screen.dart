@@ -399,16 +399,19 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     required String label,
     required VoidCallback onTap,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: active ? Colors.white : Colors.transparent,
+          color: active
+              ? (isLight ? Colors.white : const Color(0xFF2B4659))
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: active ? const Color(0xFFC8D6DD) : Colors.transparent,
+            color: active ? Theme.of(context).dividerColor : Colors.transparent,
           ),
         ),
         child: Row(
@@ -431,13 +434,14 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
   }
 
   Widget _inputBox({required Widget child}) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       height: 46,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isLight ? Colors.white : const Color(0xFF243E52),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: child,
     );
@@ -1060,6 +1064,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
   Widget build(BuildContext context) {
     return Consumer<UserAdminDatabaseProvider>(
       builder: (context, db, child) {
+        final isLight = Theme.of(context).brightness == Brightness.light;
         final users = _applyFilters(db.users);
 
         return SingleChildScrollView(
@@ -1087,10 +1092,14 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      const Text(
+                      Text(
                         'Manage users and their access control permissions',
-                        style:
-                            TextStyle(fontSize: 15, color: Color(0xFF4e6473)),
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: isLight
+                              ? const Color(0xFF4e6473)
+                              : const Color(0xFF9db7d2),
+                        ),
                       ),
                     ],
                   ),
@@ -1125,9 +1134,11 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                           child: Container(
                             height: 44,
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.surface,
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFFC8D6DD)),
+                              border: Border.all(
+                                color: Theme.of(context).dividerColor,
+                              ),
                             ),
                             child: TextField(
                               controller: _searchController,
@@ -1149,7 +1160,8 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                           items: const [
                             DropdownMenuItem(
                                 value: 'all', child: Text('All Roles')),
-                            DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                            DropdownMenuItem(
+                                value: 'admin', child: Text('Admin')),
                             DropdownMenuItem(
                                 value: 'engineer', child: Text('Engineer')),
                             DropdownMenuItem(
@@ -1182,17 +1194,19 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                       Container(
                         height: 44,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFC8D6DD)),
+                          border: Border.all(
+                            color: Theme.of(context).dividerColor,
+                          ),
                         ),
                         child: TextField(
                           controller: _searchController,
                           onChanged: (v) =>
                               setState(() => _searchText = v.trim()),
                           decoration: const InputDecoration(
-                            contentPadding:
-                                EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
                             border: InputBorder.none,
                             hintText: 'Search by name or email...',
                           ),
@@ -1268,7 +1282,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                     decoration: BoxDecoration(
                       color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFC8D6DD)),
+                      border: Border.all(color: Theme.of(context).dividerColor),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1294,10 +1308,13 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                                   Expanded(
                                     child: Text(
                                       user.name,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.w800,
-                                        color: Color(0xFF102632),
+                                        color: Theme.of(context).brightness ==
+                                                Brightness.light
+                                            ? const Color(0xFF102632)
+                                            : const Color(0xFFE2EDF8),
                                       ),
                                     ),
                                   ),
@@ -1409,12 +1426,13 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
   }
 
   Widget _buildViewToggle() {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFE6EFF3),
+        color: isLight ? const Color(0xFFE6EFF3) : const Color(0xFF243E52),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1439,6 +1457,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     required IconData icon,
     required VoidCallback onTap,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -1451,7 +1470,9 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
         child: Icon(
           icon,
           size: 18,
-          color: active ? Colors.white : const Color(0xFF2a414e),
+          color: active
+              ? Colors.white
+              : (isLight ? const Color(0xFF2a414e) : const Color(0xFFD7E8F6)),
         ),
       ),
     );
@@ -1466,7 +1487,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         children: users.map((user) {
@@ -1494,8 +1515,10 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
 
           return Container(
             padding: const EdgeInsets.all(14),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFFDCE5EA))),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Theme.of(context).dividerColor),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1520,9 +1543,12 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                         children: [
                           Text(
                             user.name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFF102632),
+                              color: Theme.of(context).brightness ==
+                                      Brightness.light
+                                  ? const Color(0xFF102632)
+                                  : const Color(0xFFE2EDF8),
                             ),
                           ),
                           Text(
@@ -1551,15 +1577,23 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEAF2F6),
+                            color:
+                                Theme.of(context).brightness == Brightness.light
+                                    ? const Color(0xFFEAF2F6)
+                                    : const Color(0xFF253F52),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFD0DEE6)),
+                            border: Border.all(
+                              color: Theme.of(context).dividerColor,
+                            ),
                           ),
                           child: Text(
                             detail,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF3E5765),
+                              color: Theme.of(context).brightness ==
+                                      Brightness.light
+                                  ? const Color(0xFF3E5765)
+                                  : const Color(0xFFBBD0E0),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -1621,14 +1655,15 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     required List<DropdownMenuItem<String>> items,
     required ValueChanged<String?> onChanged,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: width,
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isLight ? Colors.white : const Color(0xFF243E52),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -1647,16 +1682,21 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     required VoidCallback onTap,
     bool primary = false,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         decoration: BoxDecoration(
-          color: primary ? const Color(0xFF0f729c) : const Color(0xFFe6eff3),
+          color: primary
+              ? const Color(0xFF0f729c)
+              : (isLight ? const Color(0xFFe6eff3) : const Color(0xFF243E52)),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: primary ? const Color(0xFF0f729c) : const Color(0xFFc8d6dd),
+            color: primary
+                ? const Color(0xFF0f729c)
+                : Theme.of(context).dividerColor,
           ),
         ),
         child: Row(
@@ -1664,12 +1704,20 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
           children: [
             Icon(icon,
                 size: 18,
-                color: primary ? Colors.white : const Color(0xFF18313f)),
+                color: primary
+                    ? Colors.white
+                    : (isLight
+                        ? const Color(0xFF18313f)
+                        : const Color(0xFFD7E8F6))),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                color: primary ? Colors.white : const Color(0xFF18313f),
+                color: primary
+                    ? Colors.white
+                    : (isLight
+                        ? const Color(0xFF18313f)
+                        : const Color(0xFFD7E8F6)),
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
@@ -1681,25 +1729,32 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
   }
 
   Widget _tag(String label, {IconData? icon}) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFFE2EDF3),
+        color: isLight ? const Color(0xFFE2EDF3) : const Color(0xFF2B4659),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 14, color: const Color(0xFF2C4654)),
+            Icon(
+              icon,
+              size: 14,
+              color:
+                  isLight ? const Color(0xFF2C4654) : const Color(0xFFD7E8F6),
+            ),
             const SizedBox(width: 5),
           ],
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF1f3642),
+              color:
+                  isLight ? const Color(0xFF1f3642) : const Color(0xFFD7E8F6),
             ),
           ),
         ],
@@ -1713,27 +1768,35 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     required Color color,
     required List<String> chips,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: color,
+        color: isLight ? color : const Color(0xFF243E52),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 15, color: const Color(0xFF246081)),
+              Icon(
+                icon,
+                size: 15,
+                color:
+                    isLight ? const Color(0xFF246081) : const Color(0xFFBBD0E0),
+              ),
               const SizedBox(width: 6),
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
-                  color: Color(0xFF173341),
+                  color: isLight
+                      ? const Color(0xFF173341)
+                      : const Color(0xFFE2EDF8),
                 ),
               ),
             ],
@@ -1747,15 +1810,19 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD2E3EC),
+                        color: isLight
+                            ? const Color(0xFFD2E3EC)
+                            : const Color(0xFF2B4659),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         c,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF203845),
+                          color: isLight
+                              ? const Color(0xFF203845)
+                              : const Color(0xFFD7E8F6),
                         ),
                       ),
                     ))
@@ -1771,27 +1838,34 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     required IconData icon,
     required VoidCallback onTap,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
-          color: const Color(0xFFE7EFF3),
+          color: isLight ? const Color(0xFFE7EFF3) : const Color(0xFF243E52),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFC8D6DD)),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: const Color(0xFF1f3642)),
+            Icon(
+              icon,
+              size: 16,
+              color:
+                  isLight ? const Color(0xFF1f3642) : const Color(0xFFD7E8F6),
+            ),
             const SizedBox(width: 8),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF1f3642),
+                color:
+                    isLight ? const Color(0xFF1f3642) : const Color(0xFFD7E8F6),
               ),
             ),
           ],
@@ -1805,6 +1879,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     required VoidCallback onTap,
     Color iconColor = const Color(0xFF2f4654),
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -1812,9 +1887,9 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
         width: 38,
         height: 38,
         decoration: BoxDecoration(
-          color: const Color(0xFFE7EFF3),
+          color: isLight ? const Color(0xFFE7EFF3) : const Color(0xFF243E52),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFC8D6DD)),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: Icon(icon, size: 18, color: iconColor),
       ),
