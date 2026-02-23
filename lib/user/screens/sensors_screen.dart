@@ -44,36 +44,10 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Sensors',
-                          style: TextStyle(
-                            fontSize: 34,
-                            fontWeight: FontWeight.w800,
-                            color: isLight
-                                ? const Color(0xFF0f202d)
-                                : const Color(0xFFd4e4ef),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'View live sensor readings',
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: isLight
-                                ? const Color(0xFF4e6473)
-                                : const Color(0xFF9db7d2),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Wrap(
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 760;
+                  final actions = Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
@@ -86,8 +60,76 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
                             setState(() => _showFilters = !_showFilters),
                       ),
                     ],
-                  ),
-                ],
+                  );
+
+                  if (compact) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Sensors',
+                              style: TextStyle(
+                                fontSize: 34,
+                                fontWeight: FontWeight.w800,
+                                color: isLight
+                                    ? const Color(0xFF0f202d)
+                                    : const Color(0xFFd4e4ef),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'View live sensor readings',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: isLight
+                                    ? const Color(0xFF4e6473)
+                                    : const Color(0xFF9db7d2),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        actions,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Sensors',
+                              style: TextStyle(
+                                fontSize: 34,
+                                fontWeight: FontWeight.w800,
+                                color: isLight
+                                    ? const Color(0xFF0f202d)
+                                    : const Color(0xFFd4e4ef),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'View live sensor readings',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: isLight
+                                    ? const Color(0xFF4e6473)
+                                    : const Color(0xFF9db7d2),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      actions,
+                    ],
+                  );
+                },
               ),
               if (_showFilters) const SizedBox(height: 14),
               if (_showFilters) _buildFilterPanel(context, db, sensors.length),
@@ -201,84 +243,95 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              SizedBox(
-                width: compact ? double.infinity : 280,
-                child: _field(
-                  context,
-                  'Search',
-                  TextField(
-                    onChanged: (v) => setState(() => _searchQuery = v),
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      border: InputBorder.none,
-                      hintText: 'Sensor ID, Serial, MAC...',
-                      prefixIcon: Icon(Icons.search, size: 20),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final small = constraints.maxWidth < 430;
+              final searchWidth =
+                  (compact || small) ? constraints.maxWidth : 280.0;
+              final filterWidth = small ? constraints.maxWidth : 180.0;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: searchWidth,
+                    child: _field(
+                      context,
+                      'Search',
+                      TextField(
+                        onChanged: (v) => setState(() => _searchQuery = v),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                          hintText: 'Sensor ID, Serial, MAC...',
+                          prefixIcon: Icon(Icons.search, size: 20),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              SizedBox(
-                width: 180,
-                child: _selectField(
-                  context: context,
-                  label: 'Status',
-                  value: 'all',
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('All Statuses')),
-                  ],
-                  onChanged: (_) {},
-                ),
-              ),
-              SizedBox(
-                width: 180,
-                child: _selectField(
-                  context: context,
-                  label: 'Sensor Type',
-                  value: _typeFilter,
-                  items: [
-                    const DropdownMenuItem(
-                        value: 'all', child: Text('All Types')),
-                    ...db.sensorTypes.map((t) =>
-                        DropdownMenuItem(value: t.id, child: Text(t.name))),
-                  ],
-                  onChanged: (v) => setState(() => _typeFilter = v ?? 'all'),
-                ),
-              ),
-              SizedBox(
-                width: 180,
-                child: _selectField(
-                  context: context,
-                  label: 'Device',
-                  value: _deviceFilter,
-                  items: [
-                    const DropdownMenuItem(
-                        value: 'all', child: Text('All Devices')),
-                    ...db.devices.map((d) => DropdownMenuItem(
-                          value: d.id,
-                          child: Text(d.deviceCode),
-                        )),
-                  ],
-                  onChanged: (v) => setState(() => _deviceFilter = v ?? 'all'),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 26),
-                child: Text(
-                  'Showing $filteredCount of ${db.sensors.length} sensors',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: isLight
-                        ? const Color(0xFF48606E)
-                        : const Color(0xFF9FB4C6),
-                    fontWeight: FontWeight.w500,
+                  SizedBox(
+                    width: filterWidth,
+                    child: _selectField(
+                      context: context,
+                      label: 'Status',
+                      value: 'all',
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'all', child: Text('All Statuses')),
+                      ],
+                      onChanged: (_) {},
+                    ),
                   ),
-                ),
-              ),
-            ],
+                  SizedBox(
+                    width: filterWidth,
+                    child: _selectField(
+                      context: context,
+                      label: 'Sensor Type',
+                      value: _typeFilter,
+                      items: [
+                        const DropdownMenuItem(
+                            value: 'all', child: Text('All Types')),
+                        ...db.sensorTypes.map((t) =>
+                            DropdownMenuItem(value: t.id, child: Text(t.name))),
+                      ],
+                      onChanged: (v) =>
+                          setState(() => _typeFilter = v ?? 'all'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: filterWidth,
+                    child: _selectField(
+                      context: context,
+                      label: 'Device',
+                      value: _deviceFilter,
+                      items: [
+                        const DropdownMenuItem(
+                            value: 'all', child: Text('All Devices')),
+                        ...db.devices.map((d) => DropdownMenuItem(
+                              value: d.id,
+                              child: Text(d.deviceCode),
+                            )),
+                      ],
+                      onChanged: (v) =>
+                          setState(() => _deviceFilter = v ?? 'all'),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.only(top: small ? 0 : 26),
+                    child: Text(
+                      'Showing $filteredCount of ${db.sensors.length} sensors',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: isLight
+                            ? const Color(0xFF48606E)
+                            : const Color(0xFF9FB4C6),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -475,13 +528,13 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
           final installedAt =
               '${sensor.installedAt.day}/${sensor.installedAt.month}/${sensor.installedAt.year}';
           final details = <String>[
-            'ID: ${sensor.id}',
-            'Serial: ${sensor.serialNumber}',
-            'Type ID: ${sensor.sensorTypeId}',
-            'Device ID: ${sensor.deviceId}',
-            'Last reading: ${sensor.lastReading.toStringAsFixed(2)}°',
-            'Installed: $installedAt',
-            'Status: $status',
+            '${sensor.id}',
+            '${sensor.serialNumber}',
+            '${sensor.sensorTypeId}',
+            '${sensor.deviceId}',
+            '${sensor.lastReading.toStringAsFixed(2)}°',
+            installedAt,
+            status,
           ];
 
           return Container(
@@ -501,6 +554,8 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
                     Expanded(
                       child: Text(
                         sensor.serialNumber,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
                           color:
@@ -531,40 +586,32 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: details
-                      .map(
-                        (detail) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                Theme.of(context).brightness == Brightness.light
-                                    ? const Color(0xFFEAF2F6)
-                                    : const Color(0xFF253F52),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: Theme.of(context).dividerColor,
-                            ),
-                          ),
-                          child: Text(
-                            detail,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(context).brightness ==
-                                      Brightness.light
-                                  ? const Color(0xFF3E5765)
-                                  : const Color(0xFFBBD0E0),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.light
+                        ? const Color(0xFFEAF2F6)
+                        : const Color(0xFF253F52),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Theme.of(context).dividerColor,
+                    ),
+                  ),
+                  child: Text(
+                    details.join(' • '),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? const Color(0xFF3E5765)
+                          : const Color(0xFFBBD0E0),
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                  ),
                 ),
               ],
             ),

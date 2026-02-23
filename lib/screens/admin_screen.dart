@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
+import '../core/responsive/responsive_extensions.dart';
 import '../providers/database_provider.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';
@@ -77,7 +78,7 @@ class _AdminScreenState extends State<AdminScreen>
   }
 
   bool _onScroll(UserScrollNotification notification) {
-    if (MediaQuery.of(context).size.width >= 1100) return false;
+    if (context.isDesktopLayout) return false;
     if (notification.direction == ScrollDirection.reverse) {
       if (_showTopNav || _showBottomNav) {
         setState(() {
@@ -114,7 +115,7 @@ class _AdminScreenState extends State<AdminScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.of(context).size.width >= 1100;
+    final isDesktop = context.isDesktopLayout;
     final notifications = _notifications();
     final hasNotifications = notifications.isNotEmpty;
     final navBar = NavBar(
@@ -221,7 +222,14 @@ class _AdminScreenState extends State<AdminScreen>
     required String currentView,
     required ValueChanged<String> onViewChanged,
   }) {
-    const views = ['dashboard', 'devices', 'sensors', 'alerts', 'config'];
+    const views = [
+      'dashboard',
+      'devices',
+      'sensors',
+      'alerts',
+      'analytics',
+      'config',
+    ];
     final index = views.indexOf(currentView);
     final isLight = Theme.of(context).brightness == Brightness.light;
     final selectedColor = Theme.of(context).colorScheme.primary;
@@ -282,6 +290,11 @@ class _AdminScreenState extends State<AdminScreen>
               BottomNavigationBarItem(
                 icon: Icon(Icons.warning_amber_outlined),
                 activeIcon: Icon(Icons.warning_amber_rounded),
+                label: '',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.analytics_outlined),
+                activeIcon: Icon(Icons.analytics),
                 label: '',
               ),
               BottomNavigationBarItem(

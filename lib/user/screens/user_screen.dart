@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/responsive/responsive_extensions.dart';
 import '../providers/user_database_provider.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';
@@ -72,7 +73,7 @@ class _UserScreenState extends State<UserScreen>
   }
 
   bool _onScroll(UserScrollNotification notification) {
-    if (MediaQuery.of(context).size.width >= 1100) return false;
+    if (context.isDesktopLayout) return false;
 
     if (notification.direction == ScrollDirection.reverse) {
       if (_showTopNav || _showBottomNav) {
@@ -110,7 +111,7 @@ class _UserScreenState extends State<UserScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.of(context).size.width >= 1100;
+    final isDesktop = context.isDesktopLayout;
     final notifications = _notifications();
     final hasNotifications = notifications.isNotEmpty;
     final navBar = UserNavBar(

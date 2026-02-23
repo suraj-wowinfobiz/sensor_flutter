@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/responsive/responsive_extensions.dart';
 
 class AdminNotificationItem {
   final String title;
@@ -35,9 +36,8 @@ class NavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final width = MediaQuery.of(context).size.width;
-    final isCompact = width < 900;
-    final isMobile = width < 700;
+    final isCompact = context.narrowerThan(900);
+    final isMobile = context.narrowerThan(700);
 
     final barColor = isLight
         ? Theme.of(context).colorScheme.primary
@@ -214,35 +214,8 @@ class NavBar extends StatelessWidget {
           SizedBox(width: isCompact ? 6 : 10),
           PopupMenuButton<String>(
             tooltip: 'Profile Menu',
-            onSelected: (value) {
-              if (value == 'settings') {
-                onSettingsTap();
-              } else if (value == 'logout') {
-                onLogoutTap();
-              }
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem<String>(
-                value: 'settings',
-                child: Row(
-                  children: [
-                    Icon(Icons.settings_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Text('Settings'),
-                  ],
-                ),
-              ),
-              PopupMenuItem<String>(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout, size: 18),
-                    SizedBox(width: 8),
-                    Text('Logout'),
-                  ],
-                ),
-              ),
-            ],
+            onSelected: (_) {},
+            itemBuilder: (context) => const [],
             child: Row(
               children: [
                 if (!isCompact)

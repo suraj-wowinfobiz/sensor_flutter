@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../core/responsive/adaptive_gap.dart';
+import '../core/responsive/adaptive_text.dart';
+import '../core/responsive/responsive_extensions.dart';
+import '../core/responsive/responsive_values.dart';
+
 class CrudModal extends StatelessWidget {
   final String title;
   final List<Map<String, dynamic>> fields;
@@ -19,8 +24,10 @@ class CrudModal extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isLight = theme.brightness == Brightness.light;
-    final width = MediaQuery.of(context).size.width;
-    final isSmall = width < 520;
+    final isSmall = context.narrowerThan(520);
+    final cornerRadius = ResponsiveValues.cardRadius(context) * 2.2;
+    final sectionGap = ResponsiveValues.gap(context) * 2;
+    final fieldGap = ResponsiveValues.gap(context) * 0.6;
     final fieldSurface = Color.alphaBlend(
       scheme.primary.withValues(alpha: isLight ? 0.08 : 0.16),
       theme.cardColor,
@@ -35,13 +42,13 @@ class CrudModal extends StatelessWidget {
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: 640,
-          maxHeight: MediaQuery.of(context).size.height * 0.88,
+          maxHeight: context.screenHeight * 0.88,
         ),
         child: Container(
           padding: EdgeInsets.all(isSmall ? 18 : 32),
           decoration: BoxDecoration(
             color: theme.cardColor,
-            borderRadius: BorderRadius.circular(40),
+            borderRadius: BorderRadius.circular(cornerRadius),
             border: Border.all(color: theme.dividerColor),
             boxShadow: [
               BoxShadow(
@@ -63,7 +70,12 @@ class CrudModal extends StatelessWidget {
                     Text(
                       title,
                       style: TextStyle(
-                        fontSize: 24,
+                        fontSize: context.responsive(
+                          compact: 21,
+                          medium: 22,
+                          expanded: 24,
+                          large: 24,
+                        ),
                         fontWeight: FontWeight.bold,
                         color: scheme.onSurface,
                       ),
@@ -77,28 +89,28 @@ class CrudModal extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                AdaptiveGap(compact: sectionGap),
                 ...fields.map((field) {
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
+                    padding: EdgeInsets.only(bottom: sectionGap - 4),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        AdaptiveText(
                           field['label'] as String,
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             color: scheme.onSurface,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        AdaptiveGap(compact: fieldGap),
                         if (field['type'] == 'select')
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             decoration: BoxDecoration(
                               color: fieldSurface,
                               border: Border.all(color: theme.dividerColor),
-                              borderRadius: BorderRadius.circular(30),
+                              borderRadius: BorderRadius.circular(cornerRadius),
                             ),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
@@ -132,19 +144,22 @@ class CrudModal extends StatelessWidget {
                                 field['keyboardType'] as TextInputType?,
                             decoration: InputDecoration(
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30),
+                                borderRadius:
+                                    BorderRadius.circular(cornerRadius),
                                 borderSide: BorderSide(
                                   color: theme.dividerColor,
                                 ),
                               ),
                               enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30),
+                                borderRadius:
+                                    BorderRadius.circular(cornerRadius),
                                 borderSide: BorderSide(
                                   color: theme.dividerColor,
                                 ),
                               ),
                               focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30),
+                                borderRadius:
+                                    BorderRadius.circular(cornerRadius),
                                 borderSide: BorderSide(
                                   color: Theme.of(context).colorScheme.primary,
                                   width: 2,
@@ -162,7 +177,7 @@ class CrudModal extends StatelessWidget {
                     ),
                   );
                 }),
-                const SizedBox(height: 8),
+                AdaptiveGap(compact: ResponsiveValues.gap(context)),
                 if (isSmall)
                   Column(
                     children: [
@@ -173,10 +188,10 @@ class CrudModal extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           decoration: BoxDecoration(
                             color: Theme.of(context).colorScheme.primary,
-                            borderRadius: BorderRadius.circular(40),
+                            borderRadius: BorderRadius.circular(cornerRadius),
                           ),
-                          child: const Center(
-                            child: Text(
+                          child: Center(
+                            child: AdaptiveText(
                               'Save',
                               style: TextStyle(
                                 color: Colors.white,
@@ -187,7 +202,7 @@ class CrudModal extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      AdaptiveGap(compact: ResponsiveValues.gap(context)),
                       GestureDetector(
                         onTap: onCancel,
                         child: Container(
@@ -196,10 +211,10 @@ class CrudModal extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: fieldSurface,
                             border: Border.all(color: theme.dividerColor),
-                            borderRadius: BorderRadius.circular(40),
+                            borderRadius: BorderRadius.circular(cornerRadius),
                           ),
                           child: Center(
-                            child: Text(
+                            child: AdaptiveText(
                               'Cancel',
                               style: TextStyle(
                                 color: scheme.onSurface,
@@ -222,10 +237,10 @@ class CrudModal extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             decoration: BoxDecoration(
                               color: Theme.of(context).colorScheme.primary,
-                              borderRadius: BorderRadius.circular(40),
+                              borderRadius: BorderRadius.circular(cornerRadius),
                             ),
-                            child: const Center(
-                              child: Text(
+                            child: Center(
+                              child: AdaptiveText(
                                 'Save',
                                 style: TextStyle(
                                   color: Colors.white,
@@ -237,7 +252,10 @@ class CrudModal extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      AdaptiveGap(
+                        axis: Axis.horizontal,
+                        compact: ResponsiveValues.gap(context),
+                      ),
                       Expanded(
                         child: GestureDetector(
                           onTap: onCancel,
@@ -246,10 +264,10 @@ class CrudModal extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: fieldSurface,
                               border: Border.all(color: theme.dividerColor),
-                              borderRadius: BorderRadius.circular(40),
+                              borderRadius: BorderRadius.circular(cornerRadius),
                             ),
                             child: Center(
-                              child: Text(
+                              child: AdaptiveText(
                                 'Cancel',
                                 style: TextStyle(
                                   color: scheme.onSurface,

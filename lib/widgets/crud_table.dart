@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../core/responsive/adaptive_text.dart';
+import '../core/responsive/responsive_extensions.dart';
+import '../core/responsive/responsive_values.dart';
+
 class CrudTable extends StatefulWidget {
   final String title;
   final IconData icon;
@@ -46,15 +50,30 @@ class _CrudTableState extends State<CrudTable>
 
   @override
   Widget build(BuildContext context) {
+    final tableColumnWidth = context.responsive(
+      compact: 120,
+      medium: 136,
+      expanded: 150,
+      large: 168,
+    );
+    final actionsWidth = context.responsive(
+      compact: 130,
+      medium: 140,
+      expanded: 150,
+      large: 164,
+    );
+    final outerGap = ResponsiveValues.gap(context);
+    final cardRadius = ResponsiveValues.cardRadius(context) * 2;
+
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Container(
         width: double.infinity,
-        margin: const EdgeInsets.all(12),
-        padding: const EdgeInsets.all(16),
+        margin: EdgeInsets.all(outerGap),
+        padding: EdgeInsets.all(outerGap * 1.4),
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(cardRadius),
           border: Border.all(color: Theme.of(context).dividerColor),
           boxShadow: [
             BoxShadow(
@@ -77,8 +96,8 @@ class _CrudTableState extends State<CrudTable>
                   children: [
                     Icon(widget.icon,
                         color: Theme.of(context).colorScheme.primary, size: 22),
-                    const SizedBox(width: 10),
-                    Text(
+                    SizedBox(width: outerGap),
+                    AdaptiveText(
                       widget.title,
                       style: TextStyle(
                         fontSize: 18,
@@ -100,12 +119,12 @@ class _CrudTableState extends State<CrudTable>
                         color: Theme.of(context).colorScheme.primary,
                         borderRadius: BorderRadius.circular(40),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.add, color: Colors.white, size: 16),
                           SizedBox(width: 6),
-                          Text(
+                          AdaptiveText(
                             'Add New',
                             style: TextStyle(
                               color: Colors.white,
@@ -119,7 +138,7 @@ class _CrudTableState extends State<CrudTable>
                   ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: outerGap),
             Flexible(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -134,7 +153,8 @@ class _CrudTableState extends State<CrudTable>
                             decoration: BoxDecoration(
                               border: Border.all(
                                   color: Theme.of(context).dividerColor),
-                              borderRadius: BorderRadius.circular(22),
+                              borderRadius:
+                                  BorderRadius.circular(cardRadius - 8),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,15 +168,15 @@ class _CrudTableState extends State<CrudTable>
                                         ? const Color(0xFFf0f5fd)
                                         : const Color(0xFF203a54),
                                     borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(22),
-                                      topRight: Radius.circular(22),
+                                      topLeft: Radius.circular(24),
+                                      topRight: Radius.circular(24),
                                     ),
                                   ),
                                   child: Row(
                                     children: [
                                       ...widget.columns.map((column) =>
                                           Container(
-                                            width: 150,
+                                            width: tableColumnWidth,
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 8),
                                             child: Text(
@@ -173,8 +193,11 @@ class _CrudTableState extends State<CrudTable>
                                             ),
                                           )),
                                       const SizedBox(
-                                        width: 150,
-                                        child: Padding(
+                                        child: SizedBox.shrink(),
+                                      ),
+                                      SizedBox(
+                                        width: actionsWidth,
+                                        child: const Padding(
                                           padding: EdgeInsets.symmetric(
                                               horizontal: 8),
                                           child: Text(
@@ -201,7 +224,7 @@ class _CrudTableState extends State<CrudTable>
                                       children: [
                                         ...widget.data[index].map((cell) {
                                           return SizedBox(
-                                            width: 150,
+                                            width: tableColumnWidth,
                                             child: Padding(
                                               padding: const EdgeInsets.all(12),
                                               child: cell is Widget
@@ -222,7 +245,7 @@ class _CrudTableState extends State<CrudTable>
                                           );
                                         }),
                                         SizedBox(
-                                          width: 150,
+                                          width: actionsWidth,
                                           child: Padding(
                                             padding: const EdgeInsets.all(12),
                                             child: Row(

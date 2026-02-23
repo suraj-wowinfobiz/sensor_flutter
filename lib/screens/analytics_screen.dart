@@ -11,8 +11,7 @@ class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
 
   @override
-  State<AnalyticsScreen> createState() =>
-      _AnalyticsScreenState();
+  State<AnalyticsScreen> createState() => _AnalyticsScreenState();
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
@@ -72,7 +71,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Wrap(
                 alignment: WrapAlignment.spaceBetween,
@@ -116,6 +115,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 builder: (context, constraints) {
                   final width = constraints.maxWidth;
                   final vertical = width < 1150;
+                  final selectorCardWidth = width < 540
+                      ? width
+                      : width < 980
+                          ? (width - 12) / 2
+                          : 305.0;
 
                   final selectorCards = Wrap(
                     spacing: 12,
@@ -123,11 +127,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     children: [
                       _selectCard(
                         context,
+                        width: selectorCardWidth,
                         title: 'Sensor',
                         child: _dropdown(
                           value: _selectedSensorId,
                           hint: 'Select a sensor',
-                          width: 210,
                           items: filteredSensors
                               .map((s) => DropdownMenuItem(
                                     value: s.id,
@@ -140,11 +144,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       ),
                       _selectCard(
                         context,
+                        width: selectorCardWidth,
                         title: 'Compare',
                         child: _dropdown(
                           value: _compareMode,
                           hint: 'No Comparison',
-                          width: 210,
                           items: const [
                             DropdownMenuItem(
                                 value: 'none', child: Text('No Comparison')),
@@ -161,11 +165,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       ),
                       _selectCard(
                         context,
+                        width: selectorCardWidth,
                         title: 'Range',
                         child: _dropdown(
                           value: _range,
                           hint: 'Last 24 Hours',
-                          width: 210,
                           items: const [
                             DropdownMenuItem(
                                 value: '1h', child: Text('Last 1 Hour')),
@@ -233,7 +237,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               ),
               const SizedBox(height: 16),
               Container(
-                width: double.infinity,                padding: const EdgeInsets.all(18),
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(18),
@@ -243,18 +248,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        const Text(
-                          'Real-Time Data Visualization',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF132733),
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact = constraints.maxWidth < 420;
+                        final badge = Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
@@ -270,8 +267,40 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                               color: Color(0xFF4C63C5),
                             ),
                           ),
-                        ),
-                      ],
+                        );
+                        if (compact) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Real-Time Data Visualization',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF132733),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              badge,
+                            ],
+                          );
+                        }
+                        return Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Real-Time Data Visualization',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF132733),
+                                ),
+                              ),
+                            ),
+                            badge,
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 14),
                     _buildThresholdLegend(graphThresholds),
@@ -310,104 +339,99 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Sensor: ${selected.serialNumber}  |  Last reading: ${selected.lastReading.toStringAsFixed(2)}°',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF4F6573),
-                                fontWeight: FontWeight.w600,
-                              ),
+                        children: [
+                          Text(
+                            'Sensor: ${selected.serialNumber}  |  Last reading: ${selected.lastReading.toStringAsFixed(2)}°',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF4F6573),
+                              fontWeight: FontWeight.w600,
                             ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              height: 400,
-                              child: LineChart(
-                                LineChartData(
-                                  minY: -3,
-                                  maxY: 6,
-                                  extraLinesData:
-                                      ExtraLinesData(
-                                    horizontalLines: graphThresholds
-                                        .map(
-                                          (threshold) => HorizontalLine(
-                                            y: threshold.value,
-                                            color: threshold.color,
-                                            strokeWidth: 1.8,
-                                            dashArray: const [6, 4],
-                                          ),
-                                        )
-                                        .toList(),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 400,
+                            child: LineChart(
+                              LineChartData(
+                                minY: -3,
+                                maxY: 6,
+                                extraLinesData: ExtraLinesData(
+                                  horizontalLines: graphThresholds
+                                      .map(
+                                        (threshold) => HorizontalLine(
+                                          y: threshold.value,
+                                          color: threshold.color,
+                                          strokeWidth: 1.8,
+                                          dashArray: const [6, 4],
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                                gridData: FlGridData(
+                                  show: true,
+                                  drawVerticalLine: false,
+                                  horizontalInterval: 1,
+                                  getDrawingHorizontalLine: (_) =>
+                                      const FlLine(color: Color(0xFFD2DBE0)),
+                                ),
+                                borderData: FlBorderData(
+                                  show: true,
+                                  border: Border(
+                                    left: BorderSide(
+                                        color: Colors.blueGrey.shade200),
+                                    bottom: BorderSide(
+                                        color: Colors.blueGrey.shade200),
+                                    top: BorderSide.none,
+                                    right: BorderSide.none,
                                   ),
-                                  gridData: FlGridData(
-                                    show: true,
-                                    drawVerticalLine: false,
-                                    horizontalInterval: 1,
-                                    getDrawingHorizontalLine: (_) =>
-                                        const FlLine(color: Color(0xFFD2DBE0)),
+                                ),
+                                titlesData: const FlTitlesData(
+                                  topTitles: AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
                                   ),
-                                  borderData: FlBorderData(
-                                    show: true,
-                                    border: Border(
-                                      left: BorderSide(
-                                          color: Colors.blueGrey.shade200),
-                                      bottom: BorderSide(
-                                          color: Colors.blueGrey.shade200),
-                                      top: BorderSide.none,
-                                      right: BorderSide.none,
-                                    ),
+                                  rightTitles: AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
                                   ),
-                                  titlesData: const FlTitlesData(
-                                    topTitles: AxisTitles(
-                                      sideTitles: SideTitles(showTitles: false),
-                                    ),
-                                    rightTitles: AxisTitles(
-                                      sideTitles: SideTitles(showTitles: false),
-                                    ),
+                                ),
+                                lineBarsData: [
+                                  LineChartBarData(
+                                    spots: List.generate(40, (i) {
+                                      final base = selected.lastReading;
+                                      final noise =
+                                          (Random(i + 21).nextDouble() - 0.5) *
+                                              (_paused ? 0.2 : 1.3);
+                                      return FlSpot(i.toDouble(), base + noise);
+                                    }),
+                                    isCurved: true,
+                                    color: const Color(0xFF0f8f92),
+                                    barWidth: 2.5,
+                                    dotData: const FlDotData(show: false),
                                   ),
-                                  lineBarsData: [
+                                  if (_compareMode != 'none')
                                     LineChartBarData(
                                       spots: List.generate(40, (i) {
-                                        final base = selected.lastReading;
+                                        final offset =
+                                            _compareMode == 'both' ? 1.4 : 0.9;
                                         final noise =
-                                            (Random(i + 21).nextDouble() -
+                                            (Random(i + 77).nextDouble() -
                                                     0.5) *
-                                                (_paused ? 0.2 : 1.3);
+                                                1.1;
                                         return FlSpot(
-                                            i.toDouble(), base + noise);
+                                            i.toDouble(),
+                                            selected.lastReading +
+                                                offset +
+                                                noise);
                                       }),
                                       isCurved: true,
-                                      color: const Color(0xFF0f8f92),
-                                      barWidth: 2.5,
+                                      color: const Color(0xFF5973D8),
+                                      barWidth: 2.0,
                                       dotData: const FlDotData(show: false),
                                     ),
-                                    if (_compareMode != 'none')
-                                      LineChartBarData(
-                                        spots: List.generate(40, (i) {
-                                          final offset = _compareMode == 'both'
-                                              ? 1.4
-                                              : 0.9;
-                                          final noise =
-                                              (Random(i + 77).nextDouble() -
-                                                      0.5) *
-                                                  1.1;
-                                          return FlSpot(
-                                              i.toDouble(),
-                                              selected.lastReading +
-                                                  offset +
-                                                  noise);
-                                        }),
-                                        isCurved: true,
-                                        color: const Color(0xFF5973D8),
-                                        barWidth: 2.0,
-                                        dotData: const FlDotData(show: false),
-                                      ),
-                                  ],
-                                ),
+                                ],
                               ),
                             ),
-                          ],
-                    
+                          ),
+                        ],
                       ),
                   ],
                 ),
@@ -436,7 +460,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
             'Filter Sensors',
@@ -471,7 +495,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 child: _selectFilter(
                   label: 'Status',
                   value: _statusFilter,
-                  items: _statusFilterItems(db.thresholdRulesForGraph(ThresholdGraphTarget.analyticsMain)),
+                  items: _statusFilterItems(db.thresholdRulesForGraph(
+                      ThresholdGraphTarget.analyticsMain)),
                   onChanged: (v) => setState(() => _statusFilter = v ?? 'all'),
                 ),
               ),
@@ -724,11 +749,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _selectCard(
     BuildContext context, {
+    required double width,
     required String title,
     required Widget child,
   }) {
     return Container(
-      width: 305,
+      width: width,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
@@ -742,21 +768,42 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 88,
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1b313d),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 260) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1b313d),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                child,
+              ],
+            );
+          }
+          return Row(
+            children: [
+              SizedBox(
+                width: 88,
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1b313d),
+                  ),
+                ),
               ),
-            ),
-          ),
-          Expanded(child: child),
-        ],
+              Expanded(child: child),
+            ],
+          );
+        },
       ),
     );
   }
@@ -764,12 +811,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _dropdown({
     required String? value,
     required String hint,
-    required double width,
     required List<DropdownMenuItem<String>> items,
     required ValueChanged<String?> onChanged,
   }) {
     return Container(
-      width: width,
+      width: double.infinity,
       height: 38,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(

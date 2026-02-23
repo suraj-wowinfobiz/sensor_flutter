@@ -191,26 +191,50 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
                         }),
                       ),
                       const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              'Device GPS Coordinates (Optional)',
-                              style: TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.w700),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final compact = constraints.maxWidth < 560;
+                          final title = Text(
+                            'GPS Coordinates',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
                             ),
-                          ),
-                          OutlinedButton.icon(
+                          );
+                          final action = OutlinedButton.icon(
                             onPressed: () {
                               setState(() {
                                 _latitude = '37.7749';
                                 _longitude = '-122.4194';
                               });
                             },
-                            icon: const Icon(Icons.my_location, size: 18),
-                            label: const Text('Get Current Location'),
-                          ),
-                        ],
+                            icon: const Icon(Icons.my_location, size: 16),
+                            label: const Text(
+                              'Get Location',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                          if (compact) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                title,
+                                const SizedBox(height: 8),
+                                action,
+                              ],
+                            );
+                          }
+                          return Row(
+                            children: [
+                              Expanded(child: title),
+                              const SizedBox(width: 10),
+                              action,
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 10),
                       Row(
@@ -350,7 +374,12 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        Text(
+          label,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
         const SizedBox(height: 6),
         TextFormField(
           initialValue: value,
@@ -384,11 +413,37 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        Text(
+          label,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
           value: value,
-          hint: Text(hint),
+          isExpanded: true,
+          iconSize: 18,
+          style: const TextStyle(fontSize: 12.5),
+          hint: Text(
+            hint,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12.5),
+          ),
+          selectedItemBuilder: (context) => items
+              .map(
+                (item) => Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _dropdownItemLabel(item),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12.5),
+                  ),
+                ),
+              )
+              .toList(),
           items: items,
           onChanged: onChanged,
           decoration: InputDecoration(
@@ -408,6 +463,12 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
         ),
       ],
     );
+  }
+
+  String _dropdownItemLabel(DropdownMenuItem<String> item) {
+    final child = item.child;
+    if (child is Text) return child.data ?? (item.value ?? '');
+    return item.value ?? '';
   }
 
   String _macFor(int index) {
@@ -621,73 +682,85 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 14,
-            runSpacing: 14,
-            crossAxisAlignment: WrapCrossAlignment.end,
-            children: [
-              SizedBox(
-                width: 290,
-                child: TextField(
-                  onChanged: (value) => setState(() => _searchQuery = value),
-                  decoration: _filterFieldDecoration(
-                    label: 'Search',
-                    hint: 'Device ID, Serial, MAC, IP...',
-                    icon: Icons.search,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 430;
+              final searchWidth = compact ? constraints.maxWidth : 290.0;
+              final filterWidth = compact ? constraints.maxWidth : 190.0;
+              return Wrap(
+                spacing: 14,
+                runSpacing: 14,
+                crossAxisAlignment: WrapCrossAlignment.end,
+                children: [
+                  SizedBox(
+                    width: searchWidth,
+                    child: TextField(
+                      onChanged: (value) =>
+                          setState(() => _searchQuery = value),
+                      decoration: _filterFieldDecoration(
+                        label: 'Search',
+                        hint: 'Device ID, Serial, MAC, IP...',
+                        icon: Icons.search,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              SizedBox(
-                width: 190,
-                child: DropdownButtonFormField<String>(
-                  value: _statusFilter,
-                  decoration: _filterFieldDecoration(label: 'Status'),
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('All Statuses')),
-                    DropdownMenuItem(value: 'active', child: Text('Active')),
-                    DropdownMenuItem(
-                        value: 'inactive', child: Text('Inactive')),
-                    DropdownMenuItem(
-                        value: 'maintenance', child: Text('Maintenance')),
-                    DropdownMenuItem(value: 'retired', child: Text('Retired')),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => _statusFilter = value ?? 'all'),
-                ),
-              ),
-              SizedBox(
-                width: 190,
-                child: DropdownButtonFormField<String>(
-                  value: _webhookFilter,
-                  decoration: _filterFieldDecoration(label: 'Webhook'),
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('All')),
-                    DropdownMenuItem(
-                        value: 'configured', child: Text('Configured')),
-                    DropdownMenuItem(
-                        value: 'not_configured', child: Text('Not Configured')),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => _webhookFilter = value ?? 'all'),
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFe6eff3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  'Showing $filteredCount of $totalCount devices',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF324956),
+                  SizedBox(
+                    width: filterWidth,
+                    child: DropdownButtonFormField<String>(
+                      value: _statusFilter,
+                      decoration: _filterFieldDecoration(label: 'Status'),
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'all', child: Text('All Statuses')),
+                        DropdownMenuItem(
+                            value: 'active', child: Text('Active')),
+                        DropdownMenuItem(
+                            value: 'inactive', child: Text('Inactive')),
+                        DropdownMenuItem(
+                            value: 'maintenance', child: Text('Maintenance')),
+                        DropdownMenuItem(
+                            value: 'retired', child: Text('Retired')),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _statusFilter = value ?? 'all'),
+                    ),
                   ),
-                ),
-              ),
-            ],
+                  SizedBox(
+                    width: filterWidth,
+                    child: DropdownButtonFormField<String>(
+                      value: _webhookFilter,
+                      decoration: _filterFieldDecoration(label: 'Webhook'),
+                      items: const [
+                        DropdownMenuItem(value: 'all', child: Text('All')),
+                        DropdownMenuItem(
+                            value: 'configured', child: Text('Configured')),
+                        DropdownMenuItem(
+                            value: 'not_configured',
+                            child: Text('Not Configured')),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _webhookFilter = value ?? 'all'),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFe6eff3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Showing $filteredCount of $totalCount devices',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF324956),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
           const Divider(height: 1, color: Color(0xFFd9e4ea)),
@@ -701,35 +774,45 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 14,
-            runSpacing: 14,
-            children: [
-              _hierarchyDropdown(
-                label: 'Organization',
-                value: _organizationFilter,
-                onChanged: (value) =>
-                    setState(() => _organizationFilter = value ?? 'all'),
-              ),
-              _hierarchyDropdown(
-                label: 'Site',
-                value: _siteFilter,
-                onChanged: (value) =>
-                    setState(() => _siteFilter = value ?? 'all'),
-              ),
-              _hierarchyDropdown(
-                label: 'Zone',
-                value: _zoneFilter,
-                onChanged: (value) =>
-                    setState(() => _zoneFilter = value ?? 'all'),
-              ),
-              _hierarchyDropdown(
-                label: 'Location',
-                value: _locationFilter,
-                onChanged: (value) =>
-                    setState(() => _locationFilter = value ?? 'all'),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 430;
+              final width = compact ? constraints.maxWidth : 190.0;
+              return Wrap(
+                spacing: 14,
+                runSpacing: 14,
+                children: [
+                  _hierarchyDropdown(
+                    width: width,
+                    label: 'Organization',
+                    value: _organizationFilter,
+                    onChanged: (value) =>
+                        setState(() => _organizationFilter = value ?? 'all'),
+                  ),
+                  _hierarchyDropdown(
+                    width: width,
+                    label: 'Site',
+                    value: _siteFilter,
+                    onChanged: (value) =>
+                        setState(() => _siteFilter = value ?? 'all'),
+                  ),
+                  _hierarchyDropdown(
+                    width: width,
+                    label: 'Zone',
+                    value: _zoneFilter,
+                    onChanged: (value) =>
+                        setState(() => _zoneFilter = value ?? 'all'),
+                  ),
+                  _hierarchyDropdown(
+                    width: width,
+                    label: 'Location',
+                    value: _locationFilter,
+                    onChanged: (value) =>
+                        setState(() => _locationFilter = value ?? 'all'),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -737,12 +820,13 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
   }
 
   Widget _hierarchyDropdown({
+    required double width,
     required String label,
     required String value,
     required ValueChanged<String?> onChanged,
   }) {
     return SizedBox(
-      width: 190,
+      width: width,
       child: DropdownButtonFormField<String>(
         value: value,
         decoration: _filterFieldDecoration(label: label),
@@ -870,6 +954,8 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
         final statusColor = device.status == 'active'
             ? const Color(0xFF0ca15f)
             : const Color(0xFF8397a3);
+        final metaLine =
+            '${_macFor(safeIndex)} • ${_ipFor(safeIndex)} • ${channels == 0 ? 4 + index : channels} • ${_date(device.installedAt)} • $location • ${zoneName ?? 'Unknown'}';
 
         return Container(
           padding: const EdgeInsets.all(14),
@@ -888,6 +974,8 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
                   Expanded(
                     child: Text(
                       '${device.deviceCode} • ${_serialFor(safeIndex)}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
@@ -914,17 +1002,17 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
                 ],
               ),
               const SizedBox(height: 10),
-              Wrap(
-                spacing: 14,
-                runSpacing: 6,
-                children: [
-                  Text('MAC: ${_macFor(safeIndex)}'),
-                  Text('IP: ${_ipFor(safeIndex)}'),
-                  Text('Channels: ${channels == 0 ? 4 + index : channels}'),
-                  Text('Last Seen: ${_date(device.installedAt)}'),
-                  Text('Location: $location'),
-                  Text('Zone: ${zoneName ?? 'Unknown'}'),
-                ],
+              Text(
+                metaLine,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? const Color(0xFF4a6170)
+                      : const Color(0xFFBBD0E0),
+                  height: 1.3,
+                ),
               ),
               const SizedBox(height: 8),
               Row(

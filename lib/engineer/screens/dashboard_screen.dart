@@ -11,14 +11,16 @@ import '../providers/engineer_database_provider.dart';
 class EngineerDashboardScreen extends StatelessWidget {
   final bool embeddedScroll;
 
-  const EngineerDashboardScreen({super.key, this.embeddedScroll = false});
+  const EngineerDashboardScreen({
+    super.key,
+    this.embeddedScroll = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final content = Consumer<EngineerDatabaseProvider>(
       builder: (context, db, child) {
         final activeAlerts = db.getActiveAlerts().length;
-        final sensors = db.sensors.length;
         final avgTilt = db.sensors.isEmpty
             ? 0.0
             : db.sensors
@@ -36,7 +38,7 @@ class EngineerDashboardScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTopStats(context, sensors, avgTilt, maxTilt, activeAlerts),
+              _buildTopStats(context, avgTilt, maxTilt, activeAlerts),
               const SizedBox(height: 18),
               _buildRealtimeCard(context),
               const SizedBox(height: 18),
@@ -69,26 +71,18 @@ class EngineerDashboardScreen extends StatelessWidget {
 
   Widget _buildTopStats(
     BuildContext context,
-    int sensors,
     double avgTilt,
     double maxTilt,
     int activeAlerts,
   ) {
     final cards = [
       _MetricData(
-        title: 'SENSOR MANAGEMENT',
-        value: '$sensors',
-        subtitle: 'Add new configure\n$sensors sensors',
-        icon: Icons.memory,
-        tint: const Color(0xFF0f729c),
-        isHighlight: true,
-      ),
-      _MetricData(
         title: 'AVG TILT ANGLE',
         value: '${avgTilt.toStringAsFixed(2)}°',
         subtitle: 'Current',
         icon: Icons.trending_up,
         tint: const Color(0xFF5973d8),
+        isHighlight: false,
       ),
       _MetricData(
         title: 'MAX TILT ANGLE',
@@ -117,7 +111,7 @@ class EngineerDashboardScreen extends StatelessWidget {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final crossAxisCount = width >= 980
-            ? 5
+            ? 4
             : width >= 820
                 ? 3
                 : width >= 560
@@ -151,31 +145,30 @@ class EngineerDashboardScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 760;
+              final title = Row(
                 children: [
                   const Icon(Icons.trending_up, color: Color(0xFF5f78de)),
                   const SizedBox(width: 10),
-                  Flexible(
+                  Expanded(
                     child: Text(
                       'Real-Time Tilt Monitoring - All Sensors',
+                      maxLines: compact ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
                         color: _titleColor(context),
                       ),
                     ),
-                  )
+                  ),
                 ],
-              ),
-              Wrap(
+              );
+              final chips = Wrap(
                 spacing: 8,
+                runSpacing: 8,
                 children: [
                   _chip(context, 'Pause', icon: Icons.pause, selected: false),
                   _chip(context, '1H', selected: true),
@@ -183,8 +176,28 @@ class EngineerDashboardScreen extends StatelessWidget {
                   _chip(context, '1D'),
                   _chip(context, '7D'),
                 ],
-              ),
-            ],
+              );
+
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    title,
+                    const SizedBox(height: 10),
+                    chips,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: title),
+                  const SizedBox(width: 10),
+                  chips,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 14),
           SizedBox(
@@ -710,18 +723,34 @@ class EngineerDashboardScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            alignment: WrapAlignment.spaceBetween,
-            children: [
-              _panelTitle(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 760;
+              final title = _panelTitle(
                 context,
                 'Tilt Sensor Readings - Live Data',
                 Icons.show_chart_outlined,
-              ),
-              _chip(context, 'Export', icon: Icons.upload_outlined),
-            ],
+              );
+              final action =
+                  _chip(context, 'Export', icon: Icons.upload_outlined);
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    title,
+                    const SizedBox(height: 10),
+                    action,
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: title),
+                  const SizedBox(width: 10),
+                  action,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
           SingleChildScrollView(
@@ -903,175 +932,192 @@ class EngineerDashboardScreen extends StatelessWidget {
         children: [
           _panelTitle(context, 'Multi-Sensor Comparison', Icons.trending_up),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 360,
-            child: Row(
-              children: [
-                Expanded(
-                  child: LineChart(
-                    LineChartData(
-                      minX: 0,
-                      maxX: 60,
-                      minY: 0,
-                      maxY: 1100,
-                      gridData: FlGridData(
-                        show: true,
-                        drawVerticalLine: false,
-                        horizontalInterval: 200,
-                        getDrawingHorizontalLine: (_) =>
-                            const FlLine(color: Color(0xFFd2dbe0)),
-                      ),
-                      borderData: FlBorderData(
-                        show: true,
-                        border: Border(
-                          left: BorderSide(color: Colors.blueGrey.shade200),
-                          bottom: BorderSide(color: Colors.blueGrey.shade200),
-                          top: BorderSide.none,
-                          right: BorderSide.none,
-                        ),
-                      ),
-                      titlesData: FlTitlesData(
-                        topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        leftTitles: const AxisTitles(
-                          sideTitles:
-                              SideTitles(showTitles: true, reservedSize: 40),
-                        ),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            interval: 12,
-                            getTitlesWidget: (value, meta) {
-                              final idx = (value ~/ 6).toInt();
-                              if (idx < 0 || idx >= timeLabels.length) {
-                                return const SizedBox.shrink();
-                              }
-                              return Text(
-                                timeLabels[idx],
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color: _mutedTextColor(context)),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                      lineBarsData: [
-                        LineChartBarData(
-                          spots: List.generate(61, (i) {
-                            return FlSpot(
-                              i.toDouble(),
-                              1005 + Random(i + 33).nextDouble() * 12,
-                            );
-                          }),
-                          color: lineColors[1],
-                          isCurved: true,
-                          barWidth: 2.4,
-                          dotData: const FlDotData(show: false),
-                        ),
-                        LineChartBarData(
-                          spots: List.generate(61, (i) {
-                            return FlSpot(
-                              i.toDouble(),
-                              45 + Random(i + 11).nextDouble() * 18,
-                            );
-                          }),
-                          color: lineColors[0],
-                          isCurved: true,
-                          barWidth: 2.2,
-                          dotData: const FlDotData(show: false),
-                        ),
-                        LineChartBarData(
-                          spots: List.generate(61, (i) {
-                            return FlSpot(
-                              i.toDouble(),
-                              20 + Random(i + 5).nextDouble() * 3,
-                            );
-                          }),
-                          color: lineColors[4],
-                          isCurved: true,
-                          barWidth: 1.9,
-                          dotData: const FlDotData(show: false),
-                        ),
-                        LineChartBarData(
-                          spots: List.generate(61, (i) {
-                            return FlSpot(
-                              i.toDouble(),
-                              3 + Random(i + 9).nextDouble() * 2,
-                            );
-                          }),
-                          color: lineColors[2],
-                          isCurved: true,
-                          barWidth: 1.8,
-                          dotData: const FlDotData(show: false),
-                        ),
-                        LineChartBarData(
-                          spots: List.generate(61, (i) {
-                            return FlSpot(
-                              i.toDouble(),
-                              22 + Random(i + 71).nextDouble() * 2,
-                            );
-                          }),
-                          color: lineColors[3],
-                          isCurved: true,
-                          barWidth: 1.8,
-                          dotData: const FlDotData(show: false),
-                        ),
-                        LineChartBarData(
-                          spots: List.generate(61, (i) {
-                            return FlSpot(
-                              i.toDouble(),
-                              19 + Random(i + 81).nextDouble() * 2,
-                            );
-                          }),
-                          color: lineColors[5],
-                          isCurved: true,
-                          barWidth: 1.8,
-                          dotData: const FlDotData(show: false),
-                        ),
-                      ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 860;
+              final chart = LineChart(
+                LineChartData(
+                  minX: 0,
+                  maxX: 60,
+                  minY: 0,
+                  maxY: 1100,
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: 200,
+                    getDrawingHorizontalLine: (_) =>
+                        const FlLine(color: Color(0xFFd2dbe0)),
+                  ),
+                  borderData: FlBorderData(
+                    show: true,
+                    border: Border(
+                      left: BorderSide(color: Colors.blueGrey.shade200),
+                      bottom: BorderSide(color: Colors.blueGrey.shade200),
+                      top: BorderSide.none,
+                      right: BorderSide.none,
                     ),
                   ),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    leftTitles: const AxisTitles(
+                      sideTitles:
+                          SideTitles(showTitles: true, reservedSize: 40),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        interval: 12,
+                        getTitlesWidget: (value, meta) {
+                          final idx = (value ~/ 6).toInt();
+                          if (idx < 0 || idx >= timeLabels.length) {
+                            return const SizedBox.shrink();
+                          }
+                          return Text(
+                            timeLabels[idx],
+                            style: TextStyle(
+                                fontSize: 10, color: _mutedTextColor(context)),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: List.generate(61, (i) {
+                        return FlSpot(
+                          i.toDouble(),
+                          1005 + Random(i + 33).nextDouble() * 12,
+                        );
+                      }),
+                      color: lineColors[1],
+                      isCurved: true,
+                      barWidth: 2.4,
+                      dotData: const FlDotData(show: false),
+                    ),
+                    LineChartBarData(
+                      spots: List.generate(61, (i) {
+                        return FlSpot(
+                          i.toDouble(),
+                          45 + Random(i + 11).nextDouble() * 18,
+                        );
+                      }),
+                      color: lineColors[0],
+                      isCurved: true,
+                      barWidth: 2.2,
+                      dotData: const FlDotData(show: false),
+                    ),
+                    LineChartBarData(
+                      spots: List.generate(61, (i) {
+                        return FlSpot(
+                          i.toDouble(),
+                          20 + Random(i + 5).nextDouble() * 3,
+                        );
+                      }),
+                      color: lineColors[4],
+                      isCurved: true,
+                      barWidth: 1.9,
+                      dotData: const FlDotData(show: false),
+                    ),
+                    LineChartBarData(
+                      spots: List.generate(61, (i) {
+                        return FlSpot(
+                          i.toDouble(),
+                          3 + Random(i + 9).nextDouble() * 2,
+                        );
+                      }),
+                      color: lineColors[2],
+                      isCurved: true,
+                      barWidth: 1.8,
+                      dotData: const FlDotData(show: false),
+                    ),
+                    LineChartBarData(
+                      spots: List.generate(61, (i) {
+                        return FlSpot(
+                          i.toDouble(),
+                          22 + Random(i + 71).nextDouble() * 2,
+                        );
+                      }),
+                      color: lineColors[3],
+                      isCurved: true,
+                      barWidth: 1.8,
+                      dotData: const FlDotData(show: false),
+                    ),
+                    LineChartBarData(
+                      spots: List.generate(61, (i) {
+                        return FlSpot(
+                          i.toDouble(),
+                          19 + Random(i + 81).nextDouble() * 2,
+                        );
+                      }),
+                      color: lineColors[5],
+                      isCurved: true,
+                      barWidth: 1.8,
+                      dotData: const FlDotData(show: false),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 160,
-                  child: ListView.builder(
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: legends.length,
-                    itemBuilder: (context, index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 22,
-                              height: 2,
-                              color: lineColors[index],
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                legends[index],
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: lineColors[index],
-                                  fontWeight: FontWeight.w600,
-                                ),
+              );
+
+              final legend = SizedBox(
+                width: compact ? double.infinity : 160,
+                child: ListView.builder(
+                  physics: const NeverScrollableScrollPhysics(),
+                  shrinkWrap: true,
+                  itemCount: legends.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 22,
+                            height: 2,
+                            color: lineColors[index],
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              legends[index],
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: lineColors[index],
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              ],
-            ),
+              );
+
+              if (compact) {
+                return Column(
+                  children: [
+                    SizedBox(height: 280, child: chart),
+                    const SizedBox(height: 12),
+                    legend,
+                  ],
+                );
+              }
+
+              return SizedBox(
+                height: 360,
+                child: Row(
+                  children: [
+                    Expanded(child: chart),
+                    const SizedBox(width: 12),
+                    legend,
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -1204,6 +1250,7 @@ class EngineerDashboardScreen extends StatelessWidget {
           Center(
             child: Text(
               'Hourly Activity Pattern - SEN-H002B',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
@@ -1291,20 +1338,28 @@ class EngineerDashboardScreen extends StatelessWidget {
   }
 
   Widget _panelTitle(BuildContext context, String text, IconData icon) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: _mutedTextColor(context), size: 22),
-        const SizedBox(width: 8),
-        Text(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bounded = constraints.maxWidth.isFinite;
+        final title = Text(
           text,
+          maxLines: bounded ? 2 : null,
+          overflow: bounded ? TextOverflow.ellipsis : null,
           style: TextStyle(
             fontSize: 36 > 18 ? 36 - 18 : 18,
             fontWeight: FontWeight.w700,
             color: _titleColor(context),
           ),
-        ),
-      ],
+        );
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: _mutedTextColor(context), size: 22),
+            const SizedBox(width: 8),
+            if (bounded) Expanded(child: title) else title,
+          ],
+        );
+      },
     );
   }
 
@@ -1434,23 +1489,32 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
+    final theme = Theme.of(context);
+    final isLight = theme.brightness == Brightness.light;
+    final highlightBackground = Color.alphaBlend(
+      data.tint.withValues(alpha: isLight ? 0.18 : 0.34),
+      theme.cardColor,
+    );
     final onDark = data.isHighlight
-        ? Colors.white
+        ? theme.colorScheme.onSurface
         : (isLight ? const Color(0xFF1e3039) : const Color(0xFFE3EEF8));
     final sub = data.isHighlight
-        ? const Color(0xFFb5dbef)
+        ? data.tint.withValues(alpha: isLight ? 0.9 : 0.95)
         : (isLight ? data.tint : data.tint.withValues(alpha: 0.9));
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact =
             constraints.maxHeight < 92 || constraints.maxWidth < 170;
-        return Container(
+        final card = Container(
           padding: EdgeInsets.all(compact ? 10 : 14),
           decoration: BoxDecoration(
-            color: data.isHighlight ? data.tint : Theme.of(context).cardColor,
+            color: data.isHighlight ? highlightBackground : theme.cardColor,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: Theme.of(context).dividerColor),
+            border: Border.all(
+              color: data.isHighlight
+                  ? data.tint.withValues(alpha: isLight ? 0.5 : 0.72)
+                  : theme.dividerColor,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black
@@ -1467,14 +1531,14 @@ class _MetricCard extends StatelessWidget {
                 height: compact ? 30 : 38,
                 decoration: BoxDecoration(
                   color: data.isHighlight
-                      ? Colors.white.withValues(alpha: 0.22)
+                      ? data.tint.withValues(alpha: isLight ? 0.18 : 0.3)
                       : data.tint.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   data.icon,
                   size: compact ? 16 : 20,
-                  color: data.isHighlight ? Colors.white : data.tint,
+                  color: data.tint,
                 ),
               ),
               SizedBox(width: compact ? 6 : 10),
@@ -1522,6 +1586,8 @@ class _MetricCard extends StatelessWidget {
             ],
           ),
         );
+
+        return card;
       },
     );
   }

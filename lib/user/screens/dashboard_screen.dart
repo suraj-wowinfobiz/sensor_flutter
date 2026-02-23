@@ -18,7 +18,6 @@ class UserDashboardScreen extends StatelessWidget {
     final content = Consumer<UserDatabaseProvider>(
       builder: (context, db, child) {
         final activeAlerts = db.getActiveAlerts().length;
-        final sensors = db.sensors.length;
         final avgTilt = db.sensors.isEmpty
             ? 0.0
             : db.sensors
@@ -36,7 +35,7 @@ class UserDashboardScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTopStats(context, sensors, avgTilt, maxTilt, activeAlerts),
+              _buildTopStats(context, avgTilt, maxTilt, activeAlerts),
               const SizedBox(height: 18),
               _buildRealtimeCard(context),
               const SizedBox(height: 18),
@@ -69,26 +68,18 @@ class UserDashboardScreen extends StatelessWidget {
 
   Widget _buildTopStats(
     BuildContext context,
-    int sensors,
     double avgTilt,
     double maxTilt,
     int activeAlerts,
   ) {
     final cards = [
       _MetricData(
-        title: 'SENSOR MANAGEMENT',
-        value: '$sensors',
-        subtitle: 'Add new configure\n$sensors sensors',
-        icon: Icons.memory,
-        tint: const Color(0xFF0f729c),
-        isHighlight: true,
-      ),
-      _MetricData(
         title: 'AVG TILT ANGLE',
         value: '${avgTilt.toStringAsFixed(2)}°',
         subtitle: 'Current',
         icon: Icons.trending_up,
         tint: const Color(0xFF5973d8),
+        isHighlight: false,
       ),
       _MetricData(
         title: 'MAX TILT ANGLE',
@@ -117,7 +108,7 @@ class UserDashboardScreen extends StatelessWidget {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final crossAxisCount = width >= 980
-            ? 5
+            ? 4
             : width >= 820
                 ? 3
                 : width >= 560

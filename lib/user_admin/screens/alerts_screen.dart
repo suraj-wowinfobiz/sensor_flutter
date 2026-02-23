@@ -110,40 +110,45 @@ class UserAdminAlertsScreen extends StatelessWidget {
             : width >= 700
                 ? 2
                 : 1;
-        final baseAspectRatio = crossAxisCount == 3
-            ? 2.2
+        final baseCardHeight = crossAxisCount == 3
+            ? 96.0
             : crossAxisCount == 2
-                ? 2.5
-                : 3.0;
-        final aspectRatio = (baseAspectRatio / textScale).clamp(1.55, 2.4);
+                ? 92.0
+                : 88.0;
+        final cardHeight = (baseCardHeight * textScale).clamp(88.0, 132.0);
 
-        return GridView.count(
-          crossAxisCount: crossAxisCount,
+        final cards = [
+          _summaryCard(
+            context,
+            'Active Alerts',
+            '$activeCount',
+            Theme.of(context).colorScheme.onSurface,
+          ),
+          _summaryCard(
+            context,
+            'Critical',
+            '$criticalCount',
+            Theme.of(context).extension<CustomThemeTokens>()!.statusCritical,
+          ),
+          _summaryCard(
+            context,
+            'Warnings',
+            '$warningCount',
+            Theme.of(context).extension<CustomThemeTokens>()!.statusWarning,
+          ),
+        ];
+
+        return GridView.builder(
+          itemCount: cards.length,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 14,
-          mainAxisSpacing: 14,
-          childAspectRatio: aspectRatio,
-          children: [
-            _summaryCard(
-              context,
-              'Active Alerts',
-              '$activeCount',
-              Theme.of(context).colorScheme.onSurface,
-            ),
-            _summaryCard(
-              context,
-              'Critical',
-              '$criticalCount',
-              Theme.of(context).extension<CustomThemeTokens>()!.statusCritical,
-            ),
-            _summaryCard(
-              context,
-              'Warnings',
-              '$warningCount',
-              Theme.of(context).extension<CustomThemeTokens>()!.statusWarning,
-            ),
-          ],
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+            mainAxisExtent: cardHeight,
+          ),
+          itemBuilder: (context, index) => cards[index],
         );
       },
     );
@@ -157,48 +162,63 @@ class UserAdminAlertsScreen extends StatelessWidget {
   ) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final tokens = Theme.of(context).extension<CustomThemeTokens>()!;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Theme.of(context).dividerColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isLight ? 0.04 : 0.16),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final veryCompact = constraints.maxHeight < 68;
+        final compact = constraints.maxHeight < 78;
+        return Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: veryCompact ? 6 : (compact ? 8 : 12),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: tokens.heading,
-            ),
-          ),
-          const SizedBox(height: 6),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
-                color: valueColor,
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Theme.of(context).dividerColor),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isLight ? 0.04 : 0.16),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: veryCompact ? 12 : (compact ? 13 : 15),
+                  fontWeight: FontWeight.w700,
+                  color: tokens.heading,
+                ),
+              ),
+              SizedBox(height: veryCompact ? 1 : (compact ? 2 : 4)),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.bottomLeft,
+                    child: Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: veryCompact ? 17 : (compact ? 20 : 30),
+                        fontWeight: FontWeight.w800,
+                        color: valueColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -230,7 +250,7 @@ class UserAdminAlertsScreen extends StatelessWidget {
           const SizedBox(height: 14),
           if (activeAlerts.isEmpty)
             Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
+              padding: const EdgeInsets.symmetric(vertical: 24),
               child: Text(
                 'No active alerts',
                 style: TextStyle(
@@ -248,32 +268,66 @@ class UserAdminAlertsScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Theme.of(context).dividerColor),
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Icon(
-                      isCritical ? Icons.cancel : Icons.warning_amber_rounded,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 560;
+                  final badge = Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
                       color: isCritical
                           ? tokens.statusCritical
                           : tokens.statusWarning,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
+                    child: Text(
+                      alert.alertLevel,
+                      style: TextStyle(
+                        color: ThemeData.estimateBrightnessForColor(isCritical
+                                    ? tokens.statusCritical
+                                    : tokens.statusWarning) ==
+                                Brightness.dark
+                            ? Colors.white
+                            : const Color(0xFF0E1D2A),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  );
+
+                  if (compact) {
+                    return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          alert.message,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Icon(
+                                isCritical
+                                    ? Icons.cancel
+                                    : Icons.warning_amber_rounded,
+                                color: isCritical
+                                    ? tokens.statusCritical
+                                    : tokens.statusWarning,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                alert.message,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
                         Text(
                           'Triggered: ${_formatDate(alert.triggeredAt)}',
                           style: TextStyle(
@@ -298,34 +352,72 @@ class UserAdminAlertsScreen extends StatelessWidget {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 10),
+                        badge,
                       ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isCritical
-                          ? tokens.statusCritical
-                          : tokens.statusWarning,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      alert.alertLevel,
-                      style: TextStyle(
-                        color: ThemeData.estimateBrightnessForColor(isCritical
-                                    ? tokens.statusCritical
-                                    : tokens.statusWarning) ==
-                                Brightness.dark
-                            ? Colors.white
-                            : const Color(0xFF0E1D2A),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
+                    );
+                  }
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Icon(
+                          isCritical
+                              ? Icons.cancel
+                              : Icons.warning_amber_rounded,
+                          color: isCritical
+                              ? tokens.statusCritical
+                              : tokens.statusWarning,
+                        ),
                       ),
-                    ),
-                  ),
-                ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              alert.message,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Triggered: ${_formatDate(alert.triggeredAt)}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: tokens.mutedText,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _actionButton(
+                                  context,
+                                  label: 'Acknowledge',
+                                  onTap: () => db.resolveAlert(alert.id),
+                                ),
+                                _actionButton(
+                                  context,
+                                  label: 'View Details',
+                                  onTap: () => _showDetails(context, alert),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      badge,
+                    ],
+                  );
+                },
               ),
             );
           }),

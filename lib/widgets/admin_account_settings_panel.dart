@@ -4,7 +4,14 @@ import 'package:provider/provider.dart';
 import '../shared/models/threshold_rule.dart';
 import '../providers/database_provider.dart';
 
-enum _SettingsTab { profile, notifications, access, security, thresholds }
+enum _SettingsTab {
+  profile,
+  preferences,
+  notifications,
+  access,
+  security,
+  thresholds,
+}
 
 class AdminAccountSettingsPanel extends StatefulWidget {
   final String roleLabel;
@@ -36,6 +43,9 @@ class _AdminAccountSettingsPanelState
   bool _deviceUpdates = true;
   bool _systemNotifications = true;
   bool _dailyDigest = false;
+  bool _compactCards = false;
+  bool _autoRefresh = true;
+  bool _showUnits = true;
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +94,8 @@ class _AdminAccountSettingsPanelState
             _buildTabBar(context),
             const SizedBox(height: 18),
             if (_activeTab == _SettingsTab.profile) _buildProfileTab(context),
+            if (_activeTab == _SettingsTab.preferences)
+              _buildPreferencesTab(context),
             if (_activeTab == _SettingsTab.notifications)
               _buildNotificationsTab(context),
             if (_activeTab == _SettingsTab.access) _buildAccessTab(context),
@@ -99,6 +111,7 @@ class _AdminAccountSettingsPanelState
   Widget _buildTabBar(BuildContext context) {
     final tabs = [
       (_SettingsTab.profile, Icons.person_outline, 'Profile'),
+      (_SettingsTab.preferences, Icons.palette_outlined, 'Preferences'),
       (_SettingsTab.notifications, Icons.notifications_none, 'Notifications'),
       (_SettingsTab.access, Icons.verified_user_outlined, 'Access'),
       (_SettingsTab.security, Icons.lock_outline, 'Security'),
@@ -390,6 +403,46 @@ class _AdminAccountSettingsPanelState
               subtitle: 'Receive a daily summary of sensor activity',
               value: _dailyDigest,
               onChanged: (v) => setState(() => _dailyDigest = v)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreferencesTab(BuildContext context) {
+    return _sectionContainer(
+      context,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Preferences',
+            style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tune dashboard behavior and display options',
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.light
+                  ? const Color(0xFF4f6b82)
+                  : const Color(0xFF9db7d2),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _toggleTile(context,
+              title: 'Auto Refresh',
+              subtitle: 'Refresh live panels automatically',
+              value: _autoRefresh,
+              onChanged: (v) => setState(() => _autoRefresh = v)),
+          _toggleTile(context,
+              title: 'Compact Cards',
+              subtitle: 'Use tighter spacing in summary cards',
+              value: _compactCards,
+              onChanged: (v) => setState(() => _compactCards = v)),
+          _toggleTile(context,
+              title: 'Show Measurement Units',
+              subtitle: 'Display units next to sensor values',
+              value: _showUnits,
+              onChanged: (v) => setState(() => _showUnits = v)),
         ],
       ),
     );

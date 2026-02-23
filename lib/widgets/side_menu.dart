@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/responsive/responsive_extensions.dart';
 
 class SideMenu extends StatelessWidget {
   final Animation<double> animation;
@@ -22,9 +23,8 @@ class SideMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final menuWidth = MediaQuery.of(context).size.width < 420
-        ? MediaQuery.of(context).size.width * 0.88
-        : 312.0;
+    final menuWidth =
+        context.narrowerThan(420) ? context.screenWidth * 0.88 : 312.0;
 
     return IgnorePointer(
       ignoring: !isOpen,

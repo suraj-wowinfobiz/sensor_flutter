@@ -76,6 +76,8 @@ class _UsersScreenState extends State<UsersScreen> {
     ];
     var useTemplateTab = user == null;
     var selectedTemplate = 0;
+    final parentContext = context;
+    final db = parentContext.read<DatabaseProvider>();
 
     String normalizeRole(String value) {
       final lower = value.trim().toLowerCase();
@@ -85,18 +87,16 @@ class _UsersScreenState extends State<UsersScreen> {
     }
 
     await showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          final db = Provider.of<DatabaseProvider>(context, listen: false);
-
+      context: parentContext,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setState) {
           void saveUser() {
             final name = nameController.text.trim();
             final email = emailController.text.trim();
             final role = normalizeRole(roleController.text);
 
             if (name.isEmpty || email.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
+              ScaffoldMessenger.of(parentContext).showSnackBar(
                 const SnackBar(content: Text('Name and email are required')),
               );
               return;
@@ -113,7 +113,7 @@ class _UsersScreenState extends State<UsersScreen> {
             } else {
               db.update('users', _editingId!, payload);
             }
-            Navigator.pop(context);
+            Navigator.pop(dialogContext);
           }
 
           return Dialog(
@@ -131,24 +131,31 @@ class _UsersScreenState extends State<UsersScreen> {
                         const Icon(Icons.auto_awesome,
                             color: Color(0xFF0f729c), size: 20),
                         const SizedBox(width: 8),
-                        Text(
-                          user == null ? 'Create New User' : 'Edit User',
-                          style: const TextStyle(
-                            fontSize: 34 > 30 ? 34 - 4 : 30,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF142936),
+                        Expanded(
+                          child: Text(
+                            user == null ? 'Create New User' : 'Edit User',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 34 > 30 ? 34 - 4 : 30,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF142936),
+                            ),
                           ),
                         ),
-                        const Spacer(),
                         IconButton(
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () => Navigator.pop(dialogContext),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints:
+                              const BoxConstraints.tightFor(width: 32, height: 32),
                           icon: const Icon(Icons.close),
                         ),
                       ],
                     ),
                     Text(
                       user == null
-                          ? 'Choose a template for quick setup or configure manually'
+                          ? 'Choose a template (optional) or enter details manually'
                           : 'Update user details and access role',
                       style: const TextStyle(
                         fontSize: 15,
@@ -156,132 +163,135 @@ class _UsersScreenState extends State<UsersScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE7EFF3),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _tabOption(
-                              active: useTemplateTab,
-                              icon: Icons.auto_awesome_outlined,
-                              label: 'Quick Templates',
-                              onTap: () =>
-                                  setState(() => useTemplateTab = true),
-                            ),
-                          ),
-                          Expanded(
-                            child: _tabOption(
-                              active: !useTemplateTab,
-                              icon: Icons.build_outlined,
-                              label: 'Manual Setup',
-                              onTap: () =>
-                                  setState(() => useTemplateTab = false),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (useTemplateTab) ...[
+                    if (user == null) ...[
                       Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.all(3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE9F5FB),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFB8D9EA)),
+                          color: const Color(0xFFE7EFF3),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Text(
-                          'Select a template to prefill manual setup.',
-                          style: TextStyle(
-                            color: Color(0xFF2B5368),
-                            fontWeight: FontWeight.w600,
-                          ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _tabOption(
+                                active: useTemplateTab,
+                                icon: Icons.auto_awesome_outlined,
+                                label: 'Theme',
+                                onTap: () => setState(() => useTemplateTab = true),
+                              ),
+                            ),
+                            Expanded(
+                              child: _tabOption(
+                                active: !useTemplateTab,
+                                icon: Icons.build_outlined,
+                                label: 'Manual',
+                                onTap: () => setState(() => useTemplateTab = false),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 12),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final compact = constraints.maxWidth < 620;
-                          return Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: List.generate(templates.length, (i) {
-                              final template = templates[i];
-                              final active = i == selectedTemplate;
-                              return InkWell(
-                                onTap: () => setState(() {
-                                  selectedTemplate = i;
-                                  nameController.text = template['name']!;
-                                  emailController.text = template['email']!;
-                                  roleController.text = template['role']!;
-                                  organizationController.text =
-                                      template['organization']!;
-                                  useTemplateTab = false;
-                                }),
-                                borderRadius: BorderRadius.circular(14),
-                                child: Container(
-                                  width: compact
-                                      ? constraints.maxWidth
-                                      : (constraints.maxWidth - 10) / 2,
-                                  padding: const EdgeInsets.all(14),
-                                  decoration: BoxDecoration(
-                                    gradient: active
-                                        ? const LinearGradient(
-                                            colors: [
-                                              Color(0xFFEAF5FC),
-                                              Color(0xFFF2F8FC)
-                                            ],
-                                          )
-                                        : null,
-                                    color:
-                                        active ? null : const Color(0xFFF7FBFD),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: active
-                                          ? const Color(0xFF88BFD9)
-                                          : const Color(0xFFD7E5EC),
+                      if (useTemplateTab) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE9F5FB),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFB8D9EA)),
+                          ),
+                          child: const Text(
+                            'Select a theme template to prefill fields.',
+                            style: TextStyle(
+                              color: Color(0xFF2B5368),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final compact = constraints.maxWidth < 620;
+                            return Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: List.generate(templates.length, (i) {
+                                final template = templates[i];
+                                final active = i == selectedTemplate;
+                                return InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      selectedTemplate = i;
+                                      nameController.text = template['name']!;
+                                      emailController.text = template['email']!;
+                                      roleController.text = template['role']!;
+                                      organizationController.text =
+                                          template['organization']!;
+                                      useTemplateTab = false;
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Container(
+                                    width: compact
+                                        ? constraints.maxWidth
+                                        : (constraints.maxWidth - 10) / 2,
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      gradient: active
+                                          ? const LinearGradient(
+                                              colors: [
+                                                Color(0xFFEAF5FC),
+                                                Color(0xFFF2F8FC),
+                                              ],
+                                            )
+                                          : null,
+                                      color:
+                                          active ? null : const Color(0xFFF7FBFD),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: active
+                                            ? const Color(0xFF88BFD9)
+                                            : const Color(0xFFD7E5EC),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          template['title']!,
+                                          style: const TextStyle(
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF152A36),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Prefill: ${template['role']}',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            color: Color(0xFF4E6775),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        template['title']!,
-                                        style: const TextStyle(
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.w800,
-                                          color: Color(0xFF152A36),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Prefill: ${template['role']}',
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          color: Color(0xFF4E6775),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 14),
+                                );
+                              }),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 14),
+                      ],
                     ],
-                    if (!useTemplateTab) ...[
+                    if (!useTemplateTab || user != null) ...[
+                      const SizedBox(height: 2),
                       const Text(
                         'Full Name',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF1b313d),
                         ),
@@ -301,7 +311,7 @@ class _UsersScreenState extends State<UsersScreen> {
                       const Text(
                         'Email',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF1b313d),
                         ),
@@ -321,7 +331,7 @@ class _UsersScreenState extends State<UsersScreen> {
                       const Text(
                         'Role',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF1b313d),
                         ),
@@ -341,7 +351,7 @@ class _UsersScreenState extends State<UsersScreen> {
                       const Text(
                         'Organization',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF1b313d),
                         ),
@@ -358,23 +368,9 @@ class _UsersScreenState extends State<UsersScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          const Spacer(),
-                          OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'),
-                          ),
-                          const SizedBox(width: 10),
-                          FilledButton(
-                            onPressed: saveUser,
-                            child: Text(
-                              _editingId == null
-                                  ? 'Create User'
-                                  : 'Update User',
-                            ),
-                          ),
-                        ],
+                      _dialogActions(
+                        dialogContext: dialogContext,
+                        onSave: saveUser,
                       ),
                     ],
                   ],
@@ -429,6 +425,47 @@ class _UsersScreenState extends State<UsersScreen> {
     );
   }
 
+  Widget _dialogActions({
+    required BuildContext dialogContext,
+    required VoidCallback onSave,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 300) {
+          return Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              OutlinedButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: onSave,
+                child: Text(_editingId == null ? 'Create User' : 'Update User'),
+              ),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            const Spacer(),
+            OutlinedButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            const SizedBox(width: 10),
+            FilledButton(
+              onPressed: onSave,
+              child: Text(_editingId == null ? 'Create User' : 'Update User'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _inputBox({required Widget child}) {
     return Container(
       height: 46,
@@ -440,30 +477,6 @@ class _UsersScreenState extends State<UsersScreen> {
       ),
       child: child,
     );
-  }
-
-  void _generateSampleUsers(DatabaseProvider db) {
-    if (db.users.length >= 6) return;
-    const sample = [
-      {
-        'name': 'Alice Johnson',
-        'email': 'alice.johnson@acme.com',
-        'role': 'operator'
-      },
-      {
-        'name': 'Rohit Mehra',
-        'email': 'rohit.mehra@acme.com',
-        'role': 'engineer'
-      },
-      {'name': 'Priya Nair', 'email': 'priya.nair@acme.com', 'role': 'admin'},
-    ];
-    for (final u in sample) {
-      db.create('users', {
-        'name': u['name']!,
-        'email': u['email']!,
-        'role': u['role']!,
-      });
-    }
   }
 
   String _shortName(String name) {
@@ -1098,11 +1111,6 @@ class _UsersScreenState extends State<UsersScreen> {
                     children: [
                       _buildViewToggle(),
                       _headerButton(
-                        label: 'Generate Sample Data',
-                        icon: Icons.data_saver_on_outlined,
-                        onTap: () => _generateSampleUsers(db),
-                      ),
-                      _headerButton(
                         label: 'Add User',
                         icon: Icons.add,
                         primary: true,
@@ -1245,7 +1253,9 @@ class _UsersScreenState extends State<UsersScreen> {
                                   _tag('Unknown'),
                                   _tag(
                                     restricted ? 'Restricted' : 'Open',
-                                    icon: Icons.lock_outline,
+                                    icon: restricted
+                                        ? Icons.lock_outline
+                                        : Icons.lock_open_outlined,
                                   ),
                                 ],
                               ),
@@ -1285,7 +1295,9 @@ class _UsersScreenState extends State<UsersScreen> {
                             ),
                             const SizedBox(height: 8),
                             _iconAction(
-                              icon: Icons.lock_outline,
+                              icon: restricted
+                                  ? Icons.lock_outline
+                                  : Icons.lock_open_outlined,
                               onTap: () {
                                 setState(() {
                                   if (restricted) {
@@ -1300,14 +1312,6 @@ class _UsersScreenState extends State<UsersScreen> {
                             _iconAction(
                               icon: Icons.edit_outlined,
                               onTap: () => _showUserModal(user: user),
-                            ),
-                            const SizedBox(height: 8),
-                            _iconAction(
-                              icon: Icons.cancel_outlined,
-                              iconColor: const Color(0xFFD39A00),
-                              onTap: () {
-                                setState(() => _restrictedUsers.add(user.id));
-                              },
                             ),
                             const SizedBox(height: 8),
                             _iconAction(
@@ -1407,11 +1411,11 @@ class _UsersScreenState extends State<UsersScreen> {
               .map((s) => s.serialNumber)
               .toList();
           final details = <String>[
-            'Role: ${user.role}',
-            'Status: ${restricted ? 'restricted' : 'active'}',
-            'Site: $site',
-            'Zone: $zone',
-            'Sensors: ${sensorCodes.isEmpty ? 'No Sensors' : sensorCodes.join(', ')}',
+            user.role,
+            restricted ? 'restricted' : 'active',
+            site,
+            zone,
+            sensorCodes.isEmpty ? 'No Sensors' : sensorCodes.join(', '),
           ];
 
           return Container(
@@ -1442,6 +1446,8 @@ class _UsersScreenState extends State<UsersScreen> {
                         children: [
                           Text(
                             user.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               color: Color(0xFF102632),
@@ -1449,6 +1455,8 @@ class _UsersScreenState extends State<UsersScreen> {
                           ),
                           Text(
                             user.email,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 13,
                               color: Color(0xFF516875),
@@ -1464,30 +1472,26 @@ class _UsersScreenState extends State<UsersScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: details
-                      .map(
-                        (detail) => Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEAF2F6),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFD0DEE6)),
-                          ),
-                          child: Text(
-                            detail,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF3E5765),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF2F6),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFD0DEE6)),
+                  ),
+                  child: Text(
+                    details.join(' • '),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF3E5765),
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -1500,7 +1504,9 @@ class _UsersScreenState extends State<UsersScreen> {
                       onTap: () => _showAccessDialog(context, user, db),
                     ),
                     _iconAction(
-                      icon: Icons.lock_outline,
+                      icon: restricted
+                          ? Icons.lock_outline
+                          : Icons.lock_open_outlined,
                       onTap: () {
                         setState(() {
                           if (restricted) {
@@ -1514,13 +1520,6 @@ class _UsersScreenState extends State<UsersScreen> {
                     _iconAction(
                       icon: Icons.edit_outlined,
                       onTap: () => _showUserModal(user: user),
-                    ),
-                    _iconAction(
-                      icon: Icons.cancel_outlined,
-                      iconColor: const Color(0xFFD39A00),
-                      onTap: () {
-                        setState(() => _restrictedUsers.add(user.id));
-                      },
                     ),
                     _iconAction(
                       icon: Icons.delete_outline,

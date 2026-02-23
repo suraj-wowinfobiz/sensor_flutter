@@ -117,6 +117,11 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                 builder: (context, constraints) {
                   final width = constraints.maxWidth;
                   final vertical = width < 1150;
+                  final selectorCardWidth = width < 540
+                      ? width
+                      : width < 980
+                          ? (width - 12) / 2
+                          : 305.0;
 
                   final selectorCards = Wrap(
                     spacing: 12,
@@ -124,11 +129,11 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                     children: [
                       _selectCard(
                         context,
+                        width: selectorCardWidth,
                         title: 'Sensor',
                         child: _dropdown(
                           value: _selectedSensorId,
                           hint: 'Select a sensor',
-                          width: 210,
                           items: filteredSensors
                               .map((s) => DropdownMenuItem(
                                     value: s.id,
@@ -141,11 +146,11 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                       ),
                       _selectCard(
                         context,
+                        width: selectorCardWidth,
                         title: 'Compare',
                         child: _dropdown(
                           value: _compareMode,
                           hint: 'No Comparison',
-                          width: 210,
                           items: const [
                             DropdownMenuItem(
                                 value: 'none', child: Text('No Comparison')),
@@ -162,11 +167,11 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                       ),
                       _selectCard(
                         context,
+                        width: selectorCardWidth,
                         title: 'Range',
                         child: _dropdown(
                           value: _range,
                           hint: 'Last 24 Hours',
-                          width: 210,
                           items: const [
                             DropdownMenuItem(
                                 value: '1h', child: Text('Last 1 Hour')),
@@ -245,18 +250,10 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Real-Time Data Visualization',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: tokens.heading,
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact = constraints.maxWidth < 420;
+                        final badge = Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
@@ -272,8 +269,40 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                               color: Color(0xFF4C63C5),
                             ),
                           ),
-                        ),
-                      ],
+                        );
+                        if (compact) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Real-Time Data Visualization',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: tokens.heading,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              badge,
+                            ],
+                          );
+                        }
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Real-Time Data Visualization',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: tokens.heading,
+                                ),
+                              ),
+                            ),
+                            badge,
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 14),
                     _buildThresholdLegend(graphThresholds),
@@ -287,7 +316,7 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                             children: [
                               Icon(Icons.insert_chart_outlined,
                                   size: 64, color: tokens.mutedText),
-                              SizedBox(height: 12),
+                              const SizedBox(height: 12),
                               Text(
                                 'Select a sensor to view analytics',
                                 style: TextStyle(
@@ -296,7 +325,7 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
                                   color: tokens.heading,
                                 ),
                               ),
-                              SizedBox(height: 6),
+                              const SizedBox(height: 6),
                               Text(
                                 'Use the filters above to find sensors, then select one to visualize its data',
                                 style: TextStyle(
@@ -730,11 +759,12 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
 
   Widget _selectCard(
     BuildContext context, {
+    required double width,
     required String title,
     required Widget child,
   }) {
     return Container(
-      width: 305,
+      width: width,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
@@ -748,23 +778,35 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 88,
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Theme.of(context).brightness == Brightness.light
-                    ? const Color(0xFF1b313d)
-                    : const Color(0xFFD8E8F5),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final titleStyle = TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).brightness == Brightness.light
+                ? const Color(0xFF1b313d)
+                : const Color(0xFFD8E8F5),
+          );
+          if (constraints.maxWidth < 260) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: titleStyle),
+                const SizedBox(height: 10),
+                child,
+              ],
+            );
+          }
+          return Row(
+            children: [
+              SizedBox(
+                width: 88,
+                child: Text(title, style: titleStyle),
               ),
-            ),
-          ),
-          Expanded(child: child),
-        ],
+              Expanded(child: child),
+            ],
+          );
+        },
       ),
     );
   }
@@ -772,13 +814,12 @@ class _EngineerAnalyticsScreenState extends State<EngineerAnalyticsScreen> {
   Widget _dropdown({
     required String? value,
     required String hint,
-    required double width,
     required List<DropdownMenuItem<String>> items,
     required ValueChanged<String?> onChanged,
   }) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
-      width: width,
+      width: double.infinity,
       height: 38,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(

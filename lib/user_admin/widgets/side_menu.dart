@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/responsive/responsive_extensions.dart';
 
 class UserAdminSideMenu extends StatelessWidget {
   final Animation<double> animation;
@@ -25,9 +26,8 @@ class UserAdminSideMenu extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isLight = theme.brightness == Brightness.light;
-    final menuWidth = MediaQuery.of(context).size.width < 420
-        ? MediaQuery.of(context).size.width * 0.88
-        : 312.0;
+    final menuWidth =
+        context.narrowerThan(420) ? context.screenWidth * 0.88 : 312.0;
     final panelColor = Color.alphaBlend(
       scheme.surface.withValues(alpha: isLight ? 0.94 : 0.98),
       theme.scaffoldBackgroundColor,

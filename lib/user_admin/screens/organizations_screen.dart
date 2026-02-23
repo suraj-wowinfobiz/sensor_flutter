@@ -223,16 +223,6 @@ class _UserAdminOrganizationsScreenState
     );
   }
 
-  void _addSampleData(UserAdminDatabaseProvider db) {
-    if (db.organizations.isNotEmpty) return;
-    db.create('organizations', {
-      'name': 'Default Organization',
-      'email': 'contact@defaultorg.com',
-      'status': 'active',
-      'owner_user_id': db.users.first.id,
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Consumer<UserAdminDatabaseProvider>(
@@ -291,11 +281,6 @@ class _UserAdminOrganizationsScreenState
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _chipButton(
-                        label: 'Add Sample Data',
-                        icon: Icons.auto_awesome,
-                        onTap: () => _addSampleData(db),
-                      ),
                       _infoChip('${organizations.length} Orgs'),
                       _infoChip('${db.sites.length} Sites'),
                       _infoChip('${db.zones.length} Zones'),
@@ -414,7 +399,7 @@ class _UserAdminOrganizationsScreenState
           BoxShadow(
             color: Colors.black.withValues(alpha: isLight ? 0.07 : 0.16),
             blurRadius: 16,
-            offset: Offset(0, 6),
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -426,7 +411,7 @@ class _UserAdminOrganizationsScreenState
             decoration: BoxDecoration(
               color:
                   isLight ? const Color(0xFFF5FAFD) : const Color(0xFF1f3342),
-              borderRadius: BorderRadius.only(
+              borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(18),
                 topRight: Radius.circular(18),
               ),
@@ -648,46 +633,6 @@ class _UserAdminOrganizationsScreenState
     );
   }
 
-  Widget _chipButton({
-    required String label,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0F729C),
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x22117AA8),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: Colors.white),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _infoChip(String label) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
@@ -879,7 +824,7 @@ class _ListTileCard extends StatelessWidget {
                     BoxShadow(
                       color: scheme.primary.withValues(alpha: 0.35),
                       blurRadius: 8,
-                      offset: Offset(0, 0),
+                      offset: const Offset(0, 0),
                     ),
                   ],
                 ),

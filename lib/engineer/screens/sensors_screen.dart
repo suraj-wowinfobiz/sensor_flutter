@@ -198,26 +198,50 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
                             setState(() => _organizationId = value ?? ''),
                       ),
                       const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              'Sensor GPS Coordinates (Optional)',
-                              style: TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.w700),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final compact = constraints.maxWidth < 560;
+                          final title = Text(
+                            'GPS Coordinates',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
                             ),
-                          ),
-                          OutlinedButton.icon(
+                          );
+                          final action = OutlinedButton.icon(
                             onPressed: () {
                               setState(() {
                                 _latitude = '37.7749';
                                 _longitude = '-122.4194';
                               });
                             },
-                            icon: const Icon(Icons.my_location, size: 18),
-                            label: const Text('Get Current Location'),
-                          ),
-                        ],
+                            icon: const Icon(Icons.my_location, size: 16),
+                            label: const Text(
+                              'Get Location',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                          if (compact) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                title,
+                                const SizedBox(height: 8),
+                                action,
+                              ],
+                            );
+                          }
+                          return Row(
+                            children: [
+                              Expanded(child: title),
+                              const SizedBox(width: 10),
+                              action,
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 10),
                       Row(
@@ -315,7 +339,12 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        Text(
+          label,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
         const SizedBox(height: 6),
         TextFormField(
           initialValue: value,
@@ -349,11 +378,37 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        Text(
+          label,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
           value: value,
-          hint: Text(hint),
+          isExpanded: true,
+          iconSize: 18,
+          style: const TextStyle(fontSize: 12.5),
+          hint: Text(
+            hint,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12.5),
+          ),
+          selectedItemBuilder: (context) => items
+              .map(
+                (item) => Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _dropdownItemLabel(item),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12.5),
+                  ),
+                ),
+              )
+              .toList(),
           items: items,
           onChanged: onChanged,
           decoration: InputDecoration(
@@ -373,6 +428,12 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
         ),
       ],
     );
+  }
+
+  String _dropdownItemLabel(DropdownMenuItem<String> item) {
+    final child = item.child;
+    if (child is Text) return child.data ?? (item.value ?? '');
+    return item.value ?? '';
   }
 
   String _sensorCodeFor(int index) => 'SEN-${[
@@ -643,96 +704,106 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 14,
-            runSpacing: 14,
-            crossAxisAlignment: WrapCrossAlignment.end,
-            children: [
-              SizedBox(
-                width: 290,
-                child: TextField(
-                  onChanged: (value) => setState(() => _searchQuery = value),
-                  decoration: _filterFieldDecoration(
-                    label: 'Search',
-                    hint: 'Sensor ID, Serial, MAC...',
-                    icon: Icons.search,
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: 190,
-                child: DropdownButtonFormField<String>(
-                  value: _statusFilter,
-                  decoration: _filterFieldDecoration(label: 'Status'),
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('All Statuses')),
-                    DropdownMenuItem(value: 'active', child: Text('Active')),
-                    DropdownMenuItem(
-                        value: 'inactive', child: Text('Inactive')),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => _statusFilter = value ?? 'all'),
-                ),
-              ),
-              SizedBox(
-                width: 190,
-                child: DropdownButtonFormField<String>(
-                  value: _typeFilter,
-                  decoration: _filterFieldDecoration(label: 'Sensor Type'),
-                  items: [
-                    const DropdownMenuItem(
-                        value: 'all', child: Text('All Types')),
-                    ...db.sensorTypes.map(
-                      (type) => DropdownMenuItem(
-                        value: type.id,
-                        child: Text(type.name),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 430;
+              final searchWidth = compact ? constraints.maxWidth : 290.0;
+              final filterWidth = compact ? constraints.maxWidth : 190.0;
+              return Wrap(
+                spacing: 14,
+                runSpacing: 14,
+                crossAxisAlignment: WrapCrossAlignment.end,
+                children: [
+                  SizedBox(
+                    width: searchWidth,
+                    child: TextField(
+                      onChanged: (value) =>
+                          setState(() => _searchQuery = value),
+                      decoration: _filterFieldDecoration(
+                        label: 'Search',
+                        hint: 'Sensor ID, Serial, MAC...',
+                        icon: Icons.search,
                       ),
                     ),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => _typeFilter = value ?? 'all'),
-                ),
-              ),
-              SizedBox(
-                width: 190,
-                child: DropdownButtonFormField<String>(
-                  value: _deviceFilter,
-                  decoration: _filterFieldDecoration(label: 'Device'),
-                  items: [
-                    const DropdownMenuItem(
-                        value: 'all', child: Text('All Devices')),
-                    ...db.devices.map(
-                      (device) => DropdownMenuItem(
-                        value: device.id,
-                        child: Text(device.deviceCode),
+                  ),
+                  SizedBox(
+                    width: filterWidth,
+                    child: DropdownButtonFormField<String>(
+                      value: _statusFilter,
+                      decoration: _filterFieldDecoration(label: 'Status'),
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'all', child: Text('All Statuses')),
+                        DropdownMenuItem(
+                            value: 'active', child: Text('Active')),
+                        DropdownMenuItem(
+                            value: 'inactive', child: Text('Inactive')),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _statusFilter = value ?? 'all'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: filterWidth,
+                    child: DropdownButtonFormField<String>(
+                      value: _typeFilter,
+                      decoration: _filterFieldDecoration(label: 'Sensor Type'),
+                      items: [
+                        const DropdownMenuItem(
+                            value: 'all', child: Text('All Types')),
+                        ...db.sensorTypes.map(
+                          (type) => DropdownMenuItem(
+                            value: type.id,
+                            child: Text(type.name),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _typeFilter = value ?? 'all'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: filterWidth,
+                    child: DropdownButtonFormField<String>(
+                      value: _deviceFilter,
+                      decoration: _filterFieldDecoration(label: 'Device'),
+                      items: [
+                        const DropdownMenuItem(
+                            value: 'all', child: Text('All Devices')),
+                        ...db.devices.map(
+                          (device) => DropdownMenuItem(
+                            value: device.id,
+                            child: Text(device.deviceCode),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _deviceFilter = value ?? 'all'),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isLight
+                          ? const Color(0xFFe6eff3)
+                          : const Color(0xFF243E52),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Showing $filteredCount of $totalCount sensors',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: isLight
+                            ? const Color(0xFF324956)
+                            : const Color(0xFFD4E5F2),
                       ),
                     ),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => _deviceFilter = value ?? 'all'),
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: isLight
-                      ? const Color(0xFFe6eff3)
-                      : const Color(0xFF243E52),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  'Showing $filteredCount of $totalCount sensors',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: isLight
-                        ? const Color(0xFF324956)
-                        : const Color(0xFFD4E5F2),
                   ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
           Divider(height: 1, color: Theme.of(context).dividerColor),
@@ -746,35 +817,45 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 14,
-            runSpacing: 14,
-            children: [
-              _hierarchyDropdown(
-                label: 'Organization',
-                value: _organizationFilter,
-                onChanged: (value) =>
-                    setState(() => _organizationFilter = value ?? 'all'),
-              ),
-              _hierarchyDropdown(
-                label: 'Site',
-                value: _siteFilter,
-                onChanged: (value) =>
-                    setState(() => _siteFilter = value ?? 'all'),
-              ),
-              _hierarchyDropdown(
-                label: 'Zone',
-                value: _zoneFilter,
-                onChanged: (value) =>
-                    setState(() => _zoneFilter = value ?? 'all'),
-              ),
-              _hierarchyDropdown(
-                label: 'Location',
-                value: _locationFilter,
-                onChanged: (value) =>
-                    setState(() => _locationFilter = value ?? 'all'),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 430;
+              final width = compact ? constraints.maxWidth : 190.0;
+              return Wrap(
+                spacing: 14,
+                runSpacing: 14,
+                children: [
+                  _hierarchyDropdown(
+                    width: width,
+                    label: 'Organization',
+                    value: _organizationFilter,
+                    onChanged: (value) =>
+                        setState(() => _organizationFilter = value ?? 'all'),
+                  ),
+                  _hierarchyDropdown(
+                    width: width,
+                    label: 'Site',
+                    value: _siteFilter,
+                    onChanged: (value) =>
+                        setState(() => _siteFilter = value ?? 'all'),
+                  ),
+                  _hierarchyDropdown(
+                    width: width,
+                    label: 'Zone',
+                    value: _zoneFilter,
+                    onChanged: (value) =>
+                        setState(() => _zoneFilter = value ?? 'all'),
+                  ),
+                  _hierarchyDropdown(
+                    width: width,
+                    label: 'Location',
+                    value: _locationFilter,
+                    onChanged: (value) =>
+                        setState(() => _locationFilter = value ?? 'all'),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -782,12 +863,13 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
   }
 
   Widget _hierarchyDropdown({
+    required double width,
     required String label,
     required String value,
     required ValueChanged<String?> onChanged,
   }) {
     return SizedBox(
-      width: 190,
+      width: width,
       child: DropdownButtonFormField<String>(
         value: value,
         decoration: _filterFieldDecoration(label: label),
@@ -935,6 +1017,8 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
         final statusColor = status == 'active'
             ? const Color(0xFF0ca15f)
             : const Color(0xFF8397a3);
+        final metaLine =
+            '${sensor.serialNumber} • $deviceName • ${_channelFor(safeIndex)} • ${_unitForType(type)} • $siteName';
 
         return Container(
           padding: const EdgeInsets.all(14),
@@ -957,6 +1041,8 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
                   Expanded(
                     child: Text(
                       '${_sensorCodeFor(safeIndex)} • $type',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
@@ -985,16 +1071,17 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
                 ],
               ),
               const SizedBox(height: 10),
-              Wrap(
-                spacing: 14,
-                runSpacing: 6,
-                children: [
-                  Text('Serial: ${sensor.serialNumber}'),
-                  Text('Device: $deviceName'),
-                  Text('Channel: ${_channelFor(safeIndex)}'),
-                  Text('Unit: ${_unitForType(type)}'),
-                  Text('Location: $siteName'),
-                ],
+              Text(
+                metaLine,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? const Color(0xFF4a6170)
+                      : const Color(0xFFBBD0E0),
+                  height: 1.3,
+                ),
               ),
               const SizedBox(height: 8),
               Row(

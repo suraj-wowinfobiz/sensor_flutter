@@ -37,34 +37,10 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Devices',
-                          style: TextStyle(
-                            fontSize: 34,
-                            fontWeight: FontWeight.w800,
-                            color: isLight
-                                ? const Color(0xFF0f202d)
-                                : const Color(0xFFd4e4ef),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Monitor gateway devices',
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: secondaryTextColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Wrap(
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 760;
+                  final actions = Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
@@ -76,8 +52,72 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
                             setState(() => _showFilters = !_showFilters),
                       ),
                     ],
-                  ),
-                ],
+                  );
+
+                  if (compact) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Devices',
+                              style: TextStyle(
+                                fontSize: 34,
+                                fontWeight: FontWeight.w800,
+                                color: isLight
+                                    ? const Color(0xFF0f202d)
+                                    : const Color(0xFFd4e4ef),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Monitor gateway devices',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: secondaryTextColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        actions,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Devices',
+                              style: TextStyle(
+                                fontSize: 34,
+                                fontWeight: FontWeight.w800,
+                                color: isLight
+                                    ? const Color(0xFF0f202d)
+                                    : const Color(0xFFd4e4ef),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Monitor gateway devices',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: secondaryTextColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      actions,
+                    ],
+                  );
+                },
               ),
               if (_showFilters) const SizedBox(height: 14),
               if (_showFilters) _buildFilterPanel(context, db, devices.length),
@@ -183,58 +223,69 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              SizedBox(
-                width: 280,
-                child: _field(
-                  'Search',
-                  TextField(
-                    onChanged: (v) => setState(() => _searchQuery = v),
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      border: InputBorder.none,
-                      hintText: 'Device ID, Serial, MAC, IP...',
-                      prefixIcon: Icon(Icons.search, size: 20),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 430;
+              final searchWidth = compact ? constraints.maxWidth : 280.0;
+              final statusWidth = compact ? constraints.maxWidth : 180.0;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: searchWidth,
+                    child: _field(
+                      'Search',
+                      TextField(
+                        onChanged: (v) => setState(() => _searchQuery = v),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                          hintText: 'Device ID, Serial, MAC, IP...',
+                          prefixIcon: Icon(Icons.search, size: 20),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              SizedBox(
-                width: 180,
-                child: _selectField(
-                  label: 'Status',
-                  value: _statusFilter,
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('All Statuses')),
-                    DropdownMenuItem(value: 'active', child: Text('Active')),
-                    DropdownMenuItem(
-                        value: 'inactive', child: Text('Inactive')),
-                    DropdownMenuItem(
-                      value: 'maintenance',
-                      child: Text('Maintenance'),
+                  SizedBox(
+                    width: statusWidth,
+                    child: _selectField(
+                      label: 'Status',
+                      value: _statusFilter,
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'all', child: Text('All Statuses')),
+                        DropdownMenuItem(
+                            value: 'active', child: Text('Active')),
+                        DropdownMenuItem(
+                            value: 'inactive', child: Text('Inactive')),
+                        DropdownMenuItem(
+                          value: 'maintenance',
+                          child: Text('Maintenance'),
+                        ),
+                        DropdownMenuItem(
+                            value: 'retired', child: Text('Retired')),
+                      ],
+                      onChanged: (v) =>
+                          setState(() => _statusFilter = v ?? 'all'),
                     ),
-                    DropdownMenuItem(value: 'retired', child: Text('Retired')),
-                  ],
-                  onChanged: (v) => setState(() => _statusFilter = v ?? 'all'),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 26),
-                child: Text(
-                  'Showing $filteredCount of ${db.devices.length} devices',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: isLight
-                        ? const Color(0xFF48606E)
-                        : const Color(0xFF9FB4C6),
-                    fontWeight: FontWeight.w500,
                   ),
-                ),
-              ),
-            ],
+                  Padding(
+                    padding: EdgeInsets.only(top: compact ? 0 : 26),
+                    child: Text(
+                      'Showing $filteredCount of ${db.devices.length} devices',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: isLight
+                            ? const Color(0xFF48606E)
+                            : const Color(0xFF9FB4C6),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -396,12 +447,12 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
           final installedAt =
               '${device.installedAt.day}/${device.installedAt.month}/${device.installedAt.year}';
           final details = <String>[
-            'ID: ${device.id}',
-            'Code: ${device.deviceCode}',
-            'Status: ${device.status}',
-            'Site ID: ${device.siteId}',
-            'Zone ID: ${device.zoneId}',
-            'Installed: $installedAt',
+            '${device.id}',
+            '${device.deviceCode}',
+            '${device.status}',
+            '${device.siteId}',
+            '${device.zoneId}',
+            installedAt,
           ];
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -425,6 +476,8 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
                     Expanded(
                       child: Text(
                         device.deviceCode,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
                           color: isLight
@@ -437,38 +490,32 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: details
-                      .map(
-                        (detail) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isLight
-                                ? const Color(0xFFEAF2F6)
-                                : const Color(0xFF253F52),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: Theme.of(context).dividerColor,
-                            ),
-                          ),
-                          child: Text(
-                            detail,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isLight
-                                  ? const Color(0xFF3E5765)
-                                  : const Color(0xFFBBD0E0),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isLight
+                        ? const Color(0xFFEAF2F6)
+                        : const Color(0xFF253F52),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Theme.of(context).dividerColor,
+                    ),
+                  ),
+                  child: Text(
+                    details.join(' • '),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isLight
+                          ? const Color(0xFF3E5765)
+                          : const Color(0xFFBBD0E0),
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                  ),
                 ),
               ],
             ),

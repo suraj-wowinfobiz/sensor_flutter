@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/responsive/responsive_extensions.dart';
 
 class UserNotificationItem {
   final String title;
@@ -37,9 +38,8 @@ class UserNavBar extends StatelessWidget {
     final theme = Theme.of(context);
     final isLight = theme.brightness == Brightness.light;
     final scheme = theme.colorScheme;
-    final width = MediaQuery.of(context).size.width;
-    final isCompact = width < 900;
-    final isMobile = width < 700;
+    final isCompact = context.narrowerThan(900);
+    final isMobile = context.narrowerThan(700);
 
     final barColor = scheme.primary;
     final barTextColor = scheme.onPrimary;
@@ -215,35 +215,8 @@ class UserNavBar extends StatelessWidget {
           SizedBox(width: isCompact ? 6 : 10),
           PopupMenuButton<String>(
             tooltip: 'Profile Menu',
-            onSelected: (value) {
-              if (value == 'settings') {
-                onTopSettingsTap();
-              } else if (value == 'logout') {
-                onLogoutTap();
-              }
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem<String>(
-                value: 'settings',
-                child: Row(
-                  children: [
-                    Icon(Icons.settings_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Text('Settings'),
-                  ],
-                ),
-              ),
-              PopupMenuItem<String>(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout, size: 18),
-                    SizedBox(width: 8),
-                    Text('Logout'),
-                  ],
-                ),
-              ),
-            ],
+            onSelected: (_) {},
+            itemBuilder: (context) => const [],
             child: Row(
               children: [
                 if (!isCompact)

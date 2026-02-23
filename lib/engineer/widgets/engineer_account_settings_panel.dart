@@ -1247,10 +1247,12 @@ class _EngineerAccountSettingsPanelState
                   children: [
                     Icon(Icons.verified, color: Color(0xFF27a36a)),
                     SizedBox(width: 8),
-                    Text(
-                      'Full Organization Access',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                    Expanded(
+                      child: Text(
+                        'Full Organization Access',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 16),
+                      ),
                     ),
                   ],
                 ),
@@ -1259,21 +1261,33 @@ class _EngineerAccountSettingsPanelState
                   'You currently have unrestricted access to sites, zones, and sensors.',
                 ),
                 const SizedBox(height: 14),
-                const Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    SizedBox(
-                        width: 220,
-                        child: _AccessStatCard(label: 'All Sites', value: '1')),
-                    SizedBox(
-                        width: 220,
-                        child: _AccessStatCard(label: 'All Zones', value: '1')),
-                    SizedBox(
-                        width: 220,
-                        child: _AccessStatCard(
-                            label: 'All Sensors', value: '214')),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final statWidth = constraints.maxWidth < 460
+                        ? constraints.maxWidth
+                        : 220.0;
+                    return Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        SizedBox(
+                          width: statWidth,
+                          child: const _AccessStatCard(
+                              label: 'All Sites', value: '1'),
+                        ),
+                        SizedBox(
+                          width: statWidth,
+                          child: const _AccessStatCard(
+                              label: 'All Zones', value: '1'),
+                        ),
+                        SizedBox(
+                          width: statWidth,
+                          child: const _AccessStatCard(
+                              label: 'All Sensors', value: '214'),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),

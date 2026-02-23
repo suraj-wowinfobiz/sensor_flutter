@@ -198,26 +198,50 @@ class _SensorsScreenState extends State<SensorsScreen> {
                             setState(() => _organizationId = value ?? ''),
                       ),
                       const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              'Sensor GPS Coordinates (Optional)',
-                              style: TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.w700),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final compact = constraints.maxWidth < 560;
+                          final title = Text(
+                            'GPS Coordinates',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
                             ),
-                          ),
-                          OutlinedButton.icon(
+                          );
+                          final action = OutlinedButton.icon(
                             onPressed: () {
                               setState(() {
                                 _latitude = '37.7749';
                                 _longitude = '-122.4194';
                               });
                             },
-                            icon: const Icon(Icons.my_location, size: 18),
-                            label: const Text('Get Current Location'),
-                          ),
-                        ],
+                            icon: const Icon(Icons.my_location, size: 16),
+                            label: const Text(
+                              'Get Location',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                          if (compact) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                title,
+                                const SizedBox(height: 8),
+                                action,
+                              ],
+                            );
+                          }
+                          return Row(
+                            children: [
+                              Expanded(child: title),
+                              const SizedBox(width: 10),
+                              action,
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 10),
                       Row(
@@ -314,7 +338,12 @@ class _SensorsScreenState extends State<SensorsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        Text(
+          label,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
         const SizedBox(height: 6),
         TextFormField(
           initialValue: value,
@@ -348,11 +377,37 @@ class _SensorsScreenState extends State<SensorsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        Text(
+          label,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
           value: value,
-          hint: Text(hint),
+          isExpanded: true,
+          iconSize: 18,
+          style: const TextStyle(fontSize: 12.5),
+          hint: Text(
+            hint,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12.5),
+          ),
+          selectedItemBuilder: (context) => items
+              .map(
+                (item) => Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _dropdownItemLabel(item),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12.5),
+                  ),
+                ),
+              )
+              .toList(),
           items: items,
           onChanged: onChanged,
           decoration: InputDecoration(
@@ -372,6 +427,12 @@ class _SensorsScreenState extends State<SensorsScreen> {
         ),
       ],
     );
+  }
+
+  String _dropdownItemLabel(DropdownMenuItem<String> item) {
+    final child = item.child;
+    if (child is Text) return child.data ?? (item.value ?? '');
+    return item.value ?? '';
   }
 
   String _sensorCodeFor(int index) => 'SEN-${[
@@ -934,6 +995,8 @@ class _SensorsScreenState extends State<SensorsScreen> {
         final statusColor = status == 'active'
             ? const Color(0xFF0ca15f)
             : const Color(0xFF8397a3);
+        final metaLine =
+            '${sensor.serialNumber} • $deviceName • ${_channelFor(safeIndex)} • ${_unitForType(type)} • $siteName';
 
         return Container(
           padding: const EdgeInsets.all(14),
@@ -956,6 +1019,8 @@ class _SensorsScreenState extends State<SensorsScreen> {
                   Expanded(
                     child: Text(
                       '${_sensorCodeFor(safeIndex)} • $type',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
@@ -984,16 +1049,17 @@ class _SensorsScreenState extends State<SensorsScreen> {
                 ],
               ),
               const SizedBox(height: 10),
-              Wrap(
-                spacing: 14,
-                runSpacing: 6,
-                children: [
-                  Text('Serial: ${sensor.serialNumber}'),
-                  Text('Device: $deviceName'),
-                  Text('Channel: ${_channelFor(safeIndex)}'),
-                  Text('Unit: ${_unitForType(type)}'),
-                  Text('Location: $siteName'),
-                ],
+              Text(
+                metaLine,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? const Color(0xFF4a6170)
+                      : const Color(0xFFBBD0E0),
+                  height: 1.3,
+                ),
               ),
               const SizedBox(height: 8),
               Row(
