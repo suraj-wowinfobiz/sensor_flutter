@@ -37,6 +37,7 @@ class UserNavBar extends StatelessWidget {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final width = MediaQuery.of(context).size.width;
     final isCompact = width < 900;
+    final isMobile = width < 700;
 
     final barColor = isLight
         ? Theme.of(context).colorScheme.primary
@@ -44,9 +45,9 @@ class UserNavBar extends StatelessWidget {
     const barTextColor = Color(0xFFEAF3FF);
 
     return Container(
-      height: 74,
+      height: isCompact ? 58 : 66,
       margin: EdgeInsets.zero,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 14),
       decoration: BoxDecoration(
         color: barColor,
         borderRadius: BorderRadius.zero,
@@ -65,8 +66,8 @@ class UserNavBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               onTap: onMenuToggle,
               child: Container(
-                width: 42,
-                height: 42,
+                width: isCompact ? 36 : 42,
+                height: isCompact ? 36 : 42,
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
@@ -76,21 +77,26 @@ class UserNavBar extends StatelessWidget {
                 child: Icon(
                   isMenuOpen ? Icons.close : Icons.menu,
                   color: barTextColor,
+                  size: isCompact ? 20 : 24,
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: isCompact ? 8 : 12),
           ],
           Container(
-            width: 40,
-            height: 40,
+            width: isCompact ? 32 : 40,
+            height: isCompact ? 32 : 40,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.speed, color: Colors.white, size: 20),
+            child: Icon(
+              Icons.speed,
+              color: Colors.white,
+              size: isCompact ? 17 : 20,
+            ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: isCompact ? 8 : 12),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -102,7 +108,7 @@ class UserNavBar extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: barTextColor,
-                    fontSize: isCompact ? 17 : 20,
+                    fontSize: isCompact ? 14 : 18,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -113,7 +119,7 @@ class UserNavBar extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: barTextColor.withValues(alpha: 0.82),
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w500,
                       letterSpacing: 0.4,
                     ),
@@ -121,89 +127,91 @@ class UserNavBar extends StatelessWidget {
               ],
             ),
           ),
-          if (!isCompact) ...[
-            PopupMenuButton<int>(
-              tooltip: 'Notifications',
-              offset: const Offset(0, 44),
-              constraints: const BoxConstraints(minWidth: 300, maxWidth: 360),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              itemBuilder: (context) {
-                if (notifications.isEmpty) {
-                  return [
-                    const PopupMenuItem<int>(
-                      enabled: false,
-                      height: 72,
-                      child: Center(
-                        child: Text(
-                          'No notifications',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                  ];
-                }
-
-                return notifications.take(6).map((item) {
-                  return PopupMenuItem<int>(
-                    enabled: false,
-                    height: 64,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.only(top: 5),
-                          child: Icon(Icons.circle, size: 9),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                item.title,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              Text(
-                                item.message,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList();
-              },
-              child: Stack(
-                children: [
-                  Icon(Icons.notifications_none, color: barTextColor),
-                  if (hasNotifications)
-                    Positioned(
-                      right: 1,
-                      top: 1,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFE54C4C),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+          PopupMenuButton<int>(
+            tooltip: 'Notifications',
+            offset: const Offset(0, 40),
+            constraints: const BoxConstraints(minWidth: 300, maxWidth: 360),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
             ),
-            const SizedBox(width: 10),
-          ],
+            itemBuilder: (context) {
+              if (notifications.isEmpty) {
+                return [
+                  const PopupMenuItem<int>(
+                    enabled: false,
+                    height: 72,
+                    child: Center(
+                      child: Text(
+                        'No notifications',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ];
+              }
+
+              return notifications.take(6).map((item) {
+                return PopupMenuItem<int>(
+                  enabled: false,
+                  height: 64,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 5),
+                        child: Icon(Icons.circle, size: 9),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              item.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                            Text(
+                              item.message,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList();
+            },
+            child: Stack(
+              children: [
+                Icon(
+                  Icons.notifications_active_outlined,
+                  color: barTextColor,
+                  size: isCompact ? 20 : 23,
+                ),
+                if (hasNotifications)
+                  Positioned(
+                    right: 1,
+                    top: 1,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE54C4C),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          SizedBox(width: isCompact ? 6 : 10),
           PopupMenuButton<String>(
             tooltip: 'Profile Menu',
             onSelected: (value) {
@@ -242,11 +250,11 @@ class UserNavBar extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
+                      const Text(
                         'suraj.tiwari',
                         style: TextStyle(
                           color: barTextColor,
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -254,16 +262,16 @@ class UserNavBar extends StatelessWidget {
                         'User',
                         style: TextStyle(
                           color: barTextColor.withValues(alpha: 0.84),
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
-                const SizedBox(width: 10),
+                SizedBox(width: isCompact ? 6 : 10),
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: isMobile ? 34 : 40,
+                  height: isMobile ? 34 : 40,
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.18),
                     shape: BoxShape.circle,
@@ -273,6 +281,7 @@ class UserNavBar extends StatelessWidget {
                     'F',
                     style: TextStyle(
                       color: barTextColor,
+                      fontSize: isMobile ? 12 : 14,
                       fontWeight: FontWeight.w700,
                     ),
                   ),

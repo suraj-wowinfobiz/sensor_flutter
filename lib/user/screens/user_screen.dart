@@ -23,12 +23,11 @@ class UserScreen extends StatefulWidget {
 class _UserScreenState extends State<UserScreen>
     with SingleTickerProviderStateMixin {
   bool _isMenuOpen = false;
-  bool _dragActive = false;
   String _currentView = 'dashboard';
+  bool _showTopNav = true;
   bool _showBottomNav = true;
   final List<String> _openedViews = ['dashboard'];
   late AnimationController _menuController;
-  late Animation<double> _menuAnimation;
 
   @override
   void initState() {
@@ -36,10 +35,6 @@ class _UserScreenState extends State<UserScreen>
     _menuController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
-    );
-    _menuAnimation = CurvedAnimation(
-      parent: _menuController,
-      curve: Curves.easeInOut,
     );
   }
 
@@ -70,33 +65,6 @@ class _UserScreenState extends State<UserScreen>
     );
   }
 
-  void _onHorizontalDragStart(DragStartDetails details) {
-    _dragActive = _isMenuOpen || details.globalPosition.dx <= 28;
-  }
-
-  void _onHorizontalDragUpdate(DragUpdateDetails details) {
-    if (!_dragActive) return;
-    final delta = details.primaryDelta ?? 0;
-    if (!_isMenuOpen && delta > 0) {
-      setState(() => _isMenuOpen = true);
-    }
-    final value = (_menuController.value + (delta / 320)).clamp(0.0, 1.0);
-    _menuController.value = value;
-  }
-
-  void _onHorizontalDragEnd(DragEndDetails details) {
-    if (!_dragActive) return;
-    _dragActive = false;
-    final velocity = details.primaryVelocity ?? 0;
-    final shouldOpen = velocity > 250 || _menuController.value > 0.35;
-    setState(() => _isMenuOpen = shouldOpen);
-    if (shouldOpen) {
-      _menuController.forward();
-    } else {
-      _menuController.reverse();
-    }
-  }
-
   void _setCurrentView(String view) {
     final normalized = _normalizeView(view);
     if (_currentView == normalized) return;
@@ -107,14 +75,16 @@ class _UserScreenState extends State<UserScreen>
     if (MediaQuery.of(context).size.width >= 1100) return false;
 
     if (notification.direction == ScrollDirection.reverse) {
-      if (_showBottomNav) {
+      if (_showTopNav || _showBottomNav) {
         setState(() {
+          _showTopNav = false;
           _showBottomNav = false;
         });
       }
     } else if (notification.direction == ScrollDirection.forward) {
-      if (!_showBottomNav) {
+      if (!_showTopNav || !_showBottomNav) {
         setState(() {
+          _showTopNav = true;
           _showBottomNav = true;
         });
       }
@@ -158,7 +128,28 @@ class _UserScreenState extends State<UserScreen>
       body: SafeArea(
         child: Column(
           children: [
-            if (isDesktop) navBar,
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              switchInCurve: Curves.easeOutQuart,
+              switchOutCurve: Curves.easeInQuart,
+              transitionBuilder: (child, animation) {
+                final slide = Tween<Offset>(
+                  begin: const Offset(0, -0.08),
+                  end: Offset.zero,
+                ).animate(animation);
+                return SizeTransition(
+                  sizeFactor: animation,
+                  axisAlignment: -1,
+                  child: FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(position: slide, child: child),
+                  ),
+                );
+              },
+              child: (isDesktop || _showTopNav)
+                  ? navBar
+                  : const SizedBox.shrink(key: ValueKey('hidden-user-nav')),
+            ),
             Expanded(
               child: NotificationListener<UserScrollNotification>(
                 onNotification: _onScroll,
@@ -184,48 +175,42 @@ class _UserScreenState extends State<UserScreen>
           ],
         ),
       ),
-      bottomNavigationBar: isDesktop || !_showBottomNav
+      bottomNavigationBar: isDesktop
           ? null
-          : _buildBottomNav(
-              currentView: _currentView,
-              onViewChanged: _setCurrentView,
+          : AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              switchInCurve: Curves.easeOutQuart,
+              switchOutCurve: Curves.easeInQuart,
+              transitionBuilder: (child, animation) {
+                final slide = Tween<Offset>(
+                  begin: const Offset(0, 0.2),
+                  end: Offset.zero,
+                ).animate(animation);
+                return SizeTransition(
+                  sizeFactor: animation,
+                  axis: Axis.vertical,
+                  axisAlignment: -1,
+                  child: FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(position: slide, child: child),
+                  ),
+                );
+              },
+              child: _showBottomNav
+                  ? KeyedSubtree(
+                      key: const ValueKey('user-bottom-nav-visible'),
+                      child: _buildBottomNav(
+                        currentView: _currentView,
+                        onViewChanged: _setCurrentView,
+                      ),
+                    )
+                  : const SizedBox.shrink(
+                      key: ValueKey('user-bottom-nav-hidden'),
+                    ),
             ),
     );
 
-    if (isDesktop) return scaffold;
-
-    return Stack(
-      children: [
-        GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onHorizontalDragStart: _onHorizontalDragStart,
-          onHorizontalDragUpdate: _onHorizontalDragUpdate,
-          onHorizontalDragEnd: _onHorizontalDragEnd,
-          child: scaffold,
-        ),
-        if (_isMenuOpen)
-          GestureDetector(
-            onTap: closeMenu,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              color:
-                  Colors.black.withValues(alpha: 0.24 * _menuAnimation.value),
-              child: const SizedBox.expand(),
-            ),
-          ),
-        UserSideMenu(
-          animation: _menuAnimation,
-          isOpen: _isMenuOpen,
-          currentView: _currentView,
-          onViewChanged: (view) {
-            _setCurrentView(view);
-            closeMenu();
-          },
-          onClose: closeMenu,
-          onLogout: _logout,
-        ),
-      ],
-    );
+    return scaffold;
   }
 
   Widget _buildBottomNav({
@@ -234,20 +219,71 @@ class _UserScreenState extends State<UserScreen>
   }) {
     const views = ['dashboard', 'alerts', 'analytics', 'settings'];
     final index = views.indexOf(currentView);
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final selectedColor = Theme.of(context).colorScheme.primary;
+    final unselectedColor =
+        isLight ? const Color(0xFF6D7E89) : const Color(0xFF9CB0C0);
 
-    return BottomNavigationBar(
-      type: BottomNavigationBarType.fixed,
-      currentIndex: index < 0 ? 0 : index,
-      onTap: (i) => onViewChanged(views[i]),
-      items: const [
-        BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard), label: 'Dashboard'),
-        BottomNavigationBarItem(
-            icon: Icon(Icons.notifications), label: 'Alerts'),
-        BottomNavigationBarItem(
-            icon: Icon(Icons.analytics), label: 'Analytics'),
-        BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
-      ],
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isLight ? 0.08 : 0.18),
+            blurRadius: 18,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BottomNavigationBar(
+            type: BottomNavigationBarType.fixed,
+            elevation: 0,
+            backgroundColor:
+                isLight ? const Color(0xFFF7FAFC) : const Color(0xFF1E3446),
+            selectedItemColor: selectedColor,
+            unselectedItemColor: unselectedColor,
+            selectedLabelStyle: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+            showSelectedLabels: false,
+            showUnselectedLabels: false,
+            currentIndex: index < 0 ? 0 : index,
+            onTap: (i) => onViewChanged(views[i]),
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.dashboard_outlined),
+                activeIcon: Icon(Icons.dashboard_rounded),
+                label: '',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.warning_amber_outlined),
+                activeIcon: Icon(Icons.warning_amber_rounded),
+                label: '',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.analytics_outlined),
+                activeIcon: Icon(Icons.analytics),
+                label: '',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.settings_outlined),
+                activeIcon: Icon(Icons.settings),
+                label: '',
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
