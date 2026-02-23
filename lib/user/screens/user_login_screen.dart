@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../pages/user_page.dart';
+import '../../widgets/login_preferences_button.dart';
 
 class UserLoginScreen extends StatefulWidget {
   const UserLoginScreen({super.key});
@@ -41,9 +42,19 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'User Login',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                  const Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'User Login',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      LoginPreferencesButton(),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   TextField(

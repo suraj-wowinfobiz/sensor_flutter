@@ -88,6 +88,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
+          final isLight = Theme.of(context).brightness == Brightness.light;
           final db =
               Provider.of<UserAdminDatabaseProvider>(context, listen: false);
 
@@ -118,6 +119,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
           }
 
           return Dialog(
+            backgroundColor: Theme.of(context).cardColor,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             child: ConstrainedBox(
@@ -134,10 +136,12 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                         const SizedBox(width: 8),
                         Text(
                           user == null ? 'Create New User' : 'Edit User',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 34 > 30 ? 34 - 4 : 30,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF142936),
+                            color: isLight
+                                ? const Color(0xFF142936)
+                                : const Color(0xFFE2EDF8),
                           ),
                         ),
                         const Spacer(),
@@ -151,9 +155,11 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                       user == null
                           ? 'Choose a template for quick setup or configure manually'
                           : 'Update user details and access role',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
-                        color: Color(0xFF506775),
+                        color: isLight
+                            ? const Color(0xFF506775)
+                            : const Color(0xFFBBD0E0),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -1289,12 +1295,16 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                       children: [
                         CircleAvatar(
                           radius: 22,
-                          backgroundColor: const Color(0xFFDCE7ED),
+                          backgroundColor: isLight
+                              ? const Color(0xFFDCE7ED)
+                              : const Color(0xFF2A475A),
                           child: Text(
                             _shortName(user.name),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF203845),
+                              color: isLight
+                                  ? const Color(0xFF203845)
+                                  : const Color(0xFFDDEAF6),
                             ),
                           ),
                         ),
@@ -1325,9 +1335,11 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                               const SizedBox(height: 2),
                               Text(
                                 user.email,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 14,
-                                  color: Color(0xFF516875),
+                                  color: isLight
+                                      ? const Color(0xFF516875)
+                                      : const Color(0xFFBBD0E0),
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -1483,6 +1495,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     UserAdminDatabaseProvider db,
     List<User> users,
   ) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
@@ -1527,12 +1540,16 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                   children: [
                     CircleAvatar(
                       radius: 18,
-                      backgroundColor: const Color(0xFFDCE7ED),
+                      backgroundColor: isLight
+                          ? const Color(0xFFDCE7ED)
+                          : const Color(0xFF2A475A),
                       child: Text(
                         _shortName(user.name),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF203845),
+                          color: isLight
+                              ? const Color(0xFF203845)
+                              : const Color(0xFFDDEAF6),
                         ),
                       ),
                     ),
@@ -1553,9 +1570,11 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                           ),
                           Text(
                             user.email,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
-                              color: Color(0xFF516875),
+                              color: isLight
+                                  ? const Color(0xFF516875)
+                                  : const Color(0xFFBBD0E0),
                             ),
                           ),
                         ],

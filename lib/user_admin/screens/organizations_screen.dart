@@ -730,7 +730,25 @@ class _ListTileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
+    final theme = Theme.of(context);
+    final isLight = theme.brightness == Brightness.light;
+    final scheme = theme.colorScheme;
+    final selectedStart = Color.alphaBlend(
+      scheme.primary.withValues(alpha: isLight ? 0.18 : 0.34),
+      theme.cardColor,
+    );
+    final selectedEnd = Color.alphaBlend(
+      scheme.primary.withValues(alpha: isLight ? 0.1 : 0.24),
+      theme.cardColor,
+    );
+    final normalStart = Color.alphaBlend(
+      scheme.primary.withValues(alpha: isLight ? 0.04 : 0.1),
+      theme.cardColor,
+    );
+    final normalEnd = Color.alphaBlend(
+      scheme.primary.withValues(alpha: isLight ? 0.02 : 0.06),
+      theme.cardColor,
+    );
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -743,23 +761,13 @@ class _ListTileCard extends StatelessWidget {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               gradient: selected
-                  ? LinearGradient(
-                      colors: isLight
-                          ? const [Color(0xFFDDEFFA), Color(0xFFEAF6FD)]
-                          : const [Color(0xFF2E4A5F), Color(0xFF294356)],
-                    )
-                  : LinearGradient(
-                      colors: isLight
-                          ? const [Color(0xFFF8FCFE), Color(0xFFF4FAFD)]
-                          : const [Color(0xFF22394B), Color(0xFF1E3343)],
-                    ),
+                  ? LinearGradient(colors: [selectedStart, selectedEnd])
+                  : LinearGradient(colors: [normalStart, normalEnd]),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: selected
-                    ? (isLight
-                        ? const Color(0xFF7FB3CF)
-                        : const Color(0xFF5D89A3))
-                    : Theme.of(context).dividerColor,
+                    ? scheme.primary.withValues(alpha: isLight ? 0.6 : 0.75)
+                    : theme.dividerColor,
               ),
             ),
             child: Column(
@@ -773,12 +781,8 @@ class _ListTileCard extends StatelessWidget {
                       margin: const EdgeInsets.only(right: 8),
                       decoration: BoxDecoration(
                         color: selected
-                            ? (isLight
-                                ? const Color(0xFF1478A6)
-                                : const Color(0xFF88B6CF))
-                            : (isLight
-                                ? const Color(0xFF9DB2BF)
-                                : const Color(0xFF6E8797)),
+                            ? scheme.primary
+                            : scheme.onSurface.withValues(alpha: 0.45),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -789,9 +793,7 @@ class _ListTileCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: isLight
-                              ? const Color(0xFF142936)
-                              : const Color(0xFFE2EDF8),
+                          color: scheme.onSurface,
                           fontSize: 14,
                         ),
                       ),
@@ -819,9 +821,9 @@ class _ListTileCard extends StatelessWidget {
                         height: 2,
                         margin: const EdgeInsets.only(right: 6),
                         decoration: BoxDecoration(
-                          color: isLight
-                              ? const Color(0xFF7FB3CF)
-                              : const Color(0xFF88B6CF),
+                          color: scheme.primary.withValues(
+                            alpha: isLight ? 0.7 : 0.9,
+                          ),
                           borderRadius: BorderRadius.circular(20),
                         ),
                       ),
@@ -832,9 +834,7 @@ class _ListTileCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: isLight
-                              ? const Color(0xFF5D7381)
-                              : const Color(0xFFBBD0E0),
+                          color: scheme.onSurface.withValues(alpha: 0.78),
                           fontSize: 13,
                         ),
                       ),
@@ -847,9 +847,9 @@ class _ListTileCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isLight
-                          ? const Color(0xFFDDEBF3)
-                          : const Color(0xFF2C475A),
+                      color: scheme.primary.withValues(
+                        alpha: isLight ? 0.14 : 0.28,
+                      ),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
@@ -857,9 +857,7 @@ class _ListTileCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: isLight
-                            ? const Color(0xFF264655)
-                            : const Color(0xFFD7E8F6),
+                        color: scheme.onSurface,
                       ),
                     ),
                   ),
@@ -875,15 +873,11 @@ class _ListTileCard extends StatelessWidget {
               child: Container(
                 width: 3,
                 decoration: BoxDecoration(
-                  color: isLight
-                      ? const Color(0xFF8ABED7)
-                      : const Color(0xFF6FA7C5),
+                  color: scheme.primary.withValues(alpha: isLight ? 0.75 : 0.9),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: isLight
-                          ? const Color(0x8038A3CF)
-                          : const Color(0x664A8BAE),
+                      color: scheme.primary.withValues(alpha: 0.35),
                       blurRadius: 8,
                       offset: Offset(0, 0),
                     ),

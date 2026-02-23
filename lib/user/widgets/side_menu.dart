@@ -22,9 +22,20 @@ class UserSideMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isLight = theme.brightness == Brightness.light;
     final menuWidth = MediaQuery.of(context).size.width < 420
         ? MediaQuery.of(context).size.width * 0.88
         : 312.0;
+    final panelColor = Color.alphaBlend(
+      scheme.surface.withValues(alpha: isLight ? 0.94 : 0.98),
+      theme.scaffoldBackgroundColor,
+    );
+    final softSurface = Color.alphaBlend(
+      scheme.primary.withValues(alpha: isLight ? 0.08 : 0.16),
+      theme.cardColor,
+    );
 
     return IgnorePointer(
       ignoring: !isOpen,
@@ -40,16 +51,14 @@ class UserSideMenu extends StatelessWidget {
           width: menuWidth,
           height: double.infinity,
           decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.light
-                ? Colors.white.withValues(alpha: 0.9)
-                : const Color(0xFF1a3148).withValues(alpha: 0.95),
+            color: panelColor,
             border: Border(
-              right:
-                  BorderSide(color: Theme.of(context).dividerColor, width: 2),
+              right: BorderSide(color: theme.dividerColor, width: 2),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
+                color:
+                    theme.shadowColor.withValues(alpha: isLight ? 0.1 : 0.22),
                 blurRadius: 20,
                 offset: const Offset(4, 0),
               ),
@@ -61,8 +70,7 @@ class UserSideMenu extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   border: Border(
-                    bottom: BorderSide(
-                        color: Theme.of(context).dividerColor, width: 2),
+                    bottom: BorderSide(color: theme.dividerColor, width: 2),
                   ),
                 ),
                 child: Row(
@@ -77,10 +85,7 @@ class UserSideMenu extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color:
-                              Theme.of(context).brightness == Brightness.light
-                                  ? const Color(0xFF1e3a5a)
-                                  : const Color(0xFFc0d6f0),
+                          color: scheme.onSurface,
                         ),
                       ),
                     ),
@@ -92,13 +97,9 @@ class UserSideMenu extends StatelessWidget {
                           width: 34,
                           height: 34,
                           decoration: BoxDecoration(
-                            color:
-                                Theme.of(context).brightness == Brightness.light
-                                    ? const Color(0xFFf0f5fd)
-                                    : const Color(0xFF203a54),
+                            color: softSurface,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: Theme.of(context).dividerColor),
+                            border: Border.all(color: theme.dividerColor),
                           ),
                           child: const Icon(Icons.close, size: 18),
                         ),
@@ -128,8 +129,7 @@ class UserSideMenu extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
                 decoration: BoxDecoration(
                   border: Border(
-                    top: BorderSide(
-                        color: Theme.of(context).dividerColor, width: 1),
+                    top: BorderSide(color: theme.dividerColor, width: 1),
                   ),
                 ),
                 child: GestureDetector(
@@ -138,31 +138,23 @@ class UserSideMenu extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 11),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.light
-                          ? const Color(0xFFf0f5fd)
-                          : const Color(0xFF203a54),
+                      color: softSurface,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Theme.of(context).dividerColor),
+                      border: Border.all(color: theme.dividerColor),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Icons.logout,
                           size: 16,
-                          color:
-                              Theme.of(context).brightness == Brightness.light
-                                  ? const Color(0xFF4a6b8a)
-                                  : const Color(0xFF8aaac9),
+                          color: scheme.onSurface.withValues(alpha: 0.74),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           'Logout',
                           style: TextStyle(
                             fontSize: 12.5,
-                            color:
-                                Theme.of(context).brightness == Brightness.light
-                                    ? const Color(0xFF1e3a5a)
-                                    : const Color(0xFFc0d6f0),
+                            color: scheme.onSurface,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -191,9 +183,9 @@ class UserSideMenu extends StatelessWidget {
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
               decoration: TextDecoration.none,
-              color: Theme.of(context).brightness == Brightness.light
-                  ? const Color(0xFF4a6b8a)
-                  : const Color(0xFF8aaac9),
+              color: Theme.of(context).colorScheme.onSurface.withValues(
+                    alpha: 0.7,
+                  ),
               letterSpacing: 0.5,
             ),
           ),
@@ -205,6 +197,7 @@ class UserSideMenu extends StatelessWidget {
 
   Widget _buildMenuItem(
       BuildContext context, String title, IconData icon, String view) {
+    final scheme = Theme.of(context).colorScheme;
     final isActive = currentView == view;
 
     return GestureDetector(
@@ -224,10 +217,8 @@ class UserSideMenu extends StatelessWidget {
               icon,
               size: 16,
               color: isActive
-                  ? Colors.white
-                  : Theme.of(context).brightness == Brightness.light
-                      ? const Color(0xFF4a6b8a)
-                      : const Color(0xFF8aaac9),
+                  ? scheme.onPrimary
+                  : scheme.onSurface.withValues(alpha: 0.72),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -237,11 +228,7 @@ class UserSideMenu extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12.5,
                   decoration: TextDecoration.none,
-                  color: isActive
-                      ? Colors.white
-                      : Theme.of(context).brightness == Brightness.light
-                          ? const Color(0xFF1e3a5a)
-                          : const Color(0xFFc0d6f0),
+                  color: isActive ? scheme.onPrimary : scheme.onSurface,
                   fontWeight: FontWeight.w600,
                 ),
               ),

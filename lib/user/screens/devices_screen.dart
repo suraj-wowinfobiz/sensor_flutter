@@ -242,7 +242,8 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
   }
 
   Widget _field(String label, Widget child) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
+    final theme = Theme.of(context);
+    final isLight = theme.brightness == Brightness.light;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -259,9 +260,9 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
           height: 40,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
-            color: isLight ? Colors.white : const Color(0xFF243E52),
+            color: theme.cardColor,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Theme.of(context).dividerColor),
+            border: Border.all(color: theme.dividerColor),
           ),
           child: child,
         ),

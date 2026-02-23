@@ -4,6 +4,7 @@ import '../pages/engineer_page.dart';
 import '../pages/user_page.dart';
 import '../pages/user_admin_page.dart';
 import 'admin_screen.dart';
+import '../widgets/login_preferences_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -88,6 +89,10 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Align(
+                  alignment: Alignment.topRight,
+                  child: LoginPreferencesButton(),
+                ),
                 const Text(
                   'Welcome',
                   style: TextStyle(
@@ -128,17 +133,21 @@ class _LoginScreenState extends State<LoginScreen> {
                     fillColor: const Color(0xFFF8FAFB),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFFE1E8ED), width: 1.5),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFE1E8ED), width: 1.5),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFFE1E8ED), width: 1.5),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFE1E8ED), width: 1.5),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFF4A6B8A), width: 2),
+                      borderSide:
+                          const BorderSide(color: Color(0xFF4A6B8A), width: 2),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 18),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -165,24 +174,31 @@ class _LoginScreenState extends State<LoginScreen> {
                     fillColor: const Color(0xFFF8FAFB),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        _obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
                         color: const Color(0xFF9CAAB8),
                       ),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFFE1E8ED), width: 1.5),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFE1E8ED), width: 1.5),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFFE1E8ED), width: 1.5),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFE1E8ED), width: 1.5),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFF4A6B8A), width: 2),
+                      borderSide:
+                          const BorderSide(color: Color(0xFF4A6B8A), width: 2),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 18),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -199,20 +215,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFB),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE1E8ED), width: 1.5),
+                    border:
+                        Border.all(color: const Color(0xFFE1E8ED), width: 1.5),
                   ),
                   child: DropdownButtonFormField<String>(
                     value: _selectedRole,
                     decoration: const InputDecoration(
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                     ),
                     dropdownColor: Colors.white,
                     items: const [
                       DropdownMenuItem(value: 'user', child: Text('User')),
-                      DropdownMenuItem(value: 'user_admin', child: Text('User Admin')),
-                      DropdownMenuItem(value: 'engineer', child: Text('Engineer')),
-                      DropdownMenuItem(value: 'super_admin', child: Text('Super Admin')),
+                      DropdownMenuItem(
+                          value: 'user_admin', child: Text('User Admin')),
+                      DropdownMenuItem(
+                          value: 'engineer', child: Text('Engineer')),
+                      DropdownMenuItem(
+                          value: 'super_admin', child: Text('Super Admin')),
                     ],
                     onChanged: (value) {
                       if (value != null) setState(() => _selectedRole = value);
@@ -221,30 +242,38 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: Checkbox(
-                            value: _keepSignedIn,
-                            onChanged: (value) => setState(() => _keepSignedIn = value ?? false),
-                            activeColor: const Color(0xFF4A6B8A),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: Checkbox(
+                              value: _keepSignedIn,
+                              onChanged: (value) => setState(
+                                () => _keepSignedIn = value ?? false,
+                              ),
+                              activeColor: const Color(0xFF4A6B8A),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Keep me signed in',
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: Color(0xFF3D5266),
-                            fontWeight: FontWeight.w500,
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Keep me signed in',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: Color(0xFF3D5266),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     TextButton(
                       onPressed: () {},
@@ -269,14 +298,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       backgroundColor: const Color(0xFF3D5A6C),
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
                       disabledBackgroundColor: const Color(0xFF8A9DAD),
                     ),
                     child: _isLoading
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
                           )
                         : const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -302,7 +333,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       const Text(
                         'no account?',
-                        style: TextStyle(fontSize: 15, color: Color(0xFF5F7285)),
+                        style:
+                            TextStyle(fontSize: 15, color: Color(0xFF5F7285)),
                       ),
                       const SizedBox(width: 8),
                       TextButton(
@@ -323,7 +355,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             SizedBox(width: 4),
-                            Icon(Icons.arrow_forward, size: 16, color: Color(0xFF3D5A6C)),
+                            Icon(Icons.arrow_forward,
+                                size: 16, color: Color(0xFF3D5A6C)),
                           ],
                         ),
                       ),

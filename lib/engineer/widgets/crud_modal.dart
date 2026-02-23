@@ -16,8 +16,15 @@ class EngineerCrudModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isLight = theme.brightness == Brightness.light;
     final width = MediaQuery.of(context).size.width;
     final isSmall = width < 520;
+    final fieldSurface = Color.alphaBlend(
+      scheme.primary.withValues(alpha: isLight ? 0.08 : 0.16),
+      theme.cardColor,
+    );
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -33,12 +40,13 @@ class EngineerCrudModal extends StatelessWidget {
         child: Container(
           padding: EdgeInsets.all(isSmall ? 18 : 32),
           decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
+            color: theme.cardColor,
             borderRadius: BorderRadius.circular(40),
-            border: Border.all(color: Theme.of(context).dividerColor),
+            border: Border.all(color: theme.dividerColor),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
+                color:
+                    theme.shadowColor.withValues(alpha: isLight ? 0.1 : 0.22),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
@@ -57,18 +65,14 @@ class EngineerCrudModal extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: Theme.of(context).brightness == Brightness.light
-                            ? const Color(0xFF1e3a5a)
-                            : const Color(0xFFc0d6f0),
+                        color: scheme.onSurface,
                       ),
                     ),
                     GestureDetector(
                       onTap: onCancel,
                       child: Icon(
                         Icons.close,
-                        color: Theme.of(context).brightness == Brightness.light
-                            ? const Color(0xFF4a6b8a)
-                            : const Color(0xFF8aaac9),
+                        color: scheme.onSurface.withValues(alpha: 0.72),
                       ),
                     ),
                   ],
@@ -84,10 +88,7 @@ class EngineerCrudModal extends StatelessWidget {
                           field['label'] as String,
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            color:
-                                Theme.of(context).brightness == Brightness.light
-                                    ? const Color(0xFF1e3a5a)
-                                    : const Color(0xFFc0d6f0),
+                            color: scheme.onSurface,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -95,12 +96,8 @@ class EngineerCrudModal extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).brightness ==
-                                      Brightness.light
-                                  ? const Color(0xFFf0f5fd)
-                                  : const Color(0xFF203a54),
-                              border: Border.all(
-                                  color: Theme.of(context).dividerColor),
+                              color: fieldSurface,
+                              border: Border.all(color: theme.dividerColor),
                               borderRadius: BorderRadius.circular(30),
                             ),
                             child: DropdownButtonHideUnderline(
@@ -121,10 +118,7 @@ class EngineerCrudModal extends StatelessWidget {
                                   );
                                 }).toList(),
                                 style: TextStyle(
-                                  color: Theme.of(context).brightness ==
-                                          Brightness.light
-                                      ? const Color(0xFF0a1a2a)
-                                      : const Color(0xFFe8f1fc),
+                                  color: scheme.onSurface,
                                 ),
                               ),
                             ),
@@ -140,13 +134,13 @@ class EngineerCrudModal extends StatelessWidget {
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(30),
                                 borderSide: BorderSide(
-                                  color: Theme.of(context).dividerColor,
+                                  color: theme.dividerColor,
                                 ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(30),
                                 borderSide: BorderSide(
-                                  color: Theme.of(context).dividerColor,
+                                  color: theme.dividerColor,
                                 ),
                               ),
                               focusedBorder: OutlineInputBorder(
@@ -157,10 +151,7 @@ class EngineerCrudModal extends StatelessWidget {
                                 ),
                               ),
                               filled: true,
-                              fillColor: Theme.of(context).brightness ==
-                                      Brightness.light
-                                  ? const Color(0xFFf0f5fd)
-                                  : const Color(0xFF203a54),
+                              fillColor: fieldSurface,
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 12,
@@ -203,22 +194,15 @@ class EngineerCrudModal extends StatelessWidget {
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           decoration: BoxDecoration(
-                            color:
-                                Theme.of(context).brightness == Brightness.light
-                                    ? const Color(0xFFf0f5fd)
-                                    : const Color(0xFF203a54),
-                            border: Border.all(
-                                color: Theme.of(context).dividerColor),
+                            color: fieldSurface,
+                            border: Border.all(color: theme.dividerColor),
                             borderRadius: BorderRadius.circular(40),
                           ),
                           child: Center(
                             child: Text(
                               'Cancel',
                               style: TextStyle(
-                                color: Theme.of(context).brightness ==
-                                        Brightness.light
-                                    ? const Color(0xFF1e3a5a)
-                                    : const Color(0xFFc0d6f0),
+                                color: scheme.onSurface,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 16,
                               ),
@@ -260,22 +244,15 @@ class EngineerCrudModal extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).brightness ==
-                                      Brightness.light
-                                  ? const Color(0xFFf0f5fd)
-                                  : const Color(0xFF203a54),
-                              border: Border.all(
-                                  color: Theme.of(context).dividerColor),
+                              color: fieldSurface,
+                              border: Border.all(color: theme.dividerColor),
                               borderRadius: BorderRadius.circular(40),
                             ),
                             child: Center(
                               child: Text(
                                 'Cancel',
                                 style: TextStyle(
-                                  color: Theme.of(context).brightness ==
-                                          Brightness.light
-                                      ? const Color(0xFF1e3a5a)
-                                      : const Color(0xFFc0d6f0),
+                                  color: scheme.onSurface,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 16,
                                 ),

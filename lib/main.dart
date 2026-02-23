@@ -60,6 +60,10 @@ class MyApp extends StatelessWidget {
 class _AppRoot extends ConsumerWidget {
   const _AppRoot();
 
+  ThemeData _withTypography(ThemeData theme) {
+    return theme.copyWith(textTheme: _compactTextTheme(theme.textTheme));
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeProvider = ref.watch(themeChangeNotifierProvider);
@@ -74,35 +78,13 @@ class _AppRoot extends ConsumerWidget {
       child: MaterialApp(
         title: 'Industrial Tilt Super Admin',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData.light().copyWith(
-          scaffoldBackgroundColor: const Color(0xFFf4f9ff),
-          textTheme: _compactTextTheme(ThemeData.light().textTheme),
-          colorScheme: const ColorScheme.light(
-            primary: Color(0xFF1f7bcf),
-            secondary: Color(0xFFe68a2e),
-            surface: Color(0xFFffffff),
-            error: Color(0xFFd64545),
-          ),
-          cardColor: Colors.white,
-          dividerColor: const Color(0xFFd9e6f5),
-        ),
-        darkTheme: ThemeData.dark().copyWith(
-          scaffoldBackgroundColor: const Color(0xFF0e1b2a),
-          textTheme: _compactTextTheme(ThemeData.dark().textTheme),
-          colorScheme: const ColorScheme.dark(
-            primary: Color(0xFF3290df),
-            secondary: Color(0xFFd97e2a),
-            surface: Color(0xFF1d3852),
-            error: Color(0xFFcc4a4a),
-          ),
-          cardColor: const Color(0xFF1d3852),
-          dividerColor: const Color(0xFF315a7a),
-        ),
-        themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+        theme: _withTypography(themeProvider.buildTheme(Brightness.light)),
+        darkTheme: _withTypography(themeProvider.buildTheme(Brightness.dark)),
+        themeMode: themeProvider.themeMode,
         builder: (context, child) {
           return MediaQuery(
             data: MediaQuery.of(context).copyWith(
-              textScaler: const TextScaler.linear(0.92),
+              textScaler: TextScaler.linear(themeProvider.textScale),
             ),
             child: child ?? const SizedBox.shrink(),
           );

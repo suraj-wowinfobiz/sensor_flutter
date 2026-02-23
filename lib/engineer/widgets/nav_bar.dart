@@ -34,15 +34,17 @@ class EngineerNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
+    final theme = Theme.of(context);
+    final isLight = theme.brightness == Brightness.light;
+    final scheme = theme.colorScheme;
     final width = MediaQuery.of(context).size.width;
     final isCompact = width < 900;
     final isMobile = width < 700;
 
-    final barColor = isLight
-        ? Theme.of(context).colorScheme.primary
-        : const Color(0xFF0f2a42);
-    const barTextColor = Color(0xFFEAF3FF);
+    final barColor = scheme.primary;
+    final barTextColor = scheme.onPrimary;
+    final chromeFill = scheme.onPrimary.withValues(alpha: 0.16);
+    final chromeBorder = scheme.onPrimary.withValues(alpha: 0.24);
 
     return Container(
       height: isCompact ? 58 : 66,
@@ -53,7 +55,7 @@ class EngineerNavBar extends StatelessWidget {
         borderRadius: BorderRadius.zero,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
+            color: theme.shadowColor.withValues(alpha: isLight ? 0.15 : 0.3),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -69,10 +71,9 @@ class EngineerNavBar extends StatelessWidget {
                 width: isCompact ? 36 : 42,
                 height: isCompact ? 36 : 42,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.12),
+                  color: chromeFill,
                   borderRadius: BorderRadius.circular(12),
-                  border:
-                      Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                  border: Border.all(color: chromeBorder),
                 ),
                 child: Icon(
                   isMenuOpen ? Icons.close : Icons.menu,
@@ -87,12 +88,12 @@ class EngineerNavBar extends StatelessWidget {
             width: isCompact ? 32 : 40,
             height: isCompact ? 32 : 40,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
+              color: chromeFill,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               Icons.speed,
-              color: Colors.white,
+              color: barTextColor,
               size: isCompact ? 17 : 20,
             ),
           ),
@@ -202,8 +203,8 @@ class EngineerNavBar extends StatelessWidget {
                     child: Container(
                       width: 8,
                       height: 8,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE54C4C),
+                      decoration: BoxDecoration(
+                        color: scheme.error,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -250,7 +251,7 @@ class EngineerNavBar extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      const Text(
+                      Text(
                         'suraj.tiwari',
                         style: TextStyle(
                           color: barTextColor,
@@ -273,7 +274,7 @@ class EngineerNavBar extends StatelessWidget {
                   width: isMobile ? 34 : 40,
                   height: isMobile ? 34 : 40,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
+                    color: chromeFill,
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,

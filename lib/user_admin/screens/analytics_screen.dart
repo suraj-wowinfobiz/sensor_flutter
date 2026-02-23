@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/theme/custom_theme_tokens.dart';
 import '../../shared/models/threshold_rule.dart';
 import '../providers/user_admin_database_provider.dart';
 
@@ -67,7 +68,7 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
 
         final selected =
             filteredSensors.where((s) => s.id == _selectedSensorId).firstOrNull;
-        final isLight = Theme.of(context).brightness == Brightness.light;
+        final tokens = Theme.of(context).extension<CustomThemeTokens>()!;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
@@ -88,10 +89,7 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
                         style: TextStyle(
                           fontSize: 34,
                           fontWeight: FontWeight.w800,
-                          color:
-                              Theme.of(context).brightness == Brightness.light
-                                  ? const Color(0xFF0f202d)
-                                  : const Color(0xFFd4e4ef),
+                          color: tokens.heading,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -99,9 +97,7 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
                         'Real-time sensor data visualization and comparison',
                         style: TextStyle(
                           fontSize: 15,
-                          color: isLight
-                              ? const Color(0xFF4e6473)
-                              : const Color(0xFF9db7d2),
+                          color: tokens.subheading,
                         ),
                       ),
                     ],
@@ -256,9 +252,7 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
-                            color: isLight
-                                ? const Color(0xFF132733)
-                                : const Color(0xFFD8E8F5),
+                            color: tokens.heading,
                           ),
                         ),
                         const Spacer(),
@@ -285,21 +279,21 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
                     _buildThresholdLegend(graphThresholds),
                     const SizedBox(height: 10),
                     if (selected == null)
-                      const SizedBox(
+                      SizedBox(
                         height: 400,
                         child: Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(Icons.insert_chart_outlined,
-                                  size: 64, color: Color(0xFF93A6B2)),
+                                  size: 64, color: tokens.mutedText),
                               SizedBox(height: 12),
                               Text(
                                 'Select a sensor to view analytics',
                                 style: TextStyle(
                                   fontSize: 30,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF4A6270),
+                                  color: tokens.heading,
                                 ),
                               ),
                               SizedBox(height: 6),
@@ -307,7 +301,7 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
                                 'Use the filters above to find sensors, then select one to visualize its data',
                                 style: TextStyle(
                                   fontSize: 15,
-                                  color: Color(0xFF657C89),
+                                  color: tokens.mutedText,
                                 ),
                               ),
                             ],
@@ -351,7 +345,7 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
                                   drawVerticalLine: false,
                                   horizontalInterval: 1,
                                   getDrawingHorizontalLine: (_) =>
-                                      const FlLine(color: Color(0xFFD2DBE0)),
+                                      FlLine(color: tokens.chartGrid),
                                 ),
                                 borderData: FlBorderData(
                                   show: true,
@@ -382,7 +376,8 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
                                       return FlSpot(i.toDouble(), base + noise);
                                     }),
                                     isCurved: true,
-                                    color: const Color(0xFF0f8f92),
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
                                     barWidth: 2.5,
                                     dotData: const FlDotData(show: false),
                                   ),
@@ -402,7 +397,9 @@ class _UserAdminAnalyticsScreenState extends State<UserAdminAnalyticsScreen> {
                                                 noise);
                                       }),
                                       isCurved: true,
-                                      color: const Color(0xFF5973D8),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .secondary,
                                       barWidth: 2.0,
                                       dotData: const FlDotData(show: false),
                                     ),

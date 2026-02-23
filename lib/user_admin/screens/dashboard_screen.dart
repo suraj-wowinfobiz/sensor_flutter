@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/theme/custom_theme_tokens.dart';
 import '../../shared/models/threshold_rule.dart';
 import '../providers/user_admin_database_provider.dart';
 
@@ -1342,15 +1343,11 @@ class UserAdminDashboardScreen extends StatelessWidget {
   }
 
   Color _titleColor(BuildContext context) {
-    return Theme.of(context).brightness == Brightness.light
-        ? const Color(0xFF1c2a33)
-        : const Color(0xFFd4e4ef);
+    return Theme.of(context).extension<CustomThemeTokens>()!.heading;
   }
 
   Color _mutedTextColor(BuildContext context) {
-    return Theme.of(context).brightness == Brightness.light
-        ? const Color(0xFF60717c)
-        : const Color(0xFF9FB4C6);
+    return Theme.of(context).extension<CustomThemeTokens>()!.mutedText;
   }
 
   List<HorizontalLine> _thresholdLinesForGraph(
@@ -1538,9 +1535,8 @@ class _LegendItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = Theme.of(context).brightness == Brightness.light
-        ? const Color(0xFF566872)
-        : const Color(0xFF9FB4C6);
+    final textColor =
+        Theme.of(context).extension<CustomThemeTokens>()!.mutedText;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1587,18 +1583,13 @@ class _MiniStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final titleColor =
-        isLight ? const Color(0xFF4d616d) : const Color(0xFFB8CBDA);
-    final valueColor =
-        isLight ? const Color(0xFF11212d) : const Color(0xFFE3EEF8);
-    final unitColor =
-        isLight ? const Color(0xFF5f707a) : const Color(0xFFA8BDCE);
-    final detailColor =
-        isLight ? const Color(0xFF60717c) : const Color(0xFF9FB4C6);
-    final badgeBg = isLight ? const Color(0xFFd7f2df) : const Color(0xFF1E4736);
-    final badgeBorder =
-        isLight ? const Color(0xFF9edbb2) : const Color(0xFF2E8E61);
+    final tokens = Theme.of(context).extension<CustomThemeTokens>()!;
+    final titleColor = tokens.subheading;
+    final valueColor = Theme.of(context).colorScheme.onSurface;
+    final unitColor = tokens.subheading;
+    final detailColor = tokens.mutedText;
+    final badgeBg = tokens.statusNormal.withValues(alpha: 0.2);
+    final badgeBorder = tokens.statusNormal.withValues(alpha: 0.45);
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact =
@@ -1645,8 +1636,8 @@ class _MiniStatCard extends StatelessWidget {
                     ),
                     child: Text(
                       data.badge,
-                      style: const TextStyle(
-                        color: Color(0xFF0d9a4d),
+                      style: TextStyle(
+                        color: tokens.statusNormal,
                         fontWeight: FontWeight.w700,
                         fontSize: 11,
                       ),
