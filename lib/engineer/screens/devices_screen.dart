@@ -36,6 +36,9 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
 
   void _showDeviceModal({Device? device}) {
     final db = Provider.of<EngineerDatabaseProvider>(context, listen: false);
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final subColor =
+        isLight ? const Color(0xFF4e6473) : const Color(0xFF9db7d2);
     final defaultSiteId = db.sites.isNotEmpty ? db.sites.first.id : '';
     final defaultZoneId = db.zones.isNotEmpty ? db.zones.first.id : '';
 
@@ -103,10 +106,10 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
                                       fontWeight: FontWeight.w800),
                                 ),
                                 const SizedBox(height: 6),
-                                const Text(
+                                Text(
                                   'Configure device parameters and network settings',
                                   style: TextStyle(
-                                      fontSize: 14, color: Color(0xFF4e6473)),
+                                      fontSize: 14, color: subColor),
                                 ),
                               ],
                             ),
@@ -260,25 +263,26 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          border: Border.all(color: const Color(0xFFc8d6dd)),
+                          border:
+                              Border.all(color: Theme.of(context).dividerColor),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           children: [
-                            const Expanded(
+                            Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     'Data Transmission',
                                     style: TextStyle(
-                                        fontSize: 20,
+                                        fontSize: 30 > 22 ? 22 : 20,
                                         fontWeight: FontWeight.w700),
                                   ),
                                   SizedBox(height: 2),
                                   Text(
                                     'Enable device to send data',
-                                    style: TextStyle(color: Color(0xFF4e6473)),
+                                    style: TextStyle(color: subColor),
                                   ),
                                 ],
                               ),
@@ -297,8 +301,7 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () {
-                                final provider =
-                                    Provider.of<EngineerDatabaseProvider>(
+                                final provider = Provider.of<EngineerDatabaseProvider>(
                                   context,
                                   listen: false,
                                 );
@@ -386,16 +389,20 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
-            fillColor: Theme.of(context).brightness == Brightness.light ? const Color(0xFFF4F8FA) : const Color(0xFF1E3A52),
+            fillColor: Theme.of(context).brightness == Brightness.light
+                ? const Color(0xFFF4F8FA)
+                : const Color(0xFF1E3A52),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+              borderSide:
+                  BorderSide(color: Theme.of(context).dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+              borderSide:
+                  BorderSide(color: Theme.of(context).dividerColor),
             ),
           ),
         ),
@@ -448,16 +455,20 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
-            fillColor: Theme.of(context).brightness == Brightness.light ? const Color(0xFFF4F8FA) : const Color(0xFF1E3A52),
+            fillColor: Theme.of(context).brightness == Brightness.light
+                ? const Color(0xFFF4F8FA)
+                : const Color(0xFF1E3A52),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+              borderSide:
+                  BorderSide(color: Theme.of(context).dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+              borderSide:
+                  BorderSide(color: Theme.of(context).dividerColor),
             ),
           ),
         ),
@@ -558,6 +569,7 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Wrap(
       alignment: WrapAlignment.spaceBetween,
       runSpacing: 12,
@@ -578,9 +590,14 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
               ),
             ),
             const SizedBox(height: 2),
-            const Text(
+            Text(
               'Configure and monitor sensor devices',
-              style: TextStyle(fontSize: 15, color: Color(0xFF4e6473)),
+              style: TextStyle(
+                fontSize: 15,
+                color: isLight
+                    ? const Color(0xFF4e6473)
+                    : const Color(0xFF9db7d2),
+              ),
             ),
           ],
         ),
@@ -627,16 +644,21 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
     required VoidCallback onTap,
     bool primary = false,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         decoration: BoxDecoration(
-          color: primary ? const Color(0xFF0f729c) : const Color(0xFFe6eff3),
+          color: primary
+              ? const Color(0xFF0f729c)
+              : (isLight ? const Color(0xFFe6eff3) : const Color(0xFF243E52)),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: primary ? const Color(0xFF0f729c) : const Color(0xFFc8d6dd),
+            color: primary
+                ? const Color(0xFF0f729c)
+                : Theme.of(context).dividerColor,
           ),
         ),
         child: Row(
@@ -644,12 +666,20 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
           children: [
             Icon(icon,
                 size: 19,
-                color: primary ? Colors.white : const Color(0xFF18313f)),
+                color: primary
+                    ? Colors.white
+                    : (isLight
+                        ? const Color(0xFF18313f)
+                        : const Color(0xFFD7E8F6))),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                color: primary ? Colors.white : const Color(0xFF18313f),
+                color: primary
+                    ? Colors.white
+                    : (isLight
+                        ? const Color(0xFF18313f)
+                        : const Color(0xFFD7E8F6)),
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
@@ -662,157 +692,144 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
 
   Widget _buildFiltersPanel(
       BuildContext context, int filteredCount, int totalCount) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFc8d6dc)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Filter Devices',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF243946),
+              color: isLight
+                  ? const Color(0xFF243946)
+                  : const Color(0xFFD7E8F6),
             ),
           ),
           const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 430;
-              final searchWidth = compact ? constraints.maxWidth : 290.0;
-              final filterWidth = compact ? constraints.maxWidth : 190.0;
-              return Wrap(
-                spacing: 14,
-                runSpacing: 14,
-                crossAxisAlignment: WrapCrossAlignment.end,
-                children: [
-                  SizedBox(
-                    width: searchWidth,
-                    child: TextField(
-                      onChanged: (value) =>
-                          setState(() => _searchQuery = value),
-                      decoration: _filterFieldDecoration(
-                        label: 'Search',
-                        hint: 'Device ID, Serial, MAC, IP...',
-                        icon: Icons.search,
-                      ),
-                    ),
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            crossAxisAlignment: WrapCrossAlignment.end,
+            children: [
+              SizedBox(
+                width: 290,
+                child: TextField(
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                  decoration: _filterFieldDecoration(
+                    label: 'Search',
+                    hint: 'Device ID, Serial, MAC, IP...',
+                    icon: Icons.search,
                   ),
-                  SizedBox(
-                    width: filterWidth,
-                    child: DropdownButtonFormField<String>(
-                      value: _statusFilter,
-                      decoration: _filterFieldDecoration(label: 'Status'),
-                      items: const [
-                        DropdownMenuItem(
-                            value: 'all', child: Text('All Statuses')),
-                        DropdownMenuItem(
-                            value: 'active', child: Text('Active')),
-                        DropdownMenuItem(
-                            value: 'inactive', child: Text('Inactive')),
-                        DropdownMenuItem(
-                            value: 'maintenance', child: Text('Maintenance')),
-                        DropdownMenuItem(
-                            value: 'retired', child: Text('Retired')),
-                      ],
-                      onChanged: (value) =>
-                          setState(() => _statusFilter = value ?? 'all'),
-                    ),
+                ),
+              ),
+              SizedBox(
+                width: 190,
+                child: DropdownButtonFormField<String>(
+                  value: _statusFilter,
+                  decoration: _filterFieldDecoration(label: 'Status'),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('All Statuses')),
+                    DropdownMenuItem(value: 'active', child: Text('Active')),
+                    DropdownMenuItem(
+                        value: 'inactive', child: Text('Inactive')),
+                    DropdownMenuItem(
+                        value: 'maintenance', child: Text('Maintenance')),
+                    DropdownMenuItem(value: 'retired', child: Text('Retired')),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _statusFilter = value ?? 'all'),
+                ),
+              ),
+              SizedBox(
+                width: 190,
+                child: DropdownButtonFormField<String>(
+                  value: _webhookFilter,
+                  decoration: _filterFieldDecoration(label: 'Webhook'),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('All')),
+                    DropdownMenuItem(
+                        value: 'configured', child: Text('Configured')),
+                    DropdownMenuItem(
+                        value: 'not_configured', child: Text('Not Configured')),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _webhookFilter = value ?? 'all'),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isLight
+                      ? const Color(0xFFe6eff3)
+                      : const Color(0xFF253F52),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Showing $filteredCount of $totalCount devices',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isLight
+                        ? const Color(0xFF324956)
+                        : const Color(0xFFD7E8F6),
                   ),
-                  SizedBox(
-                    width: filterWidth,
-                    child: DropdownButtonFormField<String>(
-                      value: _webhookFilter,
-                      decoration: _filterFieldDecoration(label: 'Webhook'),
-                      items: const [
-                        DropdownMenuItem(value: 'all', child: Text('All')),
-                        DropdownMenuItem(
-                            value: 'configured', child: Text('Configured')),
-                        DropdownMenuItem(
-                            value: 'not_configured',
-                            child: Text('Not Configured')),
-                      ],
-                      onChanged: (value) =>
-                          setState(() => _webhookFilter = value ?? 'all'),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFe6eff3),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Showing $filteredCount of $totalCount devices',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF324956),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
-          const Divider(height: 1, color: Color(0xFFd9e4ea)),
+          Divider(height: 1, color: Theme.of(context).dividerColor),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'LOCATION HIERARCHY',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF60717c),
+              color: isLight
+                  ? const Color(0xFF60717c)
+                  : const Color(0xFFBBD0E0),
             ),
           ),
           const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 430;
-              final width = compact ? constraints.maxWidth : 190.0;
-              return Wrap(
-                spacing: 14,
-                runSpacing: 14,
-                children: [
-                  _hierarchyDropdown(
-                    width: width,
-                    label: 'Organization',
-                    value: _organizationFilter,
-                    onChanged: (value) =>
-                        setState(() => _organizationFilter = value ?? 'all'),
-                  ),
-                  _hierarchyDropdown(
-                    width: width,
-                    label: 'Site',
-                    value: _siteFilter,
-                    onChanged: (value) =>
-                        setState(() => _siteFilter = value ?? 'all'),
-                  ),
-                  _hierarchyDropdown(
-                    width: width,
-                    label: 'Zone',
-                    value: _zoneFilter,
-                    onChanged: (value) =>
-                        setState(() => _zoneFilter = value ?? 'all'),
-                  ),
-                  _hierarchyDropdown(
-                    width: width,
-                    label: 'Location',
-                    value: _locationFilter,
-                    onChanged: (value) =>
-                        setState(() => _locationFilter = value ?? 'all'),
-                  ),
-                ],
-              );
-            },
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            children: [
+              _hierarchyDropdown(
+                label: 'Organization',
+                value: _organizationFilter,
+                onChanged: (value) =>
+                    setState(() => _organizationFilter = value ?? 'all'),
+              ),
+              _hierarchyDropdown(
+                label: 'Site',
+                value: _siteFilter,
+                onChanged: (value) =>
+                    setState(() => _siteFilter = value ?? 'all'),
+              ),
+              _hierarchyDropdown(
+                label: 'Zone',
+                value: _zoneFilter,
+                onChanged: (value) =>
+                    setState(() => _zoneFilter = value ?? 'all'),
+              ),
+              _hierarchyDropdown(
+                label: 'Location',
+                value: _locationFilter,
+                onChanged: (value) =>
+                    setState(() => _locationFilter = value ?? 'all'),
+              ),
+            ],
           ),
         ],
       ),
@@ -820,13 +837,12 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
   }
 
   Widget _hierarchyDropdown({
-    required double width,
     required String label,
     required String value,
     required ValueChanged<String?> onChanged,
   }) {
     return SizedBox(
-      width: width,
+      width: 190,
       child: DropdownButtonFormField<String>(
         value: value,
         decoration: _filterFieldDecoration(label: label),
@@ -849,19 +865,24 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
       prefixIcon: icon == null ? null : Icon(icon, size: 20),
       isDense: true,
       filled: true,
-      fillColor: Theme.of(context).brightness == Brightness.light ? const Color(0xFFF4F8FA) : const Color(0xFF1E3A52),
+      fillColor: Theme.of(context).brightness == Brightness.light
+          ? const Color(0xFFF4F8FA)
+          : const Color(0xFF1E3A52),
       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+        borderSide: BorderSide(color: Theme.of(context).dividerColor),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+        borderSide: BorderSide(color: Theme.of(context).dividerColor),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF0f729c), width: 1.4),
+        borderSide: BorderSide(
+          color: Theme.of(context).colorScheme.primary,
+          width: 1.4,
+        ),
       ),
     );
   }
@@ -962,24 +983,27 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFc8d6dc)),
+            border: Border.all(color: Theme.of(context).dividerColor),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  const Icon(Icons.memory, size: 20, color: Color(0xFF0f729c)),
+                  Icon(Icons.memory,
+                      size: 20, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       '${device.deviceCode} • ${_serialFor(safeIndex)}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF152733),
+                        color: Theme.of(context).brightness == Brightness.light
+                            ? const Color(0xFF152733)
+                            : const Color(0xFFD7E8F6),
                       ),
                     ),
                   ),
@@ -1073,6 +1097,7 @@ class _DeviceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final isActive = status == 'active';
     final isOffline = status == 'inactive' || status == 'retired';
     final statusColor =
@@ -1083,10 +1108,10 @@ class _DeviceCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFc8d6dc)),
+        border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: isLight ? 0.04 : 0.18),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -1101,11 +1126,13 @@ class _DeviceCard extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFdbe7ed),
+                  color: isLight
+                      ? const Color(0xFFdbe7ed)
+                      : const Color(0xFF2B4659),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(Icons.memory,
-                    color: Color(0xFF0f729c), size: 26),
+                child: Icon(Icons.memory,
+                    color: Theme.of(context).colorScheme.primary, size: 26),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1116,17 +1143,21 @@ class _DeviceCard extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF152733),
+                        color: isLight
+                            ? const Color(0xFF152733)
+                            : const Color(0xFFD7E8F6),
                       ),
                     ),
                     Text(
                       serial,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF60717c),
+                        color: isLight
+                            ? const Color(0xFF60717c)
+                            : const Color(0xFFBBD0E0),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1154,17 +1185,17 @@ class _DeviceCard extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(child: _meta('MAC Address', mac)),
+              Expanded(child: _meta(context, 'MAC Address', mac)),
               const SizedBox(width: 10),
-              Expanded(child: _meta('IP Address', ip)),
+              Expanded(child: _meta(context, 'IP Address', ip)),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(child: _meta('Channels', '$channels')),
+              Expanded(child: _meta(context, 'Channels', '$channels')),
               const SizedBox(width: 10),
-              Expanded(child: _meta('Last Seen', lastSeen)),
+              Expanded(child: _meta(context, 'Last Seen', lastSeen)),
             ],
           ),
           const SizedBox(height: 10),
@@ -1172,21 +1203,27 @@ class _DeviceCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFe9f0f4),
+              color: isLight
+                  ? const Color(0xFFe9f0f4)
+                  : const Color(0xFF253F52),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
-                const Icon(Icons.location_on_outlined,
-                    size: 18, color: Color(0xFF2f83ad)),
+                Icon(Icons.location_on_outlined,
+                    size: 18, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     location,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style:
-                        const TextStyle(color: Color(0xFF2c404d), fontSize: 13),
+                    style: TextStyle(
+                      color: isLight
+                          ? const Color(0xFF2c404d)
+                          : const Color(0xFFD7E8F6),
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
@@ -1220,16 +1257,20 @@ class _DeviceCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFe8edf1),
+                  color: isLight
+                      ? const Color(0xFFe8edf1)
+                      : const Color(0xFF253F52),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFc8d6dd)),
+                  border: Border.all(color: Theme.of(context).dividerColor),
                 ),
                 child: Text(
                   zone,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF243946),
+                    color: isLight
+                        ? const Color(0xFF243946)
+                        : const Color(0xFFD7E8F6),
                   ),
                 ),
               ),
@@ -1238,11 +1279,12 @@ class _DeviceCard extends StatelessWidget {
           const Spacer(),
           Row(
             children: [
-              _iconButton(icon: Icons.edit_outlined, onTap: onEdit),
+              _iconButton(context, icon: Icons.edit_outlined, onTap: onEdit),
               const SizedBox(width: 8),
-              _iconButton(icon: Icons.power_settings_new, onTap: onPower),
+              _iconButton(context, icon: Icons.power_settings_new, onTap: onPower),
               const SizedBox(width: 8),
               _iconButton(
+                context,
                 icon: Icons.delete_outline,
                 onTap: onDelete,
                 iconColor: Colors.red,
@@ -1254,15 +1296,18 @@ class _DeviceCard extends StatelessWidget {
     );
   }
 
-  Widget _meta(String label, String value) {
+  Widget _meta(BuildContext context, String label, String value) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
-            color: Color(0xFF60717c),
+            color: isLight
+                ? const Color(0xFF60717c)
+                : const Color(0xFFBBD0E0),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -1271,9 +1316,11 @@ class _DeviceCard extends StatelessWidget {
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
-            color: Color(0xFF152733),
+            color: isLight
+                ? const Color(0xFF152733)
+                : const Color(0xFFD7E8F6),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -1281,11 +1328,13 @@ class _DeviceCard extends StatelessWidget {
     );
   }
 
-  Widget _iconButton({
+  Widget _iconButton(
+    BuildContext context, {
     required IconData icon,
     required VoidCallback onTap,
     Color iconColor = const Color(0xFF2f4654),
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -1293,11 +1342,20 @@ class _DeviceCard extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: const Color(0xFFe6eff3),
+          color:
+              isLight ? const Color(0xFFe6eff3) : const Color(0xFF243E52),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFc8d6dd)),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
-        child: Icon(icon, size: 20, color: iconColor),
+        child: Icon(
+          icon,
+          size: 20,
+          color: iconColor ==
+                  const Color(0xFF2f4654) &&
+                  !isLight
+              ? const Color(0xFFD7E8F6)
+              : iconColor,
+        ),
       ),
     );
   }
