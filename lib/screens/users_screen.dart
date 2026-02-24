@@ -90,8 +90,9 @@ class _UsersScreenState extends State<UsersScreen> {
       context: parentContext,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setState) {
-          final isLight =
-              Theme.of(dialogContext).brightness == Brightness.light;
+          final theme = Theme.of(dialogContext);
+          final isLight = theme.brightness == Brightness.light;
+          final isDialogLight = theme.brightness == Brightness.light;
 
           void saveUser() {
             final name = nameController.text.trim();
@@ -120,268 +121,337 @@ class _UsersScreenState extends State<UsersScreen> {
           }
 
           return Dialog(
-            backgroundColor: Theme.of(dialogContext).cardColor,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            backgroundColor: Colors.transparent,
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 680, maxHeight: 760),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.auto_awesome,
-                            color: Color(0xFF0f729c), size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            user == null ? 'Create New User' : 'Edit User',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 34 > 30 ? 34 - 4 : 30,
-                              fontWeight: FontWeight.w800,
-                              color: isLight
-                                  ? const Color(0xFF142936)
-                                  : const Color(0xFFE2EDF8),
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(dialogContext),
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          constraints:
-                              const BoxConstraints.tightFor(width: 32, height: 32),
-                          icon: const Icon(Icons.close),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      user == null
-                          ? 'Choose a template (optional) or enter details manually'
-                          : 'Update user details and access role',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: isLight
-                            ? const Color(0xFF506775)
-                            : const Color(0xFFBBD0E0),
+              child: Container(
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: theme.dividerColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.shadowColor.withValues(
+                        alpha: isDialogLight ? 0.1 : 0.22,
                       ),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
                     ),
-                    const SizedBox(height: 14),
-                    if (user == null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE7EFF3),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _tabOption(
-                                active: useTemplateTab,
-                                icon: Icons.auto_awesome_outlined,
-                                label: 'Theme',
-                                onTap: () => setState(() => useTemplateTab = true),
+                  ],
+                ),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.auto_awesome,
+                              color: Color(0xFF0f729c), size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              user == null ? 'Create New User' : 'Edit User',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 34 > 30 ? 34 - 4 : 30,
+                                fontWeight: FontWeight.w800,
+                                color: isLight
+                                    ? const Color(0xFF142936)
+                                    : const Color(0xFFE2EDF8),
                               ),
                             ),
-                            Expanded(
-                              child: _tabOption(
-                                active: !useTemplateTab,
-                                icon: Icons.build_outlined,
-                                label: 'Manual',
-                                onTap: () => setState(() => useTemplateTab = false),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (useTemplateTab) ...[
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE9F5FB),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFB8D9EA)),
                           ),
-                          child: const Text(
-                            'Select a theme template to prefill fields.',
-                            style: TextStyle(
-                              color: Color(0xFF2B5368),
-                              fontWeight: FontWeight.w600,
+                          IconButton(
+                            onPressed: () => Navigator.pop(dialogContext),
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints.tightFor(
+                                width: 32, height: 32),
+                            icon: Icon(
+                              Icons.close,
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.72),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final compact = constraints.maxWidth < 620;
-                            return Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: List.generate(templates.length, (i) {
-                                final template = templates[i];
-                                final active = i == selectedTemplate;
-                                return InkWell(
-                                  onTap: () {
-                                    setState(() {
-                                      selectedTemplate = i;
-                                      nameController.text = template['name']!;
-                                      emailController.text = template['email']!;
-                                      roleController.text = template['role']!;
-                                      organizationController.text =
-                                          template['organization']!;
-                                      useTemplateTab = false;
-                                    });
-                                  },
-                                  borderRadius: BorderRadius.circular(14),
-                                  child: Container(
-                                    width: compact
-                                        ? constraints.maxWidth
-                                        : (constraints.maxWidth - 10) / 2,
-                                    padding: const EdgeInsets.all(14),
-                                    decoration: BoxDecoration(
-                                      gradient: active
-                                          ? const LinearGradient(
-                                              colors: [
-                                                Color(0xFFEAF5FC),
-                                                Color(0xFFF2F8FC),
-                                              ],
-                                            )
-                                          : null,
-                                      color:
-                                          active ? null : const Color(0xFFF7FBFD),
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(
-                                        color: active
-                                            ? const Color(0xFF88BFD9)
-                                            : const Color(0xFFD7E5EC),
-                                      ),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          template['title']!,
-                                          style: const TextStyle(
-                                            fontSize: 17,
-                                            fontWeight: FontWeight.w800,
-                                            color: Color(0xFF152A36),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          'Prefill: ${template['role']}',
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            color: Color(0xFF4E6775),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 14),
-                      ],
-                    ],
-                    if (!useTemplateTab || user != null) ...[
-                      const SizedBox(height: 2),
-                      const Text(
-                        'Full Name',
+                        ],
+                      ),
+                      Text(
+                        user == null
+                            ? 'Choose a template (optional) or enter details manually'
+                            : 'Update user details and access role',
                         style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1b313d),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      _inputBox(
-                        child: TextField(
-                          controller: nameController,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                            hintText: 'John Doe',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Email',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1b313d),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      _inputBox(
-                        child: TextField(
-                          controller: emailController,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                            hintText: 'john@example.com',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Role',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1b313d),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      _inputBox(
-                        child: TextField(
-                          controller: roleController,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                            hintText: 'operator / engineer / admin',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Organization',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1b313d),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      _inputBox(
-                        child: TextField(
-                          controller: organizationController,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                            hintText: 'Organization name',
-                          ),
+                          fontSize: 15,
+                          color: isLight
+                              ? const Color(0xFF506775)
+                              : const Color(0xFFBBD0E0),
                         ),
                       ),
                       const SizedBox(height: 14),
-                      _dialogActions(
-                        dialogContext: dialogContext,
-                        onSave: saveUser,
-                      ),
+                      if (user == null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: isLight
+                                ? const Color(0xFFE7EFF3)
+                                : const Color(0xFF243E52),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _tabOption(
+                                  active: useTemplateTab,
+                                  icon: Icons.auto_awesome_outlined,
+                                  label: 'Theme',
+                                  onTap: () =>
+                                      setState(() => useTemplateTab = true),
+                                ),
+                              ),
+                              Expanded(
+                                child: _tabOption(
+                                  active: !useTemplateTab,
+                                  icon: Icons.build_outlined,
+                                  label: 'Manual',
+                                  onTap: () =>
+                                      setState(() => useTemplateTab = false),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (useTemplateTab) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: isLight
+                                  ? const Color(0xFFE9F5FB)
+                                  : const Color(0xFF1F3648),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isLight
+                                    ? const Color(0xFFB8D9EA)
+                                    : const Color(0xFF35566D),
+                              ),
+                            ),
+                            child: Text(
+                              'Select a theme template to prefill fields.',
+                              style: TextStyle(
+                                color: isLight
+                                    ? const Color(0xFF2B5368)
+                                    : const Color(0xFFBBD0E0),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final compact = constraints.maxWidth < 620;
+                              return Wrap(
+                                spacing: 10,
+                                runSpacing: 10,
+                                children: List.generate(templates.length, (i) {
+                                  final template = templates[i];
+                                  final active = i == selectedTemplate;
+                                  return InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        selectedTemplate = i;
+                                        nameController.text = template['name']!;
+                                        emailController.text =
+                                            template['email']!;
+                                        roleController.text = template['role']!;
+                                        organizationController.text =
+                                            template['organization']!;
+                                        useTemplateTab = false;
+                                      });
+                                    },
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: Container(
+                                      width: compact
+                                          ? constraints.maxWidth
+                                          : (constraints.maxWidth - 10) / 2,
+                                      padding: const EdgeInsets.all(14),
+                                      decoration: BoxDecoration(
+                                        gradient: active
+                                            ? LinearGradient(
+                                                colors: [
+                                                  isLight
+                                                      ? const Color(0xFFEAF5FC)
+                                                      : const Color(0xFF26475F),
+                                                  isLight
+                                                      ? const Color(0xFFF2F8FC)
+                                                      : const Color(0xFF1F3A4E),
+                                                ],
+                                              )
+                                            : null,
+                                        color: active
+                                            ? null
+                                            : (isLight
+                                                ? const Color(0xFFF7FBFD)
+                                                : const Color(0xFF20384B)),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(
+                                          color: active
+                                              ? (isLight
+                                                  ? const Color(0xFF88BFD9)
+                                                  : const Color(0xFF4A7594))
+                                              : (isLight
+                                                  ? const Color(0xFFD7E5EC)
+                                                  : const Color(0xFF35566D)),
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            template['title']!,
+                                            style: TextStyle(
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.w800,
+                                              color: isLight
+                                                  ? const Color(0xFF152A36)
+                                                  : const Color(0xFFE2EDF8),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Prefill: ${template['role']}',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: isLight
+                                                  ? const Color(0xFF4E6775)
+                                                  : const Color(0xFFBBD0E0),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+                      ],
+                      if (!useTemplateTab || user != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Full Name',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: isLight
+                                ? const Color(0xFF1B313D)
+                                : const Color(0xFFE2EDF8),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        _inputBox(
+                          child: TextField(
+                            controller: nameController,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding:
+                                  EdgeInsets.symmetric(vertical: 12),
+                              hintText: 'John Doe',
+                            ),
+                            textAlignVertical: TextAlignVertical.center,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Email',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: isLight
+                                ? const Color(0xFF1B313D)
+                                : const Color(0xFFE2EDF8),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        _inputBox(
+                          child: TextField(
+                            controller: emailController,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding:
+                                  EdgeInsets.symmetric(vertical: 12),
+                              hintText: 'john@example.com',
+                            ),
+                            textAlignVertical: TextAlignVertical.center,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Role',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: isLight
+                                ? const Color(0xFF1B313D)
+                                : const Color(0xFFE2EDF8),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        _inputBox(
+                          child: TextField(
+                            controller: roleController,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding:
+                                  EdgeInsets.symmetric(vertical: 12),
+                              hintText: 'operator / engineer / admin',
+                            ),
+                            textAlignVertical: TextAlignVertical.center,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Organization',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: isLight
+                                ? const Color(0xFF1B313D)
+                                : const Color(0xFFE2EDF8),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        _inputBox(
+                          child: TextField(
+                            controller: organizationController,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding:
+                                  EdgeInsets.symmetric(vertical: 12),
+                              hintText: 'Organization name',
+                            ),
+                            textAlignVertical: TextAlignVertical.center,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _dialogActions(
+                          dialogContext: dialogContext,
+                          onSave: saveUser,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -432,9 +502,8 @@ class _UsersScreenState extends State<UsersScreen> {
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: isLight
-                    ? const Color(0xFF203845)
-                    : const Color(0xFFD7E8F6),
+                color:
+                    isLight ? const Color(0xFF203845) : const Color(0xFFD7E8F6),
               ),
             ),
           ],
@@ -450,17 +519,28 @@ class _UsersScreenState extends State<UsersScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < 300) {
-          return Wrap(
-            alignment: WrapAlignment.end,
-            spacing: 10,
-            runSpacing: 10,
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               OutlinedButton(
                 onPressed: () => Navigator.pop(dialogContext),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
                 child: const Text('Cancel'),
               ),
+              const SizedBox(height: 10),
               FilledButton(
                 onPressed: onSave,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
                 child: Text(_editingId == null ? 'Create User' : 'Update User'),
               ),
             ],
@@ -468,15 +548,30 @@ class _UsersScreenState extends State<UsersScreen> {
         }
         return Row(
           children: [
-            const Spacer(),
-            OutlinedButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text('Cancel'),
+              ),
             ),
             const SizedBox(width: 10),
-            FilledButton(
-              onPressed: onSave,
-              child: Text(_editingId == null ? 'Create User' : 'Update User'),
+            Expanded(
+              child: FilledButton(
+                onPressed: onSave,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: Text(_editingId == null ? 'Create User' : 'Update User'),
+              ),
             ),
           ],
         );
@@ -488,10 +583,10 @@ class _UsersScreenState extends State<UsersScreen> {
     final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       height: 46,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: isLight ? Colors.white : const Color(0xFF243E52),
-        borderRadius: BorderRadius.circular(10),
+        color: isLight ? const Color(0xFFF7FAFC) : const Color(0xFF1A3347),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: child,
@@ -563,8 +658,7 @@ class _UsersScreenState extends State<UsersScreen> {
     };
   }
 
-  void _showAccessDialog(
-      BuildContext context, User user, DatabaseProvider db) {
+  void _showAccessDialog(BuildContext context, User user, DatabaseProvider db) {
     final defaultAccess = _defaultAccessForUser(user, db);
     final defaultOrganizations = defaultAccess['organizations'] ?? <String>{};
     final defaultSites = defaultAccess['sites'] ?? <String>{};
@@ -581,6 +675,8 @@ class _UsersScreenState extends State<UsersScreen> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final theme = Theme.of(context);
+          final isLight = theme.brightness == Brightness.light;
           final availableSites = db.sites
               .where((s) => organizationIds.contains(s.organizationId))
               .toList();
@@ -603,6 +699,12 @@ class _UsersScreenState extends State<UsersScreen> {
           final dialogWidth = (screenSize.width * 0.92).clamp(320.0, 560.0);
 
           return AlertDialog(
+            backgroundColor: isLight
+                ? theme.cardColor
+                : Color.alphaBlend(
+                    theme.colorScheme.primary.withValues(alpha: 0.06),
+                    theme.cardColor,
+                  ),
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -811,35 +913,48 @@ class _UsersScreenState extends State<UsersScreen> {
     required IconData icon,
     required List<String> values,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F8FB),
+        color: isLight ? const Color(0xFFF3F8FB) : const Color(0xFF243E52),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD5E3EA)),
+        border: Border.all(
+          color: isLight ? const Color(0xFFD5E3EA) : const Color(0xFF36566C),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: const Color(0xFF2C5B73)),
+              Icon(
+                icon,
+                size: 16,
+                color:
+                    isLight ? const Color(0xFF2C5B73) : const Color(0xFFBBD0E0),
+              ),
               const SizedBox(width: 6),
               Text(
                 '$title (${values.length})',
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF1F3948),
+                  color: isLight
+                      ? const Color(0xFF1F3948)
+                      : const Color(0xFFE2EDF8),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
           if (values.isEmpty)
-            const Text(
+            Text(
               'No allocation',
-              style: TextStyle(color: Color(0xFF607A88)),
+              style: TextStyle(
+                color:
+                    isLight ? const Color(0xFF607A88) : const Color(0xFF9FB4C6),
+              ),
             )
           else
             Wrap(
@@ -853,15 +968,19 @@ class _UsersScreenState extends State<UsersScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE1EDF4),
+                        color: isLight
+                            ? const Color(0xFFE1EDF4)
+                            : const Color(0xFF2A475C),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
                         v,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF27485A),
+                          color: isLight
+                              ? const Color(0xFF27485A)
+                              : const Color(0xFFD7E8F6),
                         ),
                       ),
                     ),
@@ -882,26 +1001,36 @@ class _UsersScreenState extends State<UsersScreen> {
     required ValueChanged<String> onToggle,
     required Future<void> Function() onViewAll,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F8FB),
+        color: isLight ? const Color(0xFFF3F8FB) : const Color(0xFF243E52),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD5E3EA)),
+        border: Border.all(
+          color: isLight ? const Color(0xFFD5E3EA) : const Color(0xFF36566C),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: const Color(0xFF2C5B73)),
+              Icon(
+                icon,
+                size: 16,
+                color:
+                    isLight ? const Color(0xFF2C5B73) : const Color(0xFFBBD0E0),
+              ),
               const SizedBox(width: 6),
               Text(
                 '$title (${selected.length})',
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF1F3948),
+                  color: isLight
+                      ? const Color(0xFF1F3948)
+                      : const Color(0xFFE2EDF8),
                 ),
               ),
             ],
@@ -915,16 +1044,23 @@ class _UsersScreenState extends State<UsersScreen> {
                 style: OutlinedButton.styleFrom(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  side: const BorderSide(color: Color(0xFFB7CBD7)),
+                  side: BorderSide(
+                    color: isLight
+                        ? const Color(0xFFB7CBD7)
+                        : const Color(0xFF4A6B80),
+                  ),
                 ),
                 child: const Text('View All'),
               ),
             ),
           if (options.isNotEmpty) const SizedBox(height: 8),
           if (options.isEmpty)
-            const Text(
+            Text(
               'No options available',
-              style: TextStyle(color: Color(0xFF607A88)),
+              style: TextStyle(
+                color:
+                    isLight ? const Color(0xFF607A88) : const Color(0xFF9FB4C6),
+              ),
             )
           else if (options.length > 12)
             SizedBox(
@@ -938,8 +1074,37 @@ class _UsersScreenState extends State<UsersScreen> {
                     children: options
                         .map(
                           (option) => FilterChip(
-                            label: Text(option.value),
+                            label: Text(
+                              option.value,
+                              style: TextStyle(
+                                color: selected.contains(option.key)
+                                    ? (isLight
+                                        ? const Color(0xFF1D3949)
+                                        : const Color(0xFFE7F3FF))
+                                    : (isLight
+                                        ? const Color(0xFF3D5C6E)
+                                        : const Color(0xFFB9CDDD)),
+                              ),
+                            ),
                             selected: selected.contains(option.key),
+                            selectedColor: isLight
+                                ? const Color(0xFFD7ECF8)
+                                : const Color(0xFF35596F),
+                            backgroundColor: isLight
+                                ? const Color(0xFFF6FAFD)
+                                : const Color(0xFF2A465A),
+                            checkmarkColor: isLight
+                                ? const Color(0xFF2E5E77)
+                                : const Color(0xFFDDEBFA),
+                            side: BorderSide(
+                              color: selected.contains(option.key)
+                                  ? (isLight
+                                      ? const Color(0xFF8CB4CA)
+                                      : const Color(0xFF6E96AE))
+                                  : (isLight
+                                      ? const Color(0xFFC7D9E4)
+                                      : const Color(0xFF4A6B80)),
+                            ),
                             onSelected: (_) => onToggle(option.key),
                           ),
                         )
@@ -955,8 +1120,37 @@ class _UsersScreenState extends State<UsersScreen> {
               children: options
                   .map(
                     (option) => FilterChip(
-                      label: Text(option.value),
+                      label: Text(
+                        option.value,
+                        style: TextStyle(
+                          color: selected.contains(option.key)
+                              ? (isLight
+                                  ? const Color(0xFF1D3949)
+                                  : const Color(0xFFE7F3FF))
+                              : (isLight
+                                  ? const Color(0xFF3D5C6E)
+                                  : const Color(0xFFB9CDDD)),
+                        ),
+                      ),
                       selected: selected.contains(option.key),
+                      selectedColor: isLight
+                          ? const Color(0xFFD7ECF8)
+                          : const Color(0xFF35596F),
+                      backgroundColor: isLight
+                          ? const Color(0xFFF6FAFD)
+                          : const Color(0xFF2A465A),
+                      checkmarkColor: isLight
+                          ? const Color(0xFF2E5E77)
+                          : const Color(0xFFDDEBFA),
+                      side: BorderSide(
+                        color: selected.contains(option.key)
+                            ? (isLight
+                                ? const Color(0xFF8CB4CA)
+                                : const Color(0xFF6E96AE))
+                            : (isLight
+                                ? const Color(0xFFC7D9E4)
+                                : const Color(0xFF4A6B80)),
+                      ),
                       onSelected: (_) => onToggle(option.key),
                     ),
                   )
@@ -972,7 +1166,11 @@ class _UsersScreenState extends State<UsersScreen> {
                       : selectedLabels.take(3).join(', '),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFF607A88)),
+                  style: TextStyle(
+                    color: isLight
+                        ? const Color(0xFF607A88)
+                        : const Color(0xFF9FB4C6),
+                  ),
                 ),
               ),
             ],
@@ -996,6 +1194,8 @@ class _UsersScreenState extends State<UsersScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final theme = Theme.of(context);
+          final isLight = theme.brightness == Brightness.light;
           final normalized = query.toLowerCase();
           final filtered = options.where((option) {
             return option.value.toLowerCase().contains(normalized) ||
@@ -1006,6 +1206,12 @@ class _UsersScreenState extends State<UsersScreen> {
           final dialogHeight = (screenSize.height * 0.72).clamp(360.0, 460.0);
 
           return AlertDialog(
+            backgroundColor: isLight
+                ? theme.cardColor
+                : Color.alphaBlend(
+                    theme.colorScheme.primary.withValues(alpha: 0.06),
+                    theme.cardColor,
+                  ),
             title: Text(title),
             content: SizedBox(
               width: dialogWidth,
@@ -1030,8 +1236,10 @@ class _UsersScreenState extends State<UsersScreen> {
                     children: [
                       Text(
                         '${tempSelected.length} selected',
-                        style: const TextStyle(
-                          color: Color(0xFF607A88),
+                        style: TextStyle(
+                          color: isLight
+                              ? const Color(0xFF607A88)
+                              : const Color(0xFF9FB4C6),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -1047,10 +1255,14 @@ class _UsersScreenState extends State<UsersScreen> {
                   const SizedBox(height: 6),
                   Expanded(
                     child: filtered.isEmpty
-                        ? const Center(
+                        ? Center(
                             child: Text(
                               'No matching records',
-                              style: TextStyle(color: Color(0xFF607A88)),
+                              style: TextStyle(
+                                color: isLight
+                                    ? const Color(0xFF607A88)
+                                    : const Color(0xFF9FB4C6),
+                              ),
                             ),
                           )
                         : ListView.builder(
@@ -1064,7 +1276,12 @@ class _UsersScreenState extends State<UsersScreen> {
                                 title: Text(option.value),
                                 subtitle: Text(
                                   option.key,
-                                  style: const TextStyle(fontSize: 12),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isLight
+                                        ? const Color(0xFF607A88)
+                                        : const Color(0xFF9FB4C6),
+                                  ),
                                 ),
                                 onChanged: (_) {
                                   setDialogState(() {
@@ -1918,7 +2135,7 @@ class _UsersScreenState extends State<UsersScreen> {
   Widget _iconAction({
     required IconData icon,
     required VoidCallback onTap,
-    Color iconColor = const Color(0xFF2f4654),
+    Color? iconColor,
   }) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
@@ -1932,7 +2149,12 @@ class _UsersScreenState extends State<UsersScreen> {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: Theme.of(context).dividerColor),
         ),
-        child: Icon(icon, size: 18, color: iconColor),
+        child: Icon(
+          icon,
+          size: 18,
+          color: iconColor ??
+              (isLight ? const Color(0xFF2f4654) : const Color(0xFFD7E8F6)),
+        ),
       ),
     );
   }

@@ -38,7 +38,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
     final db = Provider.of<DatabaseProvider>(context, listen: false);
     final isLight = Theme.of(context).brightness == Brightness.light;
     final subColor =
-        isLight ? const Color(0xFF4e6473) : const Color(0xFF9db7d2);
+        isLight ? const Color(0xFF5A6F7D) : const Color(0xFFAEC4D7);
     final defaultDeviceId = db.devices.isNotEmpty ? db.devices.first.id : '';
     final defaultTypeId =
         db.sensorTypes.isNotEmpty ? db.sensorTypes.first.id : '';
@@ -75,13 +75,31 @@ class _SensorsScreenState extends State<SensorsScreen> {
       transitionDuration: const Duration(milliseconds: 120),
       pageBuilder: (context, animation, secondaryAnimation) => StatefulBuilder(
         builder: (context, setState) {
+          final theme = Theme.of(context);
+          final isDialogLight = theme.brightness == Brightness.light;
+          final cornerRadius = BorderRadius.circular(22);
           return Dialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            backgroundColor: Colors.transparent,
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 640, maxHeight: 740),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: cornerRadius,
+                  border: Border.all(color: theme.dividerColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.shadowColor.withValues(
+                        alpha: isDialogLight ? 0.1 : 0.22,
+                      ),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
                 child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,15 +121,19 @@ class _SensorsScreenState extends State<SensorsScreen> {
                                 const SizedBox(height: 6),
                                 Text(
                                   'Configure sensor parameters and device connection',
-                                  style: TextStyle(
-                                      fontSize: 14, color: subColor),
+                                  style:
+                                      TextStyle(fontSize: 14, color: subColor),
                                 ),
                               ],
                             ),
                           ),
                           IconButton(
                             onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.close),
+                            icon: Icon(
+                              Icons.close,
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.72),
+                            ),
                           ),
                         ],
                       ),
@@ -297,6 +319,9 @@ class _SensorsScreenState extends State<SensorsScreen> {
                                 backgroundColor:
                                     Theme.of(context).colorScheme.primary,
                                 foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
                               ),
                               child: Text(_editingId == null
                                   ? 'Add Sensor'
@@ -304,13 +329,18 @@ class _SensorsScreenState extends State<SensorsScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 14, horizontal: 22),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text('Cancel'),
                             ),
-                            child: const Text('Cancel'),
                           ),
                         ],
                       ),
@@ -346,7 +376,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
           label,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
         const SizedBox(height: 6),
         TextFormField(
@@ -355,19 +385,24 @@ class _SensorsScreenState extends State<SensorsScreen> {
           decoration: InputDecoration(
             filled: true,
             fillColor: Theme.of(context).brightness == Brightness.light
-                ? const Color(0xFFF4F8FA)
-                : const Color(0xFF223B4E),
+                ? const Color(0xFFF7FAFC)
+                : const Color(0xFF1A3347),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  BorderSide(color: Theme.of(context).dividerColor),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  BorderSide(color: Theme.of(context).dividerColor),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.primary,
+                width: 2,
+              ),
             ),
           ),
         ),
@@ -389,7 +424,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
           label,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
@@ -421,19 +456,24 @@ class _SensorsScreenState extends State<SensorsScreen> {
           decoration: InputDecoration(
             filled: true,
             fillColor: Theme.of(context).brightness == Brightness.light
-                ? const Color(0xFFF4F8FA)
-                : const Color(0xFF223B4E),
+                ? const Color(0xFFF7FAFC)
+                : const Color(0xFF1A3347),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  BorderSide(color: Theme.of(context).dividerColor),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  BorderSide(color: Theme.of(context).dividerColor),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.primary,
+                width: 2,
+              ),
             ),
           ),
         ),
@@ -1007,9 +1047,10 @@ class _SensorsScreenState extends State<SensorsScreen> {
             'Location not set';
         final status =
             _inactiveSensors.contains(sensor.id) ? 'inactive' : 'active';
+        final isLight = Theme.of(context).brightness == Brightness.light;
         final statusColor = status == 'active'
             ? const Color(0xFF0ca15f)
-            : const Color(0xFF8397a3);
+            : (isLight ? const Color(0xFF8397a3) : const Color(0xFF9FB4C6));
         final metaLine =
             '${sensor.serialNumber} • $deviceName • ${_channelFor(safeIndex)} • ${_unitForType(type)} • $siteName';
 
@@ -1081,12 +1122,17 @@ class _SensorsScreenState extends State<SensorsScreen> {
                 children: [
                   IconButton(
                     onPressed: () => _showSensorModal(sensor: sensor),
-                    icon: const Icon(Icons.edit_outlined),
+                    icon: Icon(
+                      Icons.edit_outlined,
+                      color: isLight
+                          ? const Color(0xFF2F4654)
+                          : const Color(0xFFBBD0E0),
+                    ),
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
                     onPressed: () => _togglePower(sensor.id),
-                    icon: const Icon(Icons.power_settings_new),
+                    icon: Icon(Icons.power_settings_new, color: statusColor),
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
@@ -1274,9 +1320,11 @@ class _SensorCard extends StatelessWidget {
                   context: context, icon: Icons.edit_outlined, onTap: onEdit),
               const SizedBox(width: 8),
               _iconButton(
-                  context: context,
-                  icon: Icons.power_settings_new,
-                  onTap: onPower),
+                context: context,
+                icon: Icons.power_settings_new,
+                onTap: onPower,
+                iconColor: statusColor,
+              ),
               const SizedBox(width: 8),
               _iconButton(
                 context: context,
@@ -1323,9 +1371,11 @@ class _SensorCard extends StatelessWidget {
     required BuildContext context,
     required IconData icon,
     required VoidCallback onTap,
-    Color iconColor = const Color(0xFF2f4654),
+    Color? iconColor,
   }) {
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final resolvedIconColor = iconColor ??
+        (isLight ? const Color(0xFF2F4654) : const Color(0xFFBBD0E0));
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -1337,7 +1387,7 @@ class _SensorCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: Theme.of(context).dividerColor),
         ),
-        child: Icon(icon, size: 20, color: iconColor),
+        child: Icon(icon, size: 20, color: resolvedIconColor),
       ),
     );
   }

@@ -11,12 +11,10 @@ class OrganizationsScreen extends StatefulWidget {
   const OrganizationsScreen({super.key});
 
   @override
-  State<OrganizationsScreen> createState() =>
-      _OrganizationsScreenState();
+  State<OrganizationsScreen> createState() => _OrganizationsScreenState();
 }
 
-class _OrganizationsScreenState
-    extends State<OrganizationsScreen> {
+class _OrganizationsScreenState extends State<OrganizationsScreen> {
   String? _selectedOrganizationId;
   String? _selectedSiteId;
   String? _selectedZoneId;
@@ -746,7 +744,9 @@ class _ListTileCard extends StatelessWidget {
                     _actionIcon(
                       context: context,
                       icon: Icons.edit_outlined,
-                      color: const Color(0xFF2E4B5B),
+                      color: isLight
+                          ? const Color(0xFF2E4B5B)
+                          : const Color(0xFFBBD0E0),
                       onTap: onEdit,
                     ),
                     const SizedBox(width: 6),

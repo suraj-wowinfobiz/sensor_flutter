@@ -746,7 +746,9 @@ class _ListTileCard extends StatelessWidget {
                     _actionIcon(
                       context: context,
                       icon: Icons.edit_outlined,
-                      color: const Color(0xFF2E4B5B),
+                      color: isLight
+                          ? const Color(0xFF2E4B5B)
+                          : const Color(0xFFBBD0E0),
                       onTap: onEdit,
                     ),
                     const SizedBox(width: 6),

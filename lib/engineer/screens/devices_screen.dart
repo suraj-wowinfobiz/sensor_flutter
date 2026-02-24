@@ -38,7 +38,7 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
     final db = Provider.of<EngineerDatabaseProvider>(context, listen: false);
     final isLight = Theme.of(context).brightness == Brightness.light;
     final subColor =
-        isLight ? const Color(0xFF4e6473) : const Color(0xFF9db7d2);
+        isLight ? const Color(0xFF5A6F7D) : const Color(0xFFAEC4D7);
     final defaultSiteId = db.sites.isNotEmpty ? db.sites.first.id : '';
     final defaultZoneId = db.zones.isNotEmpty ? db.zones.first.id : '';
 
@@ -80,13 +80,31 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
       transitionDuration: const Duration(milliseconds: 120),
       pageBuilder: (context, animation, secondaryAnimation) => StatefulBuilder(
         builder: (context, setState) {
+          final theme = Theme.of(context);
+          final isDialogLight = theme.brightness == Brightness.light;
+          final cornerRadius = BorderRadius.circular(22);
           return Dialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            backgroundColor: Colors.transparent,
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 640, maxHeight: 760),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: cornerRadius,
+                  border: Border.all(color: theme.dividerColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.shadowColor.withValues(
+                        alpha: isDialogLight ? 0.1 : 0.22,
+                      ),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
                 child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,15 +126,19 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
                                 const SizedBox(height: 6),
                                 Text(
                                   'Configure device parameters and network settings',
-                                  style: TextStyle(
-                                      fontSize: 14, color: subColor),
+                                  style:
+                                      TextStyle(fontSize: 14, color: subColor),
                                 ),
                               ],
                             ),
                           ),
                           IconButton(
                             onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.close),
+                            icon: Icon(
+                              Icons.close,
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.72),
+                            ),
                           ),
                         ],
                       ),
@@ -301,7 +323,8 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () {
-                                final provider = Provider.of<EngineerDatabaseProvider>(
+                                final provider =
+                                    Provider.of<EngineerDatabaseProvider>(
                                   context,
                                   listen: false,
                                 );
@@ -328,8 +351,12 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
                               style: ElevatedButton.styleFrom(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 14),
-                                backgroundColor: const Color(0xFF0f729c),
+                                backgroundColor:
+                                    Theme.of(context).colorScheme.primary,
                                 foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
                               ),
                               child: Text(
                                 _editingId == null
@@ -339,13 +366,18 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 14, horizontal: 22),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text('Cancel'),
                             ),
-                            child: const Text('Cancel'),
                           ),
                         ],
                       ),
@@ -381,7 +413,7 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
           label,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
         const SizedBox(height: 6),
         TextFormField(
@@ -390,19 +422,24 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
           decoration: InputDecoration(
             filled: true,
             fillColor: Theme.of(context).brightness == Brightness.light
-                ? const Color(0xFFF4F8FA)
-                : const Color(0xFF1E3A52),
+                ? const Color(0xFFF7FAFC)
+                : const Color(0xFF1A3347),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  BorderSide(color: Theme.of(context).dividerColor),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  BorderSide(color: Theme.of(context).dividerColor),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.primary,
+                width: 2,
+              ),
             ),
           ),
         ),
@@ -424,7 +461,7 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
           label,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
@@ -456,19 +493,24 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
           decoration: InputDecoration(
             filled: true,
             fillColor: Theme.of(context).brightness == Brightness.light
-                ? const Color(0xFFF4F8FA)
-                : const Color(0xFF1E3A52),
+                ? const Color(0xFFF7FAFC)
+                : const Color(0xFF1A3347),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  BorderSide(color: Theme.of(context).dividerColor),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  BorderSide(color: Theme.of(context).dividerColor),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.primary,
+                width: 2,
+              ),
             ),
           ),
         ),
@@ -594,9 +636,8 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
               'Configure and monitor sensor devices',
               style: TextStyle(
                 fontSize: 15,
-                color: isLight
-                    ? const Color(0xFF4e6473)
-                    : const Color(0xFF9db7d2),
+                color:
+                    isLight ? const Color(0xFF4e6473) : const Color(0xFF9db7d2),
               ),
             ),
           ],
@@ -709,9 +750,8 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: isLight
-                  ? const Color(0xFF243946)
-                  : const Color(0xFFD7E8F6),
+              color:
+                  isLight ? const Color(0xFF243946) : const Color(0xFFD7E8F6),
             ),
           ),
           const SizedBox(height: 16),
@@ -795,9 +835,8 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,
-              color: isLight
-                  ? const Color(0xFF60717c)
-                  : const Color(0xFFBBD0E0),
+              color:
+                  isLight ? const Color(0xFF60717c) : const Color(0xFFBBD0E0),
             ),
           ),
           const SizedBox(height: 12),
@@ -1203,9 +1242,8 @@ class _DeviceCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: isLight
-                  ? const Color(0xFFe9f0f4)
-                  : const Color(0xFF253F52),
+              color:
+                  isLight ? const Color(0xFFe9f0f4) : const Color(0xFF253F52),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -1281,7 +1319,8 @@ class _DeviceCard extends StatelessWidget {
             children: [
               _iconButton(context, icon: Icons.edit_outlined, onTap: onEdit),
               const SizedBox(width: 8),
-              _iconButton(context, icon: Icons.power_settings_new, onTap: onPower),
+              _iconButton(context,
+                  icon: Icons.power_settings_new, onTap: onPower),
               const SizedBox(width: 8),
               _iconButton(
                 context,
@@ -1305,9 +1344,7 @@ class _DeviceCard extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: isLight
-                ? const Color(0xFF60717c)
-                : const Color(0xFFBBD0E0),
+            color: isLight ? const Color(0xFF60717c) : const Color(0xFFBBD0E0),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -1318,9 +1355,7 @@ class _DeviceCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 18,
-            color: isLight
-                ? const Color(0xFF152733)
-                : const Color(0xFFD7E8F6),
+            color: isLight ? const Color(0xFF152733) : const Color(0xFFD7E8F6),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -1342,17 +1377,14 @@ class _DeviceCard extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color:
-              isLight ? const Color(0xFFe6eff3) : const Color(0xFF243E52),
+          color: isLight ? const Color(0xFFe6eff3) : const Color(0xFF243E52),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: Icon(
           icon,
           size: 20,
-          color: iconColor ==
-                  const Color(0xFF2f4654) &&
-                  !isLight
+          color: iconColor == const Color(0xFF2f4654) && !isLight
               ? const Color(0xFFD7E8F6)
               : iconColor,
         ),

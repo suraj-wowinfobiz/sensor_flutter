@@ -267,8 +267,6 @@ class _UserAccountSettingsPanelState extends State<UserAccountSettingsPanel> {
           ),
           const SizedBox(height: 18),
           _buildInputGrid(context),
-          const SizedBox(height: 18),
-          _buildProfileLogoutFooter(context),
         ],
       ),
     );
@@ -1643,7 +1641,49 @@ class _UserAccountSettingsPanelState extends State<UserAccountSettingsPanel> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            final isLight = Theme.of(context).brightness == Brightness.light;
+            InputDecoration themedInput({
+              required String labelText,
+              String? hintText,
+            }) {
+              return InputDecoration(
+                labelText: labelText,
+                hintText: hintText,
+                labelStyle: TextStyle(
+                  color: isLight
+                      ? const Color(0xFF3D5C6E)
+                      : const Color(0xFFB9CDDD),
+                ),
+                hintStyle: TextStyle(
+                  color: isLight
+                      ? const Color(0xFF7A96A8)
+                      : const Color(0xFF89A2B6),
+                ),
+                filled: true,
+                fillColor:
+                    isLight ? const Color(0xFFF8FBFD) : const Color(0xFF2A465A),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: isLight
+                        ? const Color(0xFFC7D9E4)
+                        : const Color(0xFF4A6B80),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: isLight
+                        ? const Color(0xFF7FA8BF)
+                        : const Color(0xFF6E96AE),
+                  ),
+                ),
+              );
+            }
+
             return AlertDialog(
+              backgroundColor:
+                  isLight ? const Color(0xFFF1F7FB) : const Color(0xFF243E52),
               title:
                   Text(existing == null ? 'Add Threshold' : 'Edit Threshold'),
               content: SingleChildScrollView(
@@ -1655,7 +1695,12 @@ class _UserAccountSettingsPanelState extends State<UserAccountSettingsPanel> {
                     children: [
                       TextField(
                         controller: labelController,
-                        decoration: const InputDecoration(
+                        style: TextStyle(
+                          color: isLight
+                              ? const Color(0xFF1D3949)
+                              : const Color(0xFFE7F3FF),
+                        ),
+                        decoration: themedInput(
                           labelText: 'Label',
                           hintText: 'Example: Warning',
                         ),
@@ -1666,14 +1711,23 @@ class _UserAccountSettingsPanelState extends State<UserAccountSettingsPanel> {
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
-                          labelText: 'Threshold Value (°)',
+                        style: TextStyle(
+                          color: isLight
+                              ? const Color(0xFF1D3949)
+                              : const Color(0xFFE7F3FF),
                         ),
+                        decoration:
+                            themedInput(labelText: 'Threshold Value (°)'),
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: soundController,
-                        decoration: const InputDecoration(
+                        style: TextStyle(
+                          color: isLight
+                              ? const Color(0xFF1D3949)
+                              : const Color(0xFFE7F3FF),
+                        ),
+                        decoration: themedInput(
                           labelText: 'Alert Sound',
                           hintText: 'Example: Siren',
                         ),
@@ -1681,8 +1735,15 @@ class _UserAccountSettingsPanelState extends State<UserAccountSettingsPanel> {
                       const SizedBox(height: 10),
                       DropdownButtonFormField<String>(
                         initialValue: selectedColorName,
-                        decoration:
-                            const InputDecoration(labelText: 'Threshold Color'),
+                        dropdownColor: isLight
+                            ? const Color(0xFFFFFFFF)
+                            : const Color(0xFF2A465A),
+                        style: TextStyle(
+                          color: isLight
+                              ? const Color(0xFF1D3949)
+                              : const Color(0xFFE7F3FF),
+                        ),
+                        decoration: themedInput(labelText: 'Threshold Color'),
                         items: presetColors.keys
                             .map(
                               (name) => DropdownMenuItem<String>(
@@ -1720,7 +1781,12 @@ class _UserAccountSettingsPanelState extends State<UserAccountSettingsPanel> {
                         const SizedBox(height: 10),
                         TextField(
                           controller: colorHexController,
-                          decoration: const InputDecoration(
+                          style: TextStyle(
+                            color: isLight
+                                ? const Color(0xFF1D3949)
+                                : const Color(0xFFE7F3FF),
+                          ),
+                          decoration: themedInput(
                             labelText: 'Custom Hex Color',
                             hintText: '#RRGGBB',
                           ),
@@ -1733,18 +1799,36 @@ class _UserAccountSettingsPanelState extends State<UserAccountSettingsPanel> {
                         ),
                       ],
                       const SizedBox(height: 12),
-                      const Text(
+                      Text(
                         'Show This Threshold On',
-                        style: TextStyle(fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: isLight
+                              ? const Color(0xFF1F3948)
+                              : const Color(0xFFDDEBFA),
+                        ),
                       ),
                       const SizedBox(height: 6),
                       ...ThresholdGraphTarget.values.map(
                         (target) => CheckboxListTile(
                           dense: true,
                           visualDensity: VisualDensity.compact,
+                          activeColor: isLight
+                              ? const Color(0xFF2E5E77)
+                              : const Color(0xFF6E96AE),
+                          checkColor: isLight
+                              ? const Color(0xFFFFFFFF)
+                              : const Color(0xFF10202C),
                           value: selectedTargets.contains(target),
                           contentPadding: EdgeInsets.zero,
-                          title: Text(target.label),
+                          title: Text(
+                            target.label,
+                            style: TextStyle(
+                              color: isLight
+                                  ? const Color(0xFF2B4A5C)
+                                  : const Color(0xFFBCD0E0),
+                            ),
+                          ),
                           onChanged: (checked) {
                             setDialogState(() {
                               if (checked == true) {
