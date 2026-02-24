@@ -386,7 +386,7 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFFF4F8FA),
+            fillColor: Theme.of(context).brightness == Brightness.light ? const Color(0xFFF4F8FA) : const Color(0xFF1E3A52),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             border: OutlineInputBorder(
@@ -448,7 +448,7 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFFF4F8FA),
+            fillColor: Theme.of(context).brightness == Brightness.light ? const Color(0xFFF4F8FA) : const Color(0xFF1E3A52),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             border: OutlineInputBorder(
@@ -849,7 +849,7 @@ class _EngineerDevicesScreenState extends State<EngineerDevicesScreen> {
       prefixIcon: icon == null ? null : Icon(icon, size: 20),
       isDense: true,
       filled: true,
-      fillColor: const Color(0xFFF4F8FA),
+      fillColor: Theme.of(context).brightness == Brightness.light ? const Color(0xFFF4F8FA) : const Color(0xFF1E3A52),
       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

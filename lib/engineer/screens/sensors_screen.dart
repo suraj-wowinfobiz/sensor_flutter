@@ -36,6 +36,9 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
 
   void _showSensorModal({Sensor? sensor}) {
     final db = Provider.of<EngineerDatabaseProvider>(context, listen: false);
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final subColor =
+        isLight ? const Color(0xFF4e6473) : const Color(0xFF9db7d2);
     final defaultDeviceId = db.devices.isNotEmpty ? db.devices.first.id : '';
     final defaultTypeId =
         db.sensorTypes.isNotEmpty ? db.sensorTypes.first.id : '';
@@ -98,10 +101,10 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
                                       fontWeight: FontWeight.w800),
                                 ),
                                 const SizedBox(height: 6),
-                                const Text(
+                                Text(
                                   'Configure sensor parameters and device connection',
                                   style: TextStyle(
-                                      fontSize: 14, color: Color(0xFF4e6473)),
+                                      fontSize: 14, color: subColor),
                                 ),
                               ],
                             ),
@@ -269,8 +272,7 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () {
-                                final provider =
-                                    Provider.of<EngineerDatabaseProvider>(
+                                final provider = Provider.of<EngineerDatabaseProvider>(
                                   context,
                                   listen: false,
                                 );
@@ -292,7 +294,8 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
                               style: ElevatedButton.styleFrom(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 14),
-                                backgroundColor: const Color(0xFF0f729c),
+                                backgroundColor:
+                                    Theme.of(context).colorScheme.primary,
                                 foregroundColor: Colors.white,
                               ),
                               child: Text(_editingId == null
@@ -351,16 +354,20 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFFF4F8FA),
+            fillColor: Theme.of(context).brightness == Brightness.light
+                ? const Color(0xFFF4F8FA)
+                : const Color(0xFF223B4E),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+              borderSide:
+                  BorderSide(color: Theme.of(context).dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+              borderSide:
+                  BorderSide(color: Theme.of(context).dividerColor),
             ),
           ),
         ),
@@ -413,16 +420,20 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFFF4F8FA),
+            fillColor: Theme.of(context).brightness == Brightness.light
+                ? const Color(0xFFF4F8FA)
+                : const Color(0xFF223B4E),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+              borderSide:
+                  BorderSide(color: Theme.of(context).dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+              borderSide:
+                  BorderSide(color: Theme.of(context).dividerColor),
             ),
           ),
         ),
@@ -704,106 +715,96 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 430;
-              final searchWidth = compact ? constraints.maxWidth : 290.0;
-              final filterWidth = compact ? constraints.maxWidth : 190.0;
-              return Wrap(
-                spacing: 14,
-                runSpacing: 14,
-                crossAxisAlignment: WrapCrossAlignment.end,
-                children: [
-                  SizedBox(
-                    width: searchWidth,
-                    child: TextField(
-                      onChanged: (value) =>
-                          setState(() => _searchQuery = value),
-                      decoration: _filterFieldDecoration(
-                        label: 'Search',
-                        hint: 'Sensor ID, Serial, MAC...',
-                        icon: Icons.search,
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            crossAxisAlignment: WrapCrossAlignment.end,
+            children: [
+              SizedBox(
+                width: 290,
+                child: TextField(
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                  decoration: _filterFieldDecoration(
+                    label: 'Search',
+                    hint: 'Sensor ID, Serial, MAC...',
+                    icon: Icons.search,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 190,
+                child: DropdownButtonFormField<String>(
+                  value: _statusFilter,
+                  decoration: _filterFieldDecoration(label: 'Status'),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('All Statuses')),
+                    DropdownMenuItem(value: 'active', child: Text('Active')),
+                    DropdownMenuItem(
+                        value: 'inactive', child: Text('Inactive')),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _statusFilter = value ?? 'all'),
+                ),
+              ),
+              SizedBox(
+                width: 190,
+                child: DropdownButtonFormField<String>(
+                  value: _typeFilter,
+                  decoration: _filterFieldDecoration(label: 'Sensor Type'),
+                  items: [
+                    const DropdownMenuItem(
+                        value: 'all', child: Text('All Types')),
+                    ...db.sensorTypes.map(
+                      (type) => DropdownMenuItem(
+                        value: type.id,
+                        child: Text(type.name),
                       ),
                     ),
-                  ),
-                  SizedBox(
-                    width: filterWidth,
-                    child: DropdownButtonFormField<String>(
-                      value: _statusFilter,
-                      decoration: _filterFieldDecoration(label: 'Status'),
-                      items: const [
-                        DropdownMenuItem(
-                            value: 'all', child: Text('All Statuses')),
-                        DropdownMenuItem(
-                            value: 'active', child: Text('Active')),
-                        DropdownMenuItem(
-                            value: 'inactive', child: Text('Inactive')),
-                      ],
-                      onChanged: (value) =>
-                          setState(() => _statusFilter = value ?? 'all'),
-                    ),
-                  ),
-                  SizedBox(
-                    width: filterWidth,
-                    child: DropdownButtonFormField<String>(
-                      value: _typeFilter,
-                      decoration: _filterFieldDecoration(label: 'Sensor Type'),
-                      items: [
-                        const DropdownMenuItem(
-                            value: 'all', child: Text('All Types')),
-                        ...db.sensorTypes.map(
-                          (type) => DropdownMenuItem(
-                            value: type.id,
-                            child: Text(type.name),
-                          ),
-                        ),
-                      ],
-                      onChanged: (value) =>
-                          setState(() => _typeFilter = value ?? 'all'),
-                    ),
-                  ),
-                  SizedBox(
-                    width: filterWidth,
-                    child: DropdownButtonFormField<String>(
-                      value: _deviceFilter,
-                      decoration: _filterFieldDecoration(label: 'Device'),
-                      items: [
-                        const DropdownMenuItem(
-                            value: 'all', child: Text('All Devices')),
-                        ...db.devices.map(
-                          (device) => DropdownMenuItem(
-                            value: device.id,
-                            child: Text(device.deviceCode),
-                          ),
-                        ),
-                      ],
-                      onChanged: (value) =>
-                          setState(() => _deviceFilter = value ?? 'all'),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isLight
-                          ? const Color(0xFFe6eff3)
-                          : const Color(0xFF243E52),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Showing $filteredCount of $totalCount sensors',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: isLight
-                            ? const Color(0xFF324956)
-                            : const Color(0xFFD4E5F2),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _typeFilter = value ?? 'all'),
+                ),
+              ),
+              SizedBox(
+                width: 190,
+                child: DropdownButtonFormField<String>(
+                  value: _deviceFilter,
+                  decoration: _filterFieldDecoration(label: 'Device'),
+                  items: [
+                    const DropdownMenuItem(
+                        value: 'all', child: Text('All Devices')),
+                    ...db.devices.map(
+                      (device) => DropdownMenuItem(
+                        value: device.id,
+                        child: Text(device.deviceCode),
                       ),
                     ),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _deviceFilter = value ?? 'all'),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isLight
+                      ? const Color(0xFFe6eff3)
+                      : const Color(0xFF243E52),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Showing $filteredCount of $totalCount sensors',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isLight
+                        ? const Color(0xFF324956)
+                        : const Color(0xFFD4E5F2),
                   ),
-                ],
-              );
-            },
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Divider(height: 1, color: Theme.of(context).dividerColor),
@@ -817,45 +818,35 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 430;
-              final width = compact ? constraints.maxWidth : 190.0;
-              return Wrap(
-                spacing: 14,
-                runSpacing: 14,
-                children: [
-                  _hierarchyDropdown(
-                    width: width,
-                    label: 'Organization',
-                    value: _organizationFilter,
-                    onChanged: (value) =>
-                        setState(() => _organizationFilter = value ?? 'all'),
-                  ),
-                  _hierarchyDropdown(
-                    width: width,
-                    label: 'Site',
-                    value: _siteFilter,
-                    onChanged: (value) =>
-                        setState(() => _siteFilter = value ?? 'all'),
-                  ),
-                  _hierarchyDropdown(
-                    width: width,
-                    label: 'Zone',
-                    value: _zoneFilter,
-                    onChanged: (value) =>
-                        setState(() => _zoneFilter = value ?? 'all'),
-                  ),
-                  _hierarchyDropdown(
-                    width: width,
-                    label: 'Location',
-                    value: _locationFilter,
-                    onChanged: (value) =>
-                        setState(() => _locationFilter = value ?? 'all'),
-                  ),
-                ],
-              );
-            },
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            children: [
+              _hierarchyDropdown(
+                label: 'Organization',
+                value: _organizationFilter,
+                onChanged: (value) =>
+                    setState(() => _organizationFilter = value ?? 'all'),
+              ),
+              _hierarchyDropdown(
+                label: 'Site',
+                value: _siteFilter,
+                onChanged: (value) =>
+                    setState(() => _siteFilter = value ?? 'all'),
+              ),
+              _hierarchyDropdown(
+                label: 'Zone',
+                value: _zoneFilter,
+                onChanged: (value) =>
+                    setState(() => _zoneFilter = value ?? 'all'),
+              ),
+              _hierarchyDropdown(
+                label: 'Location',
+                value: _locationFilter,
+                onChanged: (value) =>
+                    setState(() => _locationFilter = value ?? 'all'),
+              ),
+            ],
           ),
         ],
       ),
@@ -863,13 +854,12 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
   }
 
   Widget _hierarchyDropdown({
-    required double width,
     required String label,
     required String value,
     required ValueChanged<String?> onChanged,
   }) {
     return SizedBox(
-      width: width,
+      width: 190,
       child: DropdownButtonFormField<String>(
         value: value,
         decoration: _filterFieldDecoration(label: label),
@@ -905,7 +895,10 @@ class _EngineerSensorsScreenState extends State<EngineerSensorsScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF0f729c), width: 1.4),
+        borderSide: BorderSide(
+          color: Theme.of(context).colorScheme.primary,
+          width: 1.4,
+        ),
       ),
     );
   }

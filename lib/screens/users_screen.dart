@@ -90,6 +90,9 @@ class _UsersScreenState extends State<UsersScreen> {
       context: parentContext,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setState) {
+          final isLight =
+              Theme.of(dialogContext).brightness == Brightness.light;
+
           void saveUser() {
             final name = nameController.text.trim();
             final email = emailController.text.trim();
@@ -117,6 +120,7 @@ class _UsersScreenState extends State<UsersScreen> {
           }
 
           return Dialog(
+            backgroundColor: Theme.of(dialogContext).cardColor,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             child: ConstrainedBox(
@@ -136,10 +140,12 @@ class _UsersScreenState extends State<UsersScreen> {
                             user == null ? 'Create New User' : 'Edit User',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 34 > 30 ? 34 - 4 : 30,
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFF142936),
+                              color: isLight
+                                  ? const Color(0xFF142936)
+                                  : const Color(0xFFE2EDF8),
                             ),
                           ),
                         ),
@@ -157,9 +163,11 @@ class _UsersScreenState extends State<UsersScreen> {
                       user == null
                           ? 'Choose a template (optional) or enter details manually'
                           : 'Update user details and access role',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
-                        color: Color(0xFF506775),
+                        color: isLight
+                            ? const Color(0xFF506775)
+                            : const Color(0xFFBBD0E0),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -394,29 +402,39 @@ class _UsersScreenState extends State<UsersScreen> {
     required String label,
     required VoidCallback onTap,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: active ? Colors.white : Colors.transparent,
+          color: active
+              ? (isLight ? Colors.white : const Color(0xFF2B4659))
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: active ? const Color(0xFFC8D6DD) : Colors.transparent,
+            color: active ? Theme.of(context).dividerColor : Colors.transparent,
           ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 18, color: const Color(0xFF203845)),
+            Icon(
+              icon,
+              size: 18,
+              color:
+                  isLight ? const Color(0xFF203845) : const Color(0xFFD7E8F6),
+            ),
             const SizedBox(width: 8),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF203845),
+                color: isLight
+                    ? const Color(0xFF203845)
+                    : const Color(0xFFD7E8F6),
               ),
             ),
           ],
@@ -467,13 +485,14 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   Widget _inputBox({required Widget child}) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       height: 46,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isLight ? Colors.white : const Color(0xFF243E52),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: child,
     );
@@ -544,7 +563,8 @@ class _UsersScreenState extends State<UsersScreen> {
     };
   }
 
-  void _showAccessDialog(BuildContext context, User user, DatabaseProvider db) {
+  void _showAccessDialog(
+      BuildContext context, User user, DatabaseProvider db) {
     final defaultAccess = _defaultAccessForUser(user, db);
     final defaultOrganizations = defaultAccess['organizations'] ?? <String>{};
     final defaultSites = defaultAccess['sites'] ?? <String>{};
@@ -579,20 +599,32 @@ class _UsersScreenState extends State<UsersScreen> {
               .where((z) => zoneIds.contains(z.id))
               .map((z) => z.name)
               .toList();
+          final screenSize = MediaQuery.sizeOf(context);
+          final dialogWidth = (screenSize.width * 0.92).clamp(320.0, 560.0);
 
           return AlertDialog(
-            title: Row(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: Text('${user.name} Access')),
-                TextButton.icon(
-                  onPressed: () => setDialogState(() => editMode = !editMode),
-                  icon: Icon(editMode ? Icons.visibility : Icons.edit_outlined),
-                  label: Text(editMode ? 'Preview' : 'Edit Access'),
+                Text('${user.name} Access'),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () => setDialogState(() => editMode = !editMode),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    icon: Icon(
+                      editMode ? Icons.visibility : Icons.edit_outlined,
+                    ),
+                    label: Text(editMode ? 'Preview' : 'Edit Access'),
+                  ),
                 ),
               ],
             ),
             content: SizedBox(
-              width: 560,
+              width: dialogWidth,
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -969,12 +1001,15 @@ class _UsersScreenState extends State<UsersScreen> {
             return option.value.toLowerCase().contains(normalized) ||
                 option.key.toLowerCase().contains(normalized);
           }).toList();
+          final screenSize = MediaQuery.sizeOf(context);
+          final dialogWidth = (screenSize.width * 0.92).clamp(300.0, 520.0);
+          final dialogHeight = (screenSize.height * 0.72).clamp(360.0, 460.0);
 
           return AlertDialog(
             title: Text(title),
             content: SizedBox(
-              width: 520,
-              height: 460,
+              width: dialogWidth,
+              height: dialogHeight,
               child: Column(
                 children: [
                   TextField(
@@ -1071,6 +1106,7 @@ class _UsersScreenState extends State<UsersScreen> {
   Widget build(BuildContext context) {
     return Consumer<DatabaseProvider>(
       builder: (context, db, child) {
+        final isLight = Theme.of(context).brightness == Brightness.light;
         final users = _applyFilters(db.users);
 
         return SingleChildScrollView(
@@ -1098,10 +1134,14 @@ class _UsersScreenState extends State<UsersScreen> {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      const Text(
+                      Text(
                         'Manage users and their access control permissions',
-                        style:
-                            TextStyle(fontSize: 15, color: Color(0xFF4e6473)),
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: isLight
+                              ? const Color(0xFF4e6473)
+                              : const Color(0xFF9db7d2),
+                        ),
                       ),
                     ],
                   ),
@@ -1121,57 +1161,140 @@ class _UsersScreenState extends State<UsersScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFC8D6DD)),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (v) =>
-                            setState(() => _searchText = v.trim()),
-                        decoration: const InputDecoration(
-                          contentPadding: EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
-                          border: InputBorder.none,
-                          hintText: 'Search by name or email...',
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isNarrow = constraints.maxWidth < 860;
+                  if (!isNarrow) {
+                    final dropdownWidth =
+                        constraints.maxWidth < 980 ? 140.0 : 160.0;
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surface,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: Theme.of(context).dividerColor,
+                              ),
+                            ),
+                            child: TextField(
+                              controller: _searchController,
+                              onChanged: (v) =>
+                                  setState(() => _searchText = v.trim()),
+                              decoration: const InputDecoration(
+                                contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
+                                border: InputBorder.none,
+                                hintText: 'Search by name or email...',
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        _dropdown(
+                          value: _roleFilter,
+                          width: dropdownWidth,
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'all', child: Text('All Roles')),
+                            DropdownMenuItem(
+                                value: 'admin', child: Text('Admin')),
+                            DropdownMenuItem(
+                                value: 'engineer', child: Text('Engineer')),
+                            DropdownMenuItem(
+                                value: 'operator', child: Text('Operator')),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => _roleFilter = value!),
+                        ),
+                        const SizedBox(width: 10),
+                        _dropdown(
+                          value: _statusFilter,
+                          width: dropdownWidth,
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'all', child: Text('All Status')),
+                            DropdownMenuItem(
+                                value: 'active', child: Text('Active')),
+                            DropdownMenuItem(
+                                value: 'restricted', child: Text('Restricted')),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => _statusFilter = value!),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Column(
+                    children: [
+                      Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Theme.of(context).dividerColor,
+                          ),
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: (v) =>
+                              setState(() => _searchText = v.trim()),
+                          decoration: const InputDecoration(
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
+                            border: InputBorder.none,
+                            hintText: 'Search by name or email...',
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  _dropdown(
-                    value: _roleFilter,
-                    width: 160,
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('All Roles')),
-                      DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                      DropdownMenuItem(
-                          value: 'engineer', child: Text('Engineer')),
-                      DropdownMenuItem(
-                          value: 'operator', child: Text('Operator')),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _dropdown(
+                              value: _roleFilter,
+                              width: double.infinity,
+                              items: const [
+                                DropdownMenuItem(
+                                    value: 'all', child: Text('All Roles')),
+                                DropdownMenuItem(
+                                    value: 'admin', child: Text('Admin')),
+                                DropdownMenuItem(
+                                    value: 'engineer', child: Text('Engineer')),
+                                DropdownMenuItem(
+                                    value: 'operator', child: Text('Operator')),
+                              ],
+                              onChanged: (value) =>
+                                  setState(() => _roleFilter = value!),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _dropdown(
+                              value: _statusFilter,
+                              width: double.infinity,
+                              items: const [
+                                DropdownMenuItem(
+                                    value: 'all', child: Text('All Status')),
+                                DropdownMenuItem(
+                                    value: 'active', child: Text('Active')),
+                                DropdownMenuItem(
+                                    value: 'restricted',
+                                    child: Text('Restricted')),
+                              ],
+                              onChanged: (value) =>
+                                  setState(() => _statusFilter = value!),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
-                    onChanged: (value) => setState(() => _roleFilter = value!),
-                  ),
-                  const SizedBox(width: 10),
-                  _dropdown(
-                    value: _statusFilter,
-                    width: 160,
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('All Status')),
-                      DropdownMenuItem(value: 'active', child: Text('Active')),
-                      DropdownMenuItem(
-                          value: 'restricted', child: Text('Restricted')),
-                    ],
-                    onChanged: (value) =>
-                        setState(() => _statusFilter = value!),
-                  ),
-                ],
+                  );
+                },
               ),
               const SizedBox(height: 16),
               if (_isCardView)
@@ -1198,19 +1321,23 @@ class _UsersScreenState extends State<UsersScreen> {
                     decoration: BoxDecoration(
                       color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFC8D6DD)),
+                      border: Border.all(color: Theme.of(context).dividerColor),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         CircleAvatar(
                           radius: 22,
-                          backgroundColor: const Color(0xFFDCE7ED),
+                          backgroundColor: isLight
+                              ? const Color(0xFFDCE7ED)
+                              : const Color(0xFF2A475A),
                           child: Text(
                             _shortName(user.name),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF203845),
+                              color: isLight
+                                  ? const Color(0xFF203845)
+                                  : const Color(0xFFDDEAF6),
                             ),
                           ),
                         ),
@@ -1224,10 +1351,13 @@ class _UsersScreenState extends State<UsersScreen> {
                                   Expanded(
                                     child: Text(
                                       user.name,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.w800,
-                                        color: Color(0xFF102632),
+                                        color: Theme.of(context).brightness ==
+                                                Brightness.light
+                                            ? const Color(0xFF102632)
+                                            : const Color(0xFFE2EDF8),
                                       ),
                                     ),
                                   ),
@@ -1238,9 +1368,11 @@ class _UsersScreenState extends State<UsersScreen> {
                               const SizedBox(height: 2),
                               Text(
                                 user.email,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 14,
-                                  color: Color(0xFF516875),
+                                  color: isLight
+                                      ? const Color(0xFF516875)
+                                      : const Color(0xFFBBD0E0),
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -1335,12 +1467,13 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   Widget _buildViewToggle() {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFE6EFF3),
+        color: isLight ? const Color(0xFFE6EFF3) : const Color(0xFF243E52),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1365,6 +1498,7 @@ class _UsersScreenState extends State<UsersScreen> {
     required IconData icon,
     required VoidCallback onTap,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -1377,7 +1511,9 @@ class _UsersScreenState extends State<UsersScreen> {
         child: Icon(
           icon,
           size: 18,
-          color: active ? Colors.white : const Color(0xFF2a414e),
+          color: active
+              ? Colors.white
+              : (isLight ? const Color(0xFF2a414e) : const Color(0xFFD7E8F6)),
         ),
       ),
     );
@@ -1388,11 +1524,12 @@ class _UsersScreenState extends State<UsersScreen> {
     DatabaseProvider db,
     List<User> users,
   ) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         children: users.map((user) {
@@ -1420,8 +1557,10 @@ class _UsersScreenState extends State<UsersScreen> {
 
           return Container(
             padding: const EdgeInsets.all(14),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFFDCE5EA))),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Theme.of(context).dividerColor),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1430,12 +1569,16 @@ class _UsersScreenState extends State<UsersScreen> {
                   children: [
                     CircleAvatar(
                       radius: 18,
-                      backgroundColor: const Color(0xFFDCE7ED),
+                      backgroundColor: isLight
+                          ? const Color(0xFFDCE7ED)
+                          : const Color(0xFF2A475A),
                       child: Text(
                         _shortName(user.name),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF203845),
+                          color: isLight
+                              ? const Color(0xFF203845)
+                              : const Color(0xFFDDEAF6),
                         ),
                       ),
                     ),
@@ -1448,18 +1591,23 @@ class _UsersScreenState extends State<UsersScreen> {
                             user.name,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFF102632),
+                              color: Theme.of(context).brightness ==
+                                      Brightness.light
+                                  ? const Color(0xFF102632)
+                                  : const Color(0xFFE2EDF8),
                             ),
                           ),
                           Text(
                             user.email,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
-                              color: Color(0xFF516875),
+                              color: isLight
+                                  ? const Color(0xFF516875)
+                                  : const Color(0xFFBBD0E0),
                             ),
                           ),
                         ],
@@ -1477,17 +1625,23 @@ class _UsersScreenState extends State<UsersScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEAF2F6),
+                    color: Theme.of(context).brightness == Brightness.light
+                        ? const Color(0xFFEAF2F6)
+                        : const Color(0xFF253F52),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFD0DEE6)),
+                    border: Border.all(
+                      color: Theme.of(context).dividerColor,
+                    ),
                   ),
                   child: Text(
                     details.join(' • '),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF3E5765),
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? const Color(0xFF3E5765)
+                          : const Color(0xFFBBD0E0),
                       fontWeight: FontWeight.w600,
                       height: 1.3,
                     ),
@@ -1542,14 +1696,15 @@ class _UsersScreenState extends State<UsersScreen> {
     required List<DropdownMenuItem<String>> items,
     required ValueChanged<String?> onChanged,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: width,
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isLight ? Colors.white : const Color(0xFF243E52),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -1568,16 +1723,21 @@ class _UsersScreenState extends State<UsersScreen> {
     required VoidCallback onTap,
     bool primary = false,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         decoration: BoxDecoration(
-          color: primary ? const Color(0xFF0f729c) : const Color(0xFFe6eff3),
+          color: primary
+              ? const Color(0xFF0f729c)
+              : (isLight ? const Color(0xFFe6eff3) : const Color(0xFF243E52)),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: primary ? const Color(0xFF0f729c) : const Color(0xFFc8d6dd),
+            color: primary
+                ? const Color(0xFF0f729c)
+                : Theme.of(context).dividerColor,
           ),
         ),
         child: Row(
@@ -1585,12 +1745,20 @@ class _UsersScreenState extends State<UsersScreen> {
           children: [
             Icon(icon,
                 size: 18,
-                color: primary ? Colors.white : const Color(0xFF18313f)),
+                color: primary
+                    ? Colors.white
+                    : (isLight
+                        ? const Color(0xFF18313f)
+                        : const Color(0xFFD7E8F6))),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                color: primary ? Colors.white : const Color(0xFF18313f),
+                color: primary
+                    ? Colors.white
+                    : (isLight
+                        ? const Color(0xFF18313f)
+                        : const Color(0xFFD7E8F6)),
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
@@ -1602,25 +1770,32 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   Widget _tag(String label, {IconData? icon}) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFFE2EDF3),
+        color: isLight ? const Color(0xFFE2EDF3) : const Color(0xFF2B4659),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 14, color: const Color(0xFF2C4654)),
+            Icon(
+              icon,
+              size: 14,
+              color:
+                  isLight ? const Color(0xFF2C4654) : const Color(0xFFD7E8F6),
+            ),
             const SizedBox(width: 5),
           ],
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF1f3642),
+              color:
+                  isLight ? const Color(0xFF1f3642) : const Color(0xFFD7E8F6),
             ),
           ),
         ],
@@ -1634,27 +1809,35 @@ class _UsersScreenState extends State<UsersScreen> {
     required Color color,
     required List<String> chips,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: color,
+        color: isLight ? color : const Color(0xFF243E52),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFC8D6DD)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 15, color: const Color(0xFF246081)),
+              Icon(
+                icon,
+                size: 15,
+                color:
+                    isLight ? const Color(0xFF246081) : const Color(0xFFBBD0E0),
+              ),
               const SizedBox(width: 6),
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
-                  color: Color(0xFF173341),
+                  color: isLight
+                      ? const Color(0xFF173341)
+                      : const Color(0xFFE2EDF8),
                 ),
               ),
             ],
@@ -1668,15 +1851,19 @@ class _UsersScreenState extends State<UsersScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD2E3EC),
+                        color: isLight
+                            ? const Color(0xFFD2E3EC)
+                            : const Color(0xFF2B4659),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         c,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF203845),
+                          color: isLight
+                              ? const Color(0xFF203845)
+                              : const Color(0xFFD7E8F6),
                         ),
                       ),
                     ))
@@ -1692,27 +1879,34 @@ class _UsersScreenState extends State<UsersScreen> {
     required IconData icon,
     required VoidCallback onTap,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
-          color: const Color(0xFFE7EFF3),
+          color: isLight ? const Color(0xFFE7EFF3) : const Color(0xFF243E52),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFC8D6DD)),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: const Color(0xFF1f3642)),
+            Icon(
+              icon,
+              size: 16,
+              color:
+                  isLight ? const Color(0xFF1f3642) : const Color(0xFFD7E8F6),
+            ),
             const SizedBox(width: 8),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF1f3642),
+                color:
+                    isLight ? const Color(0xFF1f3642) : const Color(0xFFD7E8F6),
               ),
             ),
           ],
@@ -1726,6 +1920,7 @@ class _UsersScreenState extends State<UsersScreen> {
     required VoidCallback onTap,
     Color iconColor = const Color(0xFF2f4654),
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -1733,9 +1928,9 @@ class _UsersScreenState extends State<UsersScreen> {
         width: 38,
         height: 38,
         decoration: BoxDecoration(
-          color: const Color(0xFFE7EFF3),
+          color: isLight ? const Color(0xFFE7EFF3) : const Color(0xFF243E52),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFC8D6DD)),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: Icon(icon, size: 18, color: iconColor),
       ),

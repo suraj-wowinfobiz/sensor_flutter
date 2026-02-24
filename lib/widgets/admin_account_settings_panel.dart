@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../core/theme/custom_theme_tokens.dart';
+import '../providers/theme_provider.dart';
 import '../shared/models/threshold_rule.dart';
 import '../providers/database_provider.dart';
+import '../screens/login_screen.dart';
 
 enum _SettingsTab {
   profile,
@@ -10,7 +14,7 @@ enum _SettingsTab {
   notifications,
   access,
   security,
-  thresholds,
+  thresholds
 }
 
 class AdminAccountSettingsPanel extends StatefulWidget {
@@ -32,6 +36,8 @@ class AdminAccountSettingsPanel extends StatefulWidget {
 
 class _AdminAccountSettingsPanelState
     extends State<AdminAccountSettingsPanel> {
+  final TextEditingController _presetNameController =
+      TextEditingController(text: 'My Preset');
   _SettingsTab _activeTab = _SettingsTab.profile;
   bool _emailNotifications = true;
   bool _smsNotifications = false;
@@ -43,9 +49,12 @@ class _AdminAccountSettingsPanelState
   bool _deviceUpdates = true;
   bool _systemNotifications = true;
   bool _dailyDigest = false;
-  bool _compactCards = false;
-  bool _autoRefresh = true;
-  bool _showUnits = true;
+
+  @override
+  void dispose() {
+    _presetNameController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -259,6 +268,762 @@ class _AdminAccountSettingsPanelState
           ),
           const SizedBox(height: 18),
           _buildInputGrid(context),
+          const SizedBox(height: 18),
+          _buildProfileLogoutFooter(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppearancePreferences(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final themeProvider = context.watch<ThemeProvider>();
+    final subColor =
+        isLight ? const Color(0xFF4f6b82) : const Color(0xFF9db7d2);
+    final lightRatio = ThemeProvider.contrastRatio(
+      themeProvider.textLight,
+      themeProvider.backgroundLight,
+    );
+    final darkRatio = ThemeProvider.contrastRatio(
+      themeProvider.textDark,
+      themeProvider.backgroundDark,
+    );
+    final contrastOk = lightRatio >= 4.5 && darkRatio >= 4.5;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).dividerColor),
+        color: isLight ? const Color(0xFFF6FAFC) : const Color(0xFF203A54),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: isLight
+                      ? const Color(0xFFE6EFF5)
+                      : const Color(0xFF2B4A67),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Appearance Preferences',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      themeProvider.isDarkMode
+                          ? 'Dark mode enabled'
+                          : 'Light mode enabled',
+                      style: TextStyle(color: subColor),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: themeProvider.isDarkMode,
+                onChanged: themeProvider.toggleTheme,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Divider(height: 1, color: Theme.of(context).dividerColor),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Theme Mode',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              SizedBox(
+                width: 160,
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<ThemeMode>(
+                    value: themeProvider.themeMode,
+                    isExpanded: true,
+                    items: const [
+                      DropdownMenuItem(
+                          value: ThemeMode.light, child: Text('Light')),
+                      DropdownMenuItem(
+                          value: ThemeMode.dark, child: Text('Dark')),
+                      DropdownMenuItem(
+                          value: ThemeMode.system, child: Text('System')),
+                    ],
+                    onChanged: (mode) {
+                      if (mode != null) {
+                        themeProvider.setThemeMode(mode);
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Text Size (${themeProvider.textScale.toStringAsFixed(2)}x)',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          Slider(
+            value: themeProvider.textScale,
+            min: 0.85,
+            max: 1.4,
+            divisions: 11,
+            label: themeProvider.textScale.toStringAsFixed(2),
+            onChanged: (v) => themeProvider.setTextScale(v),
+          ),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Auto-fix Contrast',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              Switch(
+                value: themeProvider.autoContrastFix,
+                onChanged: themeProvider.setAutoContrastFix,
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Contrast (Light ${lightRatio.toStringAsFixed(2)}:1, Dark ${darkRatio.toStringAsFixed(2)}:1) ${contrastOk ? 'PASS' : 'LOW'}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: contrastOk
+                  ? Theme.of(context)
+                      .extension<CustomThemeTokens>()!
+                      .statusNormal
+                  : Theme.of(context)
+                      .extension<CustomThemeTokens>()!
+                      .statusWarning,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Theme Colors',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _presetButton(
+                context,
+                label: 'Default',
+                selected: themeProvider.isUsingPreset(ThemePreset.defaultBlue),
+                onTap: () => themeProvider.applyPreset(ThemePreset.defaultBlue),
+              ),
+              _presetButton(
+                context,
+                label: 'Ocean',
+                selected: themeProvider.isUsingPreset(ThemePreset.ocean),
+                onTap: () => themeProvider.applyPreset(ThemePreset.ocean),
+              ),
+              _presetButton(
+                context,
+                label: 'Forest',
+                selected: themeProvider.isUsingPreset(ThemePreset.forest),
+                onTap: () => themeProvider.applyPreset(ThemePreset.forest),
+              ),
+              _presetButton(
+                context,
+                label: 'Sunset',
+                selected: themeProvider.isUsingPreset(ThemePreset.sunset),
+                onTap: () => themeProvider.applyPreset(ThemePreset.sunset),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Advanced Colors',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          _colorLine(
+            context,
+            label: 'Primary',
+            light: themeProvider.primaryLight,
+            dark: themeProvider.primaryDark,
+            onSetLight: (c) => _updateThemeColors(
+              themeProvider,
+              primaryLight: c,
+            ),
+            onSetDark: (c) => _updateThemeColors(
+              themeProvider,
+              primaryDark: c,
+            ),
+          ),
+          _colorLine(
+            context,
+            label: 'Background',
+            light: themeProvider.backgroundLight,
+            dark: themeProvider.backgroundDark,
+            onSetLight: (c) => _updateThemeColors(
+              themeProvider,
+              backgroundLight: c,
+            ),
+            onSetDark: (c) => _updateThemeColors(
+              themeProvider,
+              backgroundDark: c,
+            ),
+          ),
+          _colorLine(
+            context,
+            label: 'Surface',
+            light: themeProvider.surfaceLight,
+            dark: themeProvider.surfaceDark,
+            onSetLight: (c) => _updateThemeColors(
+              themeProvider,
+              surfaceLight: c,
+            ),
+            onSetDark: (c) => _updateThemeColors(
+              themeProvider,
+              surfaceDark: c,
+            ),
+          ),
+          _colorLine(
+            context,
+            label: 'Text',
+            light: themeProvider.textLight,
+            dark: themeProvider.textDark,
+            onSetLight: (c) => _updateThemeColors(
+              themeProvider,
+              textLight: c,
+            ),
+            onSetDark: (c) => _updateThemeColors(
+              themeProvider,
+              textDark: c,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _colorDot(themeProvider.primaryLight),
+              const SizedBox(width: 6),
+              _colorDot(themeProvider.backgroundLight),
+              const SizedBox(width: 6),
+              _colorDot(themeProvider.textLight),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: themeProvider.resetCustomizations,
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Reset'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Divider(height: 1, color: Theme.of(context).dividerColor),
+          const SizedBox(height: 12),
+          const Text(
+            'Preset Management',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _presetNameController,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    labelText: 'Preset name',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: () async {
+                  await themeProvider
+                      .saveCurrentAsCustomPreset(_presetNameController.text);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Preset saved')),
+                  );
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _showExportDialog(context, themeProvider),
+                icon: const Icon(Icons.ios_share, size: 16),
+                label: const Text('Export JSON'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _showImportDialog(context, themeProvider),
+                icon: const Icon(Icons.upload_file, size: 16),
+                label: const Text('Import JSON'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (themeProvider.customPresetNames.isNotEmpty)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: themeProvider.customPresetNames
+                  .map(
+                    (name) => InputChip(
+                      label: Text(name),
+                      onPressed: () => themeProvider.applyCustomPreset(name),
+                      onDeleted: () => themeProvider.deleteCustomPreset(name),
+                    ),
+                  )
+                  .toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showExportDialog(
+    BuildContext context,
+    ThemeProvider themeProvider,
+  ) async {
+    final jsonText =
+        themeProvider.exportCurrentConfigJson(name: _presetNameController.text);
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Export Theme JSON'),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: SelectableText(jsonText),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: jsonText));
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Copied to clipboard')),
+              );
+            },
+            child: const Text('Copy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showImportDialog(
+    BuildContext context,
+    ThemeProvider themeProvider,
+  ) async {
+    final controller = TextEditingController();
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Import Theme JSON'),
+        content: SizedBox(
+          width: 520,
+          child: TextField(
+            controller: controller,
+            minLines: 10,
+            maxLines: 16,
+            decoration: const InputDecoration(
+              hintText: 'Paste exported theme JSON here',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final ok = await themeProvider.importConfigJson(controller.text);
+              if (!context.mounted) return;
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(ok ? 'Theme imported' : 'Invalid theme JSON'),
+                ),
+              );
+            },
+            child: const Text('Import'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+  }
+
+  Future<void> _updateThemeColors(
+    ThemeProvider themeProvider, {
+    Color? primaryLight,
+    Color? primaryDark,
+    Color? surfaceLight,
+    Color? surfaceDark,
+    Color? backgroundLight,
+    Color? backgroundDark,
+    Color? textLight,
+    Color? textDark,
+  }) {
+    return themeProvider.setThemeColors(
+      primaryLight: primaryLight ?? themeProvider.primaryLight,
+      primaryDark: primaryDark ?? themeProvider.primaryDark,
+      surfaceLight: surfaceLight ?? themeProvider.surfaceLight,
+      surfaceDark: surfaceDark ?? themeProvider.surfaceDark,
+      backgroundLight: backgroundLight ?? themeProvider.backgroundLight,
+      backgroundDark: backgroundDark ?? themeProvider.backgroundDark,
+      textLight: textLight ?? themeProvider.textLight,
+      textDark: textDark ?? themeProvider.textDark,
+    );
+  }
+
+  Widget _colorLine(
+    BuildContext context, {
+    required String label,
+    required Color light,
+    required Color dark,
+    required ValueChanged<Color> onSetLight,
+    required ValueChanged<Color> onSetDark,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 330;
+          final buttons = Row(
+            children: [
+              Expanded(
+                child: _editColorButton(
+                  context,
+                  caption: 'Light',
+                  color: light,
+                  onPick: onSetLight,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _editColorButton(
+                  context,
+                  caption: 'Dark',
+                  color: dark,
+                  onPick: onSetDark,
+                ),
+              ),
+            ],
+          );
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                buttons,
+              ],
+            );
+          }
+          return Row(
+            children: [
+              SizedBox(
+                width: 84,
+                child: Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              Expanded(child: buttons),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _editColorButton(
+    BuildContext context, {
+    required String caption,
+    required Color color,
+    required ValueChanged<Color> onPick,
+  }) {
+    return OutlinedButton(
+      onPressed: () async {
+        final selected = await _pickColorDialog(
+          context,
+          title: '$caption Color',
+          initial: color,
+        );
+        if (selected != null) onPick(selected);
+      },
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: Theme.of(context).dividerColor),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _colorDot(color),
+          const SizedBox(width: 6),
+          Text(caption),
+        ],
+      ),
+    );
+  }
+
+  Future<Color?> _pickColorDialog(
+    BuildContext context, {
+    required String title,
+    required Color initial,
+  }) async {
+    final argb = initial.toARGB32();
+    var r = (argb >> 16) & 0xFF;
+    var g = (argb >> 8) & 0xFF;
+    var b = argb & 0xFF;
+
+    return showDialog<Color>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final current = Color.fromARGB(255, r, g, b);
+            return AlertDialog(
+              title: Text(title),
+              content: SizedBox(
+                width: 340,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      height: 48,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: current,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.black.withValues(alpha: 0.22),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _rgbSlider(
+                      context,
+                      label: 'R',
+                      value: r,
+                      onChanged: (v) => setDialogState(() => r = v),
+                    ),
+                    _rgbSlider(
+                      context,
+                      label: 'G',
+                      value: g,
+                      onChanged: (v) => setDialogState(() => g = v),
+                    ),
+                    _rgbSlider(
+                      context,
+                      label: 'B',
+                      value: b,
+                      onChanged: (v) => setDialogState(() => b = v),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(current),
+                  child: const Text('Apply'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _rgbSlider(
+    BuildContext context, {
+    required String label,
+    required int value,
+    required ValueChanged<int> onChanged,
+  }) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 22,
+          child:
+              Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        ),
+        Expanded(
+          child: Slider(
+            value: value.toDouble(),
+            min: 0,
+            max: 255,
+            divisions: 255,
+            label: '$value',
+            onChanged: (v) => onChanged(v.round()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _presetButton(
+    BuildContext context, {
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(
+          color: selected ? scheme.primary : Theme.of(context).dividerColor,
+          width: selected ? 1.4 : 1,
+        ),
+        backgroundColor: selected
+            ? scheme.primary.withValues(alpha: 0.16)
+            : Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (selected) ...[
+            Icon(Icons.check_circle, size: 14, color: scheme.primary),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              color: selected ? scheme.primary : null,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _colorDot(Color color) {
+    return Container(
+      width: 18,
+      height: 18,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.black.withValues(alpha: 0.18)),
+      ),
+    );
+  }
+
+  Widget _buildPreferencesTab(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final subColor =
+        isLight ? const Color(0xFF4f6b82) : const Color(0xFF9db7d2);
+    return _sectionContainer(
+      context,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Preferences',
+            style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Customize app appearance and behavior',
+            style: TextStyle(color: subColor, fontSize: 15),
+          ),
+          const SizedBox(height: 14),
+          _buildAppearancePreferences(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileLogoutFooter(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: isLight ? const Color(0xFFF8EDED) : const Color(0xFF3A2327),
+        border:
+            Border.all(color: const Color(0xFFE54C4C).withValues(alpha: 0.32)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Account Session',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFE54C4C),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Logout from your account on this device.',
+            style: TextStyle(
+              color:
+                  isLight ? const Color(0xFF37434C) : const Color(0xFFC5D5E3),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFE54C4C),
+              ),
+              onPressed: () {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (_) => const LoginScreen(),
+                  ),
+                  (route) => false,
+                );
+              },
+              icon: const Icon(Icons.logout),
+              label: const Text('Logout'),
+            ),
+          ),
         ],
       ),
     );
@@ -408,46 +1173,6 @@ class _AdminAccountSettingsPanelState
     );
   }
 
-  Widget _buildPreferencesTab(BuildContext context) {
-    return _sectionContainer(
-      context,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Preferences',
-            style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Tune dashboard behavior and display options',
-            style: TextStyle(
-              color: Theme.of(context).brightness == Brightness.light
-                  ? const Color(0xFF4f6b82)
-                  : const Color(0xFF9db7d2),
-            ),
-          ),
-          const SizedBox(height: 14),
-          _toggleTile(context,
-              title: 'Auto Refresh',
-              subtitle: 'Refresh live panels automatically',
-              value: _autoRefresh,
-              onChanged: (v) => setState(() => _autoRefresh = v)),
-          _toggleTile(context,
-              title: 'Compact Cards',
-              subtitle: 'Use tighter spacing in summary cards',
-              value: _compactCards,
-              onChanged: (v) => setState(() => _compactCards = v)),
-          _toggleTile(context,
-              title: 'Show Measurement Units',
-              subtitle: 'Display units next to sensor values',
-              value: _showUnits,
-              onChanged: (v) => setState(() => _showUnits = v)),
-        ],
-      ),
-    );
-  }
-
   Widget _toggleTile(BuildContext context,
       {required String title,
       required String subtitle,
@@ -522,10 +1247,12 @@ class _AdminAccountSettingsPanelState
                   children: [
                     Icon(Icons.verified, color: Color(0xFF27a36a)),
                     SizedBox(width: 8),
-                    Text(
-                      'Full Organization Access',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                    Expanded(
+                      child: Text(
+                        'Full Organization Access',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 16),
+                      ),
                     ),
                   ],
                 ),
@@ -534,21 +1261,33 @@ class _AdminAccountSettingsPanelState
                   'You currently have unrestricted access to sites, zones, and sensors.',
                 ),
                 const SizedBox(height: 14),
-                const Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    SizedBox(
-                        width: 220,
-                        child: _AccessStatCard(label: 'All Sites', value: '1')),
-                    SizedBox(
-                        width: 220,
-                        child: _AccessStatCard(label: 'All Zones', value: '1')),
-                    SizedBox(
-                        width: 220,
-                        child: _AccessStatCard(
-                            label: 'All Sensors', value: '214')),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final statWidth = constraints.maxWidth < 460
+                        ? constraints.maxWidth
+                        : 220.0;
+                    return Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        SizedBox(
+                          width: statWidth,
+                          child: const _AccessStatCard(
+                              label: 'All Sites', value: '1'),
+                        ),
+                        SizedBox(
+                          width: statWidth,
+                          child: const _AccessStatCard(
+                              label: 'All Zones', value: '1'),
+                        ),
+                        SizedBox(
+                          width: statWidth,
+                          child: const _AccessStatCard(
+                              label: 'All Sensors', value: '214'),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -559,6 +1298,7 @@ class _AdminAccountSettingsPanelState
   }
 
   Widget _buildSecurityTab(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 1100;
     return _sectionContainer(
       context,
       child: Column(
@@ -632,6 +1372,63 @@ class _AdminAccountSettingsPanelState
               ],
             ),
           ),
+          if (isMobile) ...[
+            const SizedBox(height: 18),
+            _buildMobileLogoutSection(context),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileLogoutSection(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: isLight ? const Color(0xFFF8EDED) : const Color(0xFF3A2327),
+        border:
+            Border.all(color: const Color(0xFFE54C4C).withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Session',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFE54C4C),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Sign out from this device.',
+            style: TextStyle(
+              color:
+                  isLight ? const Color(0xFF37434C) : const Color(0xFFC5D5E3),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (_) => const LoginScreen(),
+                  ),
+                  (route) => false,
+                );
+              },
+              icon: const Icon(Icons.logout, color: Color(0xFFE54C4C)),
+              label: const Text(
+                'Logout',
+                style: TextStyle(color: Color(0xFFE54C4C)),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -649,19 +1446,45 @@ class _AdminAccountSettingsPanelState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Text(
-                'Threshold Configuration',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-              ),
-              const Spacer(),
-              FilledButton.icon(
-                onPressed: () => _showThresholdDialog(context, db: db),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Threshold'),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 520;
+              if (!isNarrow) {
+                return Row(
+                  children: [
+                    const Text(
+                      'Threshold Configuration',
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                    ),
+                    const Spacer(),
+                    FilledButton.icon(
+                      onPressed: () => _showThresholdDialog(context, db: db),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Threshold'),
+                    ),
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Threshold Configuration',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => _showThresholdDialog(context, db: db),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Threshold'),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 4),
           Text(
@@ -692,7 +1515,10 @@ class _AdminAccountSettingsPanelState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Container(
                           width: 10,
@@ -702,7 +1528,6 @@ class _AdminAccountSettingsPanelState
                             shape: BoxShape.circle,
                           ),
                         ),
-                        const SizedBox(width: 8),
                         Text(
                           '${rule.label} (${rule.value.toStringAsFixed(1)}°)',
                           style: const TextStyle(
@@ -710,7 +1535,6 @@ class _AdminAccountSettingsPanelState
                             fontSize: 16,
                           ),
                         ),
-                        const Spacer(),
                         Text(
                           rule.sound,
                           style: TextStyle(
@@ -718,10 +1542,9 @@ class _AdminAccountSettingsPanelState
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(width: 8),
                         IconButton(
-                          onPressed: () =>
-                              _showThresholdDialog(context, db: db, existing: rule),
+                          onPressed: () => _showThresholdDialog(context,
+                              db: db, existing: rule),
                           icon: const Icon(Icons.edit_outlined, size: 18),
                           tooltip: 'Edit threshold',
                         ),
@@ -805,11 +1628,11 @@ class _AdminAccountSettingsPanelState
     String selectedColorName = existing == null
         ? 'Blue'
         : (presetColors.entries
-                .firstWhere(
-                  (entry) => entry.value.toARGB32() == existing.color.toARGB32(),
-                  orElse: () => const MapEntry('Custom', Color(0xFF4C8BF5)),
-                )
-                .key);
+            .firstWhere(
+              (entry) => entry.value.toARGB32() == existing.color.toARGB32(),
+              orElse: () => const MapEntry('Custom', Color(0xFF4C8BF5)),
+            )
+            .key);
 
     Color selectedColor = selectedColorName == 'Custom'
         ? (existing?.color ?? const Color(0xFF4C8BF5))
@@ -822,7 +1645,8 @@ class _AdminAccountSettingsPanelState
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text(existing == null ? 'Add Threshold' : 'Edit Threshold'),
+              title:
+                  Text(existing == null ? 'Add Threshold' : 'Edit Threshold'),
               content: SingleChildScrollView(
                 child: SizedBox(
                   width: 380,
@@ -887,7 +1711,8 @@ class _AdminAccountSettingsPanelState
                             selectedColorName = value;
                             if (value != 'Custom') {
                               selectedColor = presetColors[value]!;
-                              colorHexController.text = _toHexColor(selectedColor);
+                              colorHexController.text =
+                                  _toHexColor(selectedColor);
                             }
                           });
                         },
@@ -962,7 +1787,8 @@ class _AdminAccountSettingsPanelState
                       return;
                     }
                     if (value == null) {
-                      setDialogState(() => errorText = 'Value must be numeric.');
+                      setDialogState(
+                          () => errorText = 'Value must be numeric.');
                       return;
                     }
                     if (sound.isEmpty) {

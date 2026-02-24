@@ -36,6 +36,9 @@ class _SensorsScreenState extends State<SensorsScreen> {
 
   void _showSensorModal({Sensor? sensor}) {
     final db = Provider.of<DatabaseProvider>(context, listen: false);
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final subColor =
+        isLight ? const Color(0xFF4e6473) : const Color(0xFF9db7d2);
     final defaultDeviceId = db.devices.isNotEmpty ? db.devices.first.id : '';
     final defaultTypeId =
         db.sensorTypes.isNotEmpty ? db.sensorTypes.first.id : '';
@@ -98,10 +101,10 @@ class _SensorsScreenState extends State<SensorsScreen> {
                                       fontWeight: FontWeight.w800),
                                 ),
                                 const SizedBox(height: 6),
-                                const Text(
+                                Text(
                                   'Configure sensor parameters and device connection',
                                   style: TextStyle(
-                                      fontSize: 14, color: Color(0xFF4e6473)),
+                                      fontSize: 14, color: subColor),
                                 ),
                               ],
                             ),
@@ -291,7 +294,8 @@ class _SensorsScreenState extends State<SensorsScreen> {
                               style: ElevatedButton.styleFrom(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 14),
-                                backgroundColor: const Color(0xFF0f729c),
+                                backgroundColor:
+                                    Theme.of(context).colorScheme.primary,
                                 foregroundColor: Colors.white,
                               ),
                               child: Text(_editingId == null
@@ -350,16 +354,20 @@ class _SensorsScreenState extends State<SensorsScreen> {
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFFF4F8FA),
+            fillColor: Theme.of(context).brightness == Brightness.light
+                ? const Color(0xFFF4F8FA)
+                : const Color(0xFF223B4E),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+              borderSide:
+                  BorderSide(color: Theme.of(context).dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+              borderSide:
+                  BorderSide(color: Theme.of(context).dividerColor),
             ),
           ),
         ),
@@ -412,16 +420,20 @@ class _SensorsScreenState extends State<SensorsScreen> {
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFFF4F8FA),
+            fillColor: Theme.of(context).brightness == Brightness.light
+                ? const Color(0xFFF4F8FA)
+                : const Color(0xFF223B4E),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+              borderSide:
+                  BorderSide(color: Theme.of(context).dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFc8d6dd)),
+              borderSide:
+                  BorderSide(color: Theme.of(context).dividerColor),
             ),
           ),
         ),
@@ -883,7 +895,10 @@ class _SensorsScreenState extends State<SensorsScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF0f729c), width: 1.4),
+        borderSide: BorderSide(
+          color: Theme.of(context).colorScheme.primary,
+          width: 1.4,
+        ),
       ),
     );
   }

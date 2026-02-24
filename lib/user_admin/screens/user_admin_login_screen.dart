@@ -30,19 +30,22 @@ class _UserAdminLoginScreenState extends State<UserAdminLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: Card(
             margin: const EdgeInsets.all(20),
+            color: Theme.of(context).cardColor,
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
                       Expanded(
                         child: Text(
@@ -50,10 +53,13 @@ class _UserAdminLoginScreenState extends State<UserAdminLoginScreen> {
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.w700,
+                            color: isLight
+                                ? const Color(0xFF1A2B3C)
+                                : const Color(0xFFD7E8F6),
                           ),
                         ),
                       ),
-                      LoginPreferencesButton(),
+                      const LoginPreferencesButton(),
                     ],
                   ),
                   const SizedBox(height: 16),
