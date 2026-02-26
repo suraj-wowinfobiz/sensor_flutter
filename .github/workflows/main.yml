@@ -67,20 +67,17 @@ jobs:
           )
           mkdir "C:\Users\Administrator\Desktop\sensor_web\website"
 
-    # 8️⃣ Copy files to Windows VM using SFTP
+    # 8️⃣ Copy files to Windows VM
     - name: Copy files to Windows VM
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -p 12856 ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
-        
-        cd deploy-files
-        sftp -P 12856 -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
-        cd C:/Users/Administrator/Desktop/sensor_web/website
-        put -r *
-        bye
-        EOF
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USER }}
+        key: ${{ secrets.VM_SSH_KEY }}
+        port: 12856
+        source: "deploy-files/*"
+        target: "C:/Users/Administrator/Desktop/sensor_web/website"
+        strip_components: 1
 
     # 9️⃣ Deploy to Windows VM
     - name: Deploy to Windows VM
