@@ -114,8 +114,8 @@ class ThemeProvider extends ChangeNotifier {
     _primaryLight = light;
     _primaryDark = dark;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_primaryLightKey, _primaryLight.toARGB32());
-    await prefs.setInt(_primaryDarkKey, _primaryDark.toARGB32());
+    await prefs.setInt(_primaryLightKey, _primaryLight.value);
+    await prefs.setInt(_primaryDarkKey, _primaryDark.value);
     notifyListeners();
   }
 
@@ -123,8 +123,8 @@ class ThemeProvider extends ChangeNotifier {
     _surfaceLight = light;
     _surfaceDark = dark;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_surfaceLightKey, _surfaceLight.toARGB32());
-    await prefs.setInt(_surfaceDarkKey, _surfaceDark.toARGB32());
+    await prefs.setInt(_surfaceLightKey, _surfaceLight.value);
+    await prefs.setInt(_surfaceDarkKey, _surfaceDark.value);
     notifyListeners();
   }
 
@@ -132,8 +132,8 @@ class ThemeProvider extends ChangeNotifier {
     _backgroundLight = light;
     _backgroundDark = dark;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_bgLightKey, _backgroundLight.toARGB32());
-    await prefs.setInt(_bgDarkKey, _backgroundDark.toARGB32());
+    await prefs.setInt(_bgLightKey, _backgroundLight.value);
+    await prefs.setInt(_bgDarkKey, _backgroundDark.value);
     notifyListeners();
   }
 
@@ -141,8 +141,8 @@ class ThemeProvider extends ChangeNotifier {
     _textLight = light;
     _textDark = dark;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_textLightKey, _textLight.toARGB32());
-    await prefs.setInt(_textDarkKey, _textDark.toARGB32());
+    await prefs.setInt(_textLightKey, _textLight.value);
+    await prefs.setInt(_textDarkKey, _textDark.value);
     notifyListeners();
   }
 
@@ -220,14 +220,14 @@ class ThemeProvider extends ChangeNotifier {
     _selectedPreset = null;
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_primaryLightKey, _primaryLight.toARGB32());
-    await prefs.setInt(_primaryDarkKey, _primaryDark.toARGB32());
-    await prefs.setInt(_surfaceLightKey, _surfaceLight.toARGB32());
-    await prefs.setInt(_surfaceDarkKey, _surfaceDark.toARGB32());
-    await prefs.setInt(_bgLightKey, _backgroundLight.toARGB32());
-    await prefs.setInt(_bgDarkKey, _backgroundDark.toARGB32());
-    await prefs.setInt(_textLightKey, _textLight.toARGB32());
-    await prefs.setInt(_textDarkKey, _textDark.toARGB32());
+    await prefs.setInt(_primaryLightKey, _primaryLight.value);
+    await prefs.setInt(_primaryDarkKey, _primaryDark.value);
+    await prefs.setInt(_surfaceLightKey, _surfaceLight.value);
+    await prefs.setInt(_surfaceDarkKey, _surfaceDark.value);
+    await prefs.setInt(_bgLightKey, _backgroundLight.value);
+    await prefs.setInt(_bgDarkKey, _backgroundDark.value);
+    await prefs.setInt(_textLightKey, _textLight.value);
+    await prefs.setInt(_textDarkKey, _textDark.value);
     notifyListeners();
   }
 
@@ -250,14 +250,14 @@ class ThemeProvider extends ChangeNotifier {
   bool isUsingPreset(ThemePreset preset) {
     if (_selectedPreset == preset) return true;
     final colors = _presetColors(preset);
-    return _primaryLight.toARGB32() == colors.primaryLight.toARGB32() &&
-        _primaryDark.toARGB32() == colors.primaryDark.toARGB32() &&
-        _surfaceLight.toARGB32() == colors.surfaceLight.toARGB32() &&
-        _surfaceDark.toARGB32() == colors.surfaceDark.toARGB32() &&
-        _backgroundLight.toARGB32() == colors.backgroundLight.toARGB32() &&
-        _backgroundDark.toARGB32() == colors.backgroundDark.toARGB32() &&
-        _textLight.toARGB32() == colors.textLight.toARGB32() &&
-        _textDark.toARGB32() == colors.textDark.toARGB32();
+    return _primaryLight.value == colors.primaryLight.value &&
+        _primaryDark.value == colors.primaryDark.value &&
+        _surfaceLight.value == colors.surfaceLight.value &&
+        _surfaceDark.value == colors.surfaceDark.value &&
+        _backgroundLight.value == colors.backgroundLight.value &&
+        _backgroundDark.value == colors.backgroundDark.value &&
+        _textLight.value == colors.textLight.value &&
+        _textDark.value == colors.textDark.value;
   }
 
   ThemePreset? _detectPresetFromColors() {
@@ -331,14 +331,14 @@ class ThemeProvider extends ChangeNotifier {
       'themeMode': _themeMode.name,
       'textScale': _textScale,
       'autoContrastFix': _autoContrastFix,
-      'primaryLight': _primaryLight.toARGB32(),
-      'primaryDark': _primaryDark.toARGB32(),
-      'surfaceLight': _surfaceLight.toARGB32(),
-      'surfaceDark': _surfaceDark.toARGB32(),
-      'backgroundLight': _backgroundLight.toARGB32(),
-      'backgroundDark': _backgroundDark.toARGB32(),
-      'textLight': _textLight.toARGB32(),
-      'textDark': _textDark.toARGB32(),
+      'primaryLight': _primaryLight.value,
+      'primaryDark': _primaryDark.value,
+      'surfaceLight': _surfaceLight.value,
+      'surfaceDark': _surfaceDark.value,
+      'backgroundLight': _backgroundLight.value,
+      'backgroundDark': _backgroundDark.value,
+      'textLight': _textLight.value,
+      'textDark': _textDark.value,
     };
     return const JsonEncoder.withIndent('  ').convert(payload);
   }

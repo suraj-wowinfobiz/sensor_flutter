@@ -804,7 +804,7 @@ class _UserAdminAccountSettingsPanelState
     required String title,
     required Color initial,
   }) async {
-    final argb = initial.toARGB32();
+    final argb = initial.value;
     var r = (argb >> 16) & 0xFF;
     var g = (argb >> 8) & 0xFF;
     var b = argb & 0xFF;
@@ -1627,7 +1627,7 @@ class _UserAdminAccountSettingsPanelState
         ? 'Blue'
         : (presetColors.entries
             .firstWhere(
-              (entry) => entry.value.toARGB32() == existing.color.toARGB32(),
+              (entry) => entry.value.value == existing.color.value,
               orElse: () => const MapEntry('Custom', Color(0xFF4C8BF5)),
             )
             .key);
@@ -1735,7 +1735,7 @@ class _UserAdminAccountSettingsPanelState
                       ),
                       const SizedBox(height: 10),
                       DropdownButtonFormField<String>(
-                        initialValue: selectedColorName,
+                        value: selectedColorName,
                         dropdownColor: isLight
                             ? const Color(0xFFFFFFFF)
                             : const Color(0xFF2A465A),
@@ -1923,7 +1923,7 @@ class _UserAdminAccountSettingsPanelState
   }
 
   String _toHexColor(Color color) {
-    final rgb = color.toARGB32() & 0x00FFFFFF;
+    final rgb = color.value & 0x00FFFFFF;
     return '#${rgb.toRadixString(16).padLeft(6, '0').toUpperCase()}';
   }
 
