@@ -57,15 +57,15 @@ jobs:
         port: 12856
         script: |
           echo === ENSURING DIRECTORY EXISTS ===
-          if not exist "C:\Users\Administrator\Desktop\visitor-exprience-center" (
-            mkdir "C:\Users\Administrator\Desktop\visitor-exprience-center"
+          if not exist "C:\Users\Administrator\Desktop\sensor_web" (
+            mkdir "C:\Users\Administrator\Desktop\sensor_web"
           )
           
           echo === CLEANUP EXISTING WEBSITE ===
-          if exist "C:\Users\Administrator\Desktop\visitor-exprience-center\website" (
-            rmdir /S /Q "C:\Users\Administrator\Desktop\visitor-exprience-center\website"
+          if exist "C:\Users\Administrator\Desktop\sensor_web\website" (
+            rmdir /S /Q "C:\Users\Administrator\Desktop\sensor_web\website"
           )
-          mkdir "C:\Users\Administrator\Desktop\visitor-exprience-center\website"
+          mkdir "C:\Users\Administrator\Desktop\sensor_web\website"
 
     # 8️⃣ Copy files to Windows VM
     - name: Copy files to Windows VM
@@ -76,7 +76,7 @@ jobs:
         key: ${{ secrets.VM_SSH_KEY }}
         port: 12856
         source: "deploy-files/*"
-        target: "C:/Users/Administrator/Desktop/visitor-exprience-center/website"
+        target: "C:/Users/Administrator/Desktop/sensor_web/website"
         strip_components: 1
 
     # 9️⃣ Deploy to Windows VM
@@ -89,19 +89,19 @@ jobs:
         port: 12856
         script: |
           echo === ENSURING DIRECTORY EXISTS ===
-          if not exist "C:\Users\Administrator\Desktop\visitor-exprience-center\website" (
-            mkdir "C:\Users\Administrator\Desktop\visitor-exprience-center\website"
+          if not exist "C:\Users\Administrator\Desktop\sensor_web\website" (
+            mkdir "C:\Users\Administrator\Desktop\sensor_web\website"
           )
           
           echo === VERIFYING COPIED FILES ===
-          dir "C:\Users\Administrator\Desktop\visitor-exprience-center\website"
+          dir "C:\Users\Administrator\Desktop\sensor_web\website"
           
           echo === STOP IIS ===
           iisreset /stop
           timeout /t 5 /nobreak
           
           echo === CREATE WEB.CONFIG ===
-          cd "C:\Users\Administrator\Desktop\visitor-exprience-center\website"
+          cd "C:\Users\Administrator\Desktop\sensor_web\website"
           echo ^<?xml version="1.0" encoding="UTF-8"?^> > web.config
           echo ^<configuration^> >> web.config
           echo   ^<system.webServer^> >> web.config
@@ -115,7 +115,7 @@ jobs:
           echo ^</configuration^> >> web.config
           
           echo === SET PERMISSIONS ===
-          icacls "C:\Users\Administrator\Desktop\visitor-exprience-center\website" /grant IIS_IUSRS:(OI)(CI)F /T
+          icacls "C:\Users\Administrator\Desktop\sensor_web\website" /grant IIS_IUSRS:(OI)(CI)F /T
           
           echo === START IIS ===
           iisreset /start
