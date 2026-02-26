@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:fl_chart/fl_chart.dart';
@@ -5,13 +6,59 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/custom_theme_tokens.dart';
+import '../../services/live_readings_service.dart';
 import '../../shared/models/threshold_rule.dart';
 import '../providers/user_database_provider.dart';
 
-class UserDashboardScreen extends StatelessWidget {
+class UserDashboardScreen extends StatefulWidget {
   final bool embeddedScroll;
 
   const UserDashboardScreen({super.key, this.embeddedScroll = false});
+
+  @override
+  State<UserDashboardScreen> createState() => _UserDashboardScreenState();
+}
+
+class _UserDashboardScreenState extends State<UserDashboardScreen> {
+  final LiveReadingsService _service = LiveReadingsService();
+  final List<FlSpot> _liveDataPoints = [];
+  Timer? _timer;
+  int _dataIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _startLiveDataFetch();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startLiveDataFetch() {
+    debugPrint('🚀 Starting live data fetch timer...');
+    _timer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      final readings = await _service.fetchLiveReadings();
+      debugPrint('📊 Received ${readings.length} readings');
+      if (readings.isNotEmpty && mounted) {
+        setState(() {
+          final reading = readings.first;
+          final totalTilt = sqrt(reading.x * reading.x + reading.y * reading.y + reading.z * reading.z);
+          debugPrint('➕ Adding point: x=$_dataIndex, y=$totalTilt (x=${reading.x}, y=${reading.y}, z=${reading.z})');
+          _liveDataPoints.add(FlSpot(_dataIndex.toDouble(), totalTilt));
+          if (_liveDataPoints.length > 65) {
+            _liveDataPoints.removeAt(0);
+          }
+          _dataIndex++;
+          debugPrint('📊 Total points in graph: ${_liveDataPoints.length}');
+        });
+      } else {
+        debugPrint('⚠️ No readings or widget unmounted');
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +105,7 @@ class UserDashboardScreen extends StatelessWidget {
       },
     );
 
-    if (embeddedScroll) return content;
+    if (widget.embeddedScroll) return content;
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -162,7 +209,19 @@ class UserDashboardScreen extends StatelessWidget {
                         color: _titleColor(context),
                       ),
                     ),
-                  )
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _liveDataPoints.isEmpty ? Colors.orange : Colors.green,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _liveDataPoints.isEmpty ? 'Waiting...' : '${_liveDataPoints.length} pts',
+                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ],
               ),
               Wrap(
@@ -182,8 +241,8 @@ class UserDashboardScreen extends StatelessWidget {
             height: 350,
             child: LineChart(
               LineChartData(
-                minY: 42,
-                maxY: 72,
+                minY: _liveDataPoints.isEmpty ? 42 : _liveDataPoints.map((e) => e.y).reduce(min) - 10,
+                maxY: _liveDataPoints.isEmpty ? 72 : _liveDataPoints.map((e) => e.y).reduce(max) + 10,
                 gridData: FlGridData(
                   drawVerticalLine: false,
                   horizontalInterval: 5,
@@ -240,12 +299,14 @@ class UserDashboardScreen extends StatelessWidget {
                 ),
                 lineBarsData: [
                   LineChartBarData(
-                    spots: List.generate(65, (i) {
-                      final y = 47 +
-                          (sin(i / 5) * 6) +
-                          (Random(i + 2).nextDouble() * 16);
-                      return FlSpot(i.toDouble(), y);
-                    }),
+                    spots: _liveDataPoints.isEmpty
+                        ? List.generate(65, (i) {
+                            final y = 47 +
+                                (sin(i / 5) * 6) +
+                                (Random(i + 2).nextDouble() * 16);
+                            return FlSpot(i.toDouble(), y);
+                          })
+                        : _liveDataPoints,
                     isCurved: true,
                     color: const Color(0xFF0f9ca0),
                     barWidth: 3,

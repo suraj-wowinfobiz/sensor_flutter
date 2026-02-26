@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../../pages/user_admin_page.dart';
-import '../../widgets/login_preferences_button.dart';
+import '../widgets/login_preferences_button.dart';
+import 'admin_screen.dart';
 
-class UserAdminLoginScreen extends StatefulWidget {
-  const UserAdminLoginScreen({super.key});
+class SuperAdminLoginScreen extends StatefulWidget {
+  const SuperAdminLoginScreen({super.key});
 
   @override
-  State<UserAdminLoginScreen> createState() => _UserAdminLoginScreenState();
+  State<SuperAdminLoginScreen> createState() => _SuperAdminLoginScreenState();
 }
 
-class _UserAdminLoginScreenState extends State<UserAdminLoginScreen> {
+class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
@@ -30,7 +30,7 @@ class _UserAdminLoginScreenState extends State<UserAdminLoginScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const UserAdminPage()),
+        MaterialPageRoute(builder: (_) => const AdminScreen()),
       );
     });
   }
@@ -69,7 +69,7 @@ class _UserAdminLoginScreenState extends State<UserAdminLoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'User Admin',
+                  'Super Admin',
                   style: TextStyle(
                     fontSize: 48,
                     fontWeight: FontWeight.w700,
@@ -99,7 +99,7 @@ class _UserAdminLoginScreenState extends State<UserAdminLoginScreen> {
                 TextField(
                   controller: _emailController,
                   decoration: InputDecoration(
-                    hintText: 'useradmin@example.com',
+                    hintText: 'admin@example.com',
                     hintStyle: TextStyle(color: subColor, fontSize: 16),
                     filled: true,
                     fillColor: inputFill,
