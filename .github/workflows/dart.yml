@@ -1,0 +1,124 @@
+name: Deploy Flutter Web to Windows VM (IIS)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1️⃣ Checkout
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # 2️⃣ Setup Flutter
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+
+    # 3️⃣ Install dependencies
+    - name: Install dependencies
+      run: flutter pub get
+
+    # 4️⃣ Create .env (required by pubspec)
+    - name: Create env file
+      run: |
+        mkdir -p assets
+        echo "API_BASE_URL=http://103.211.202.145:8091/user-auth-service" > assets/.env
+
+    # 5️⃣ Build Flutter Web
+    - name: Build Flutter Web
+      run: flutter build web --release
+
+    # 6️⃣ Prepare files for SCP
+    - name: Prepare files for SCP
+      run: |
+        TMP_DIR=$GITHUB_WORKSPACE/deploy-files
+        mkdir -p $TMP_DIR
+        
+        # Copy all web files individually instead of creating archive
+        cp -r build/web/* $TMP_DIR/
+        
+        chmod -R 755 $TMP_DIR
+        ls -la $TMP_DIR
+
+    # 7️⃣ Cleanup and prepare directory
+    - name: Cleanup and prepare directory
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USER }}
+        key: ${{ secrets.VM_SSH_KEY }}
+        port: 12856
+        script: |
+          echo === ENSURING DIRECTORY EXISTS ===
+          if not exist "C:\Users\Administrator\Desktop\visitor-exprience-center" (
+            mkdir "C:\Users\Administrator\Desktop\visitor-exprience-center"
+          )
+          
+          echo === CLEANUP EXISTING WEBSITE ===
+          if exist "C:\Users\Administrator\Desktop\visitor-exprience-center\website" (
+            rmdir /S /Q "C:\Users\Administrator\Desktop\visitor-exprience-center\website"
+          )
+          mkdir "C:\Users\Administrator\Desktop\visitor-exprience-center\website"
+
+    # 8️⃣ Copy files to Windows VM
+    - name: Copy files to Windows VM
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USER }}
+        key: ${{ secrets.VM_SSH_KEY }}
+        port: 12856
+        source: "deploy-files/*"
+        target: "C:/Users/Administrator/Desktop/visitor-exprience-center/website"
+        strip_components: 1
+
+    # 9️⃣ Deploy to Windows VM
+    - name: Deploy to Windows VM
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USER }}
+        key: ${{ secrets.VM_SSH_KEY }}
+        port: 12856
+        script: |
+          echo === ENSURING DIRECTORY EXISTS ===
+          if not exist "C:\Users\Administrator\Desktop\visitor-exprience-center\website" (
+            mkdir "C:\Users\Administrator\Desktop\visitor-exprience-center\website"
+          )
+          
+          echo === VERIFYING COPIED FILES ===
+          dir "C:\Users\Administrator\Desktop\visitor-exprience-center\website"
+          
+          echo === STOP IIS ===
+          iisreset /stop
+          timeout /t 5 /nobreak
+          
+          echo === CREATE WEB.CONFIG ===
+          cd "C:\Users\Administrator\Desktop\visitor-exprience-center\website"
+          echo ^<?xml version="1.0" encoding="UTF-8"?^> > web.config
+          echo ^<configuration^> >> web.config
+          echo   ^<system.webServer^> >> web.config
+          echo     ^<defaultDocument^> >> web.config
+          echo       ^<files^> >> web.config
+          echo         ^<clear /^> >> web.config
+          echo         ^<add value="index.html" /^> >> web.config
+          echo       ^</files^> >> web.config
+          echo     ^</defaultDocument^> >> web.config
+          echo   ^</system.webServer^> >> web.config
+          echo ^</configuration^> >> web.config
+          
+          echo === SET PERMISSIONS ===
+          icacls "C:\Users\Administrator\Desktop\visitor-exprience-center\website" /grant IIS_IUSRS:(OI)(CI)F /T
+          
+          echo === START IIS ===
+          iisreset /start
+          
+          echo === DEPLOYMENT COMPLETE ===
+          dir
