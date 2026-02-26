@@ -11,6 +11,8 @@ import 'super_admin/screens/super_admin_login_screen.dart';
 import 'user/screens/user_login_screen.dart';
 import 'user_admin/screens/user_admin_login_screen.dart';
 import 'engineer/screens/engineer_login_screen.dart';
+import 'vendor/screens/vendor_login_screen.dart';
+import 'analytics/screens/analytics_login_screen.dart';
 import 'super_admin/providers/super_admin_riverpod_provider.dart';
 
 TextTheme _compactTextTheme(TextTheme base) {
@@ -99,6 +101,8 @@ class _AppRoot extends ConsumerWidget {
           '/login/user-admin': (context) => const UserAdminLoginScreen(),
           '/login/engineer': (context) => const EngineerLoginScreen(),
           '/login/super-admin': (context) => const SuperAdminLoginScreen(),
+          '/login/vendor': (context) => const VendorLoginScreen(),
+          '/login/analytics': (context) => const AnalyticsLoginScreen(),
         },
       ),
     );

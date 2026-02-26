@@ -21,6 +21,9 @@ class UserNavBar extends StatelessWidget {
   final VoidCallback onLogoutTap;
   final List<UserNotificationItem> notifications;
   final bool hasNotifications;
+  final String profileName;
+  final String profileRole;
+  final String profileInitial;
 
   const UserNavBar({
     super.key,
@@ -31,6 +34,9 @@ class UserNavBar extends StatelessWidget {
     required this.onLogoutTap,
     this.notifications = const [],
     this.hasNotifications = false,
+    this.profileName = 'suraj.tiwari',
+    this.profileRole = 'User',
+    this.profileInitial = 'F',
   });
 
   @override
@@ -225,7 +231,7 @@ class UserNavBar extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        'suraj.tiwari',
+                        profileName,
                         style: TextStyle(
                           color: barTextColor,
                           fontSize: 14,
@@ -233,7 +239,7 @@ class UserNavBar extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        'User',
+                        profileRole,
                         style: TextStyle(
                           color: barTextColor.withValues(alpha: 0.84),
                           fontSize: 11,
@@ -252,7 +258,7 @@ class UserNavBar extends StatelessWidget {
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    'F',
+                    profileInitial,
                     style: TextStyle(
                       color: barTextColor,
                       fontSize: isMobile ? 12 : 14,

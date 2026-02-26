@@ -8,8 +8,10 @@ class MainPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final titleColor = isLight ? const Color(0xFF1A2B3C) : const Color(0xFFD7E8F6);
-    final subColor = isLight ? const Color(0xFF5F7285) : const Color(0xFF9DB7D2);
+    final titleColor =
+        isLight ? const Color(0xFF1A2B3C) : const Color(0xFFD7E8F6);
+    final subColor =
+        isLight ? const Color(0xFF5F7285) : const Color(0xFF9DB7D2);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -68,7 +70,8 @@ class MainPage extends StatelessWidget {
                   title: 'User Admin',
                   subtitle: 'Manage users and organizations',
                   icon: Icons.admin_panel_settings_outlined,
-                  onTap: () => Navigator.pushNamed(context, '/login/user-admin'),
+                  onTap: () =>
+                      Navigator.pushNamed(context, '/login/user-admin'),
                 ),
                 const SizedBox(height: 16),
                 _RoleButton(
@@ -79,10 +82,25 @@ class MainPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 _RoleButton(
+                  title: 'Vendor',
+                  subtitle: 'Access vendor dashboard and settings',
+                  icon: Icons.storefront_outlined,
+                  onTap: () => Navigator.pushNamed(context, '/login/vendor'),
+                ),
+                const SizedBox(height: 16),
+                _RoleButton(
+                  title: 'Analytics',
+                  subtitle: 'Access analytics dashboard and settings',
+                  icon: Icons.insights_outlined,
+                  onTap: () => Navigator.pushNamed(context, '/login/analytics'),
+                ),
+                const SizedBox(height: 16),
+                _RoleButton(
                   title: 'Super Admin',
                   subtitle: 'Full system access',
                   icon: Icons.security_outlined,
-                  onTap: () => Navigator.pushNamed(context, '/login/super-admin'),
+                  onTap: () =>
+                      Navigator.pushNamed(context, '/login/super-admin'),
                 ),
               ],
             ),
@@ -126,7 +144,10 @@ class _RoleButton extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -152,7 +173,9 @@ class _RoleButton extends StatelessWidget {
                     subtitle,
                     style: TextStyle(
                       fontSize: 14,
-                      color: isLight ? const Color(0xFF5F7285) : const Color(0xFF9DB7D2),
+                      color: isLight
+                          ? const Color(0xFF5F7285)
+                          : const Color(0xFF9DB7D2),
                     ),
                   ),
                 ],
@@ -161,7 +184,8 @@ class _RoleButton extends StatelessWidget {
             Icon(
               Icons.arrow_forward_ios,
               size: 16,
-              color: isLight ? const Color(0xFF5F7285) : const Color(0xFF9DB7D2),
+              color:
+                  isLight ? const Color(0xFF5F7285) : const Color(0xFF9DB7D2),
             ),
           ],
         ),
