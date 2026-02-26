@@ -39,7 +39,7 @@ class LoginPreferencesButton extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<ThemeMode>(
-                      initialValue: themeProvider.themeMode,
+                      value: themeProvider.themeMode,
                       decoration: const InputDecoration(
                         labelText: 'Theme mode',
                       ),
