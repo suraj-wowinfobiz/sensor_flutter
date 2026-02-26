@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/threshold_profile.dart';
-import '../providers/super_admin_database_provider.dart';
+import '../providers/super_admin_backend_provider.dart';
 import '../widgets/crud_modal.dart';
 import '../widgets/crud_table.dart';
 
@@ -17,6 +17,16 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
   String? _editingId;
   String _name = '';
   String _description = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
+      await db.loadThresholdProfiles();
+    });
+  }
 
   void _showThresholdModal({ThresholdProfile? profile}) {
     if (profile != null) {
@@ -52,20 +62,28 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
                 'keyboardType': TextInputType.text,
               },
             ],
-            onSave: () {
-              final db = Provider.of<DatabaseProvider>(context, listen: false);
-              if (_editingId == null) {
-                db.create('thresholds', {
-                  'name': _name,
-                  'description': _description,
-                });
-              } else {
-                db.update('thresholds', _editingId!, {
-                  'name': _name,
-                  'description': _description,
-                });
+            onSave: () async {
+              final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
+              try {
+                if (_editingId == null) {
+                  await db.create('thresholds', {
+                    'name': _name,
+                    'description': _description,
+                  });
+                } else {
+                  await db.update('thresholds', _editingId!, {
+                    'name': _name,
+                    'description': _description,
+                  });
+                }
+                if (context.mounted) Navigator.pop(context);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to save threshold: $e')),
+                  );
+                }
               }
-              Navigator.pop(context);
             },
             onCancel: () => Navigator.pop(context),
           );
@@ -76,7 +94,7 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<DatabaseProvider>(
+    return Consumer<SuperAdminBackendProvider>(
       builder: (context, db, child) {
         return CrudTable(
           title: 'Threshold Profiles',
@@ -88,8 +106,17 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
           onAdd: () => _showThresholdModal(),
           onEdit: (index) =>
               _showThresholdModal(profile: db.thresholdProfiles[index]),
-          onDelete: (index) =>
-              db.delete('thresholds', db.thresholdProfiles[index].id),
+          onDelete: (index) async {
+            try {
+              await db.delete('thresholds', db.thresholdProfiles[index].id);
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to delete threshold: $e')),
+                );
+              }
+            }
+          },
         );
       },
     );

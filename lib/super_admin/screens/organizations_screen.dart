@@ -1,54 +1,121 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../api/organization_api.dart';
 import '../models/organization.dart';
 import '../models/site.dart';
 import '../models/zone.dart';
-import '../providers/super_admin_database_provider.dart';
+import '../providers/super_admin_backend_provider.dart';
+import '../providers/super_admin_riverpod_provider.dart';
 import '../widgets/crud_modal.dart';
 
-class OrganizationsScreen extends StatefulWidget {
+class OrganizationsScreen extends ConsumerStatefulWidget {
   const OrganizationsScreen({super.key});
 
   @override
-  State<OrganizationsScreen> createState() => _OrganizationsScreenState();
+  ConsumerState<OrganizationsScreen> createState() =>
+      _OrganizationsScreenState();
 }
 
-class _OrganizationsScreenState extends State<OrganizationsScreen> {
-  String? _selectedOrganizationId;
-  String? _selectedSiteId;
-  String? _selectedZoneId;
+class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
+  bool _selectionSyncQueued = false;
+  String? get _selectedOrganizationId =>
+      ref.read(superAdminSelectedOrganizationIdStateProvider);
+  set _selectedOrganizationId(String? value) =>
+      ref.read(superAdminSelectedOrganizationIdStateProvider.notifier).state =
+          value;
 
-  void _ensureSelections(DatabaseProvider db) {
+  String? get _selectedSiteId => ref.read(superAdminSelectedSiteIdStateProvider);
+  set _selectedSiteId(String? value) =>
+      ref.read(superAdminSelectedSiteIdStateProvider.notifier).state = value;
+
+  String? get _selectedZoneId => ref.read(superAdminSelectedZoneIdStateProvider);
+  set _selectedZoneId(String? value) =>
+      ref.read(superAdminSelectedZoneIdStateProvider.notifier).state = value;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final db = ref.read(superAdminBackendChangeNotifierProvider);
+    await db.loadOrganizations();
+    await db.loadSites();
+    final firstOrgId = db.organizations.isNotEmpty ? db.organizations.first.id : null;
+    final firstSiteId = db.sites
+        .where((s) => s.organizationId == firstOrgId)
+        .map((s) => s.id)
+        .firstOrNull;
+    if (firstSiteId != null) {
+      await db.loadZones(firstSiteId);
+    }
+    _ensureSelections(db);
+    ref.read(superAdminIsLoadingStateProvider.notifier).state = false;
+  }
+
+  void _showApiError(Object e) {
+    final text = e.toString().replaceFirst('ApiException: ', '');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  void _ensureSelections(SuperAdminBackendProvider db) {
+    final currentOrgId = _selectedOrganizationId;
+    final currentSiteId = _selectedSiteId;
+    final currentZoneId = _selectedZoneId;
+
+    String? nextOrgId = currentOrgId;
     if (db.organizations.isNotEmpty &&
-        (_selectedOrganizationId == null ||
-            db.organizations.every((o) => o.id != _selectedOrganizationId))) {
-      _selectedOrganizationId = db.organizations.first.id;
+        (nextOrgId == null ||
+            db.organizations.every((o) => o.id != nextOrgId))) {
+      nextOrgId = db.organizations.first.id;
     }
+    if (db.organizations.isEmpty) nextOrgId = null;
 
-    final sites = db.sites
-        .where((s) => s.organizationId == _selectedOrganizationId)
-        .toList();
-    if (sites.isNotEmpty &&
-        (_selectedSiteId == null ||
-            sites.every((s) => s.id != _selectedSiteId))) {
-      _selectedSiteId = sites.first.id;
+    final scopedSites =
+        db.sites.where((s) => s.organizationId == nextOrgId).toList();
+    String? nextSiteId = currentSiteId;
+    if (scopedSites.isNotEmpty &&
+        (nextSiteId == null || scopedSites.every((s) => s.id != nextSiteId))) {
+      nextSiteId = scopedSites.first.id;
     }
-    if (sites.isEmpty) _selectedSiteId = null;
+    if (scopedSites.isEmpty) nextSiteId = null;
 
-    final zones = db.zones.where((z) => z.siteId == _selectedSiteId).toList();
-    if (zones.isNotEmpty &&
-        (_selectedZoneId == null ||
-            zones.every((z) => z.id != _selectedZoneId))) {
-      _selectedZoneId = zones.first.id;
+    final scopedZones = db.zones.where((z) => z.siteId == nextSiteId).toList();
+    String? nextZoneId = currentZoneId;
+    if (scopedZones.isNotEmpty &&
+        (nextZoneId == null || scopedZones.every((z) => z.id != nextZoneId))) {
+      nextZoneId = scopedZones.first.id;
     }
-    if (zones.isEmpty) _selectedZoneId = null;
+    if (scopedZones.isEmpty) nextZoneId = null;
+
+    final hasChanges = nextOrgId != currentOrgId ||
+        nextSiteId != currentSiteId ||
+        nextZoneId != currentZoneId;
+    if (!hasChanges || _selectionSyncQueued) return;
+
+    _selectionSyncQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _selectionSyncQueued = false;
+      if (!mounted) return;
+      ref.read(superAdminSelectedOrganizationIdStateProvider.notifier).state =
+          nextOrgId;
+      ref.read(superAdminSelectedSiteIdStateProvider.notifier).state =
+          nextSiteId;
+      ref.read(superAdminSelectedZoneIdStateProvider.notifier).state =
+          nextZoneId;
+    });
   }
 
   void _showOrganizationModal({
     Organization? organization,
-    required DatabaseProvider db,
+    required SuperAdminBackendProvider db,
   }) {
     var name = organization?.name ?? '';
     var email = organization?.email ?? '';
@@ -88,38 +155,31 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
               },
             ],
             onSave: () async {
-              if (organization == null) {
-                try {
-                  final response = await OrganizationApi.createOrganization(
-                    name: name,
-                    email: email,
-                  );
-                  db.create('organizations', {
-                    'name': response.body.name,
-                    'email': response.body.email,
-                    'status': response.body.status.toLowerCase(),
-                    'owner_user_id': db.users.first.id,
+              try {
+                if (name.trim().isEmpty || email.trim().isEmpty) {
+                  throw Exception('name can not be empty');
+                }
+                if (organization == null) {
+                  await db.create('organizations', {
+                    'name': name.trim(),
+                    'email': email.trim(),
+                    'status': status,
+                    'owner_user_id': '',
                   });
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(response.message)),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Organization created')));
                     Navigator.pop(context);
                   }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e')),
-                    );
-                  }
+                } else {
+                  await db.update('organizations', organization.id, {
+                    'name': name.trim(),
+                    'email': email.trim(),
+                    'status': status,
+                  });
+                  if (context.mounted) Navigator.pop(context);
                 }
-              } else {
-                db.update('organizations', organization.id, {
-                  'name': name,
-                  'email': email,
-                  'status': status,
-                });
-                Navigator.pop(context);
+              } catch (e) {
+                if (context.mounted) _showApiError(e);
               }
             },
             onCancel: () => Navigator.pop(context),
@@ -129,7 +189,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
     );
   }
 
-  void _showSiteModal({Site? site, required DatabaseProvider db}) {
+  void _showSiteModal({Site? site, required SuperAdminBackendProvider db}) {
     if (_selectedOrganizationId == null && site == null) return;
 
     var name = site?.name ?? '';
@@ -166,21 +226,43 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                     .toList(),
               },
             ],
-            onSave: () {
-              if (site == null) {
-                db.create('sites', {
-                  'name': name,
-                  'location': location,
-                  'organization_id': organizationId,
-                });
-              } else {
-                db.update('sites', site.id, {
-                  'name': name,
-                  'location': location,
-                  'organization_id': organizationId,
-                });
+            onSave: () async {
+              try {
+                if (organizationId.trim().isEmpty) {
+                  throw Exception('orgId is required');
+                }
+                if (name.trim().isEmpty) {
+                  throw Exception("site name can't be empty");
+                }
+                if (location.trim().isEmpty) {
+                  throw Exception("site location can't be empty");
+                }
+                if (site == null) {
+                  await db.create('sites', {
+                    'name': name.trim(),
+                    'location': location.trim(),
+                    'organization_id': organizationId,
+                  });
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Site created successfully')));
+                  }
+                } else {
+                  await db.update('sites', site.id, {
+                    'name': name.trim(),
+                    'location': location.trim(),
+                    'organization_id': organizationId,
+                  });
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Site updated successfully')));
+                  }
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  _showApiError(e);
+                }
               }
-              Navigator.pop(context);
             },
             onCancel: () => Navigator.pop(context),
           );
@@ -189,7 +271,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
     );
   }
 
-  void _showZoneModal({Zone? zone, required DatabaseProvider db}) {
+  void _showZoneModal({Zone? zone, required SuperAdminBackendProvider db}) {
     if (_selectedSiteId == null && zone == null) return;
 
     var name = zone?.name ?? '';
@@ -219,19 +301,38 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                     .toList(),
               },
             ],
-            onSave: () {
-              if (zone == null) {
-                db.create('zones', {
-                  'name': name,
-                  'site_id': siteId,
-                });
-              } else {
-                db.update('zones', zone.id, {
-                  'name': name,
-                  'site_id': siteId,
-                });
+            onSave: () async {
+              try {
+                if (siteId.trim().isEmpty) {
+                  throw Exception('siteId is required');
+                }
+                if (name.trim().isEmpty) {
+                  throw Exception("name can not be empty");
+                }
+                if (zone == null) {
+                  await db.create('zones', {
+                    'name': name.trim(),
+                    'site_id': siteId,
+                  });
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Zone created successfully')));
+                  }
+                } else {
+                  await db.update('zones', zone.id, {
+                    'name': name.trim(),
+                    'site_id': siteId,
+                  });
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Zone updated successfully')));
+                  }
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  _showApiError(e);
+                }
               }
-              Navigator.pop(context);
             },
             onCancel: () => Navigator.pop(context),
           );
@@ -242,23 +343,33 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<DatabaseProvider>(
-      builder: (context, db, child) {
-        final isLight = Theme.of(context).brightness == Brightness.light;
-        _ensureSelections(db);
+    final isLoading = ref.watch(superAdminIsLoadingStateProvider);
+    final db = ref.watch(superAdminBackendChangeNotifierProvider);
+    final selectedOrganizationId =
+        ref.watch(superAdminSelectedOrganizationIdStateProvider);
+    final selectedSiteId = ref.watch(superAdminSelectedSiteIdStateProvider);
+    final selectedZoneId = ref.watch(superAdminSelectedZoneIdStateProvider);
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    _ensureSelections(db);
+    final viewportHeight = MediaQuery.of(context).size.height;
+    final desktopCardHeight =
+        (viewportHeight - 250).clamp(380.0, 760.0).toDouble();
+    const mobileCardHeight = 420.0;
 
-        final organizations = db.organizations;
-        final sites = db.sites
-            .where((s) => s.organizationId == _selectedOrganizationId)
-            .toList();
-        final zones =
-            db.zones.where((z) => z.siteId == _selectedSiteId).toList();
-        final locations = db.devices
-            .where((d) => d.zoneId == _selectedZoneId)
-            .map((d) => d.deviceCode)
-            .toList();
+    final organizations = db.organizations;
+    final sites = db.sites
+        .where((s) => s.organizationId == selectedOrganizationId)
+        .toList();
+    final zones = db.zones.where((z) => z.siteId == selectedSiteId).toList();
+    final locations = db.devices
+        .where((d) => d.zoneId == selectedZoneId)
+        .map((d) => d.deviceCode)
+        .toList();
 
-        return SingleChildScrollView(
+    return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,6 +427,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                         _columnCard(
                           title: 'Organizations',
                           icon: Icons.business,
+                          height: mobileCardHeight,
                           onAdd: () => _showOrganizationModal(db: db),
                           child: _buildOrganizationsList(organizations, db),
                         ),
@@ -323,6 +435,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                         _columnCard(
                           title: 'Sites',
                           icon: Icons.map_outlined,
+                          height: mobileCardHeight,
                           onAdd: _selectedOrganizationId == null
                               ? null
                               : () => _showSiteModal(db: db),
@@ -332,6 +445,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                         _columnCard(
                           title: 'Zones',
                           icon: Icons.layers_outlined,
+                          height: mobileCardHeight,
                           onAdd: _selectedSiteId == null
                               ? null
                               : () => _showZoneModal(db: db),
@@ -341,6 +455,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                         _columnCard(
                           title: 'Locations',
                           icon: Icons.location_on_outlined,
+                          height: mobileCardHeight,
                           child: _buildLocationsList(locations),
                         ),
                       ],
@@ -354,6 +469,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                         child: _columnCard(
                           title: 'Organizations',
                           icon: Icons.business,
+                          height: desktopCardHeight,
                           onAdd: () => _showOrganizationModal(db: db),
                           child: _buildOrganizationsList(organizations, db),
                         ),
@@ -363,6 +479,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                         child: _columnCard(
                           title: 'Sites',
                           icon: Icons.map_outlined,
+                          height: desktopCardHeight,
                           onAdd: _selectedOrganizationId == null
                               ? null
                               : () => _showSiteModal(db: db),
@@ -374,6 +491,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                         child: _columnCard(
                           title: 'Zones',
                           icon: Icons.layers_outlined,
+                          height: desktopCardHeight,
                           onAdd: _selectedSiteId == null
                               ? null
                               : () => _showZoneModal(db: db),
@@ -385,6 +503,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                         child: _columnCard(
                           title: 'Locations',
                           icon: Icons.location_on_outlined,
+                          height: desktopCardHeight,
                           child: _buildLocationsList(locations),
                         ),
                       ),
@@ -395,19 +514,18 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
             ],
           ),
         );
-      },
-    );
   }
 
   Widget _columnCard({
     required String title,
     required IconData icon,
+    required double height,
     required Widget child,
     VoidCallback? onAdd,
   }) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
-      constraints: const BoxConstraints(minHeight: 600),
+      height: height,
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(18),
@@ -494,9 +612,13 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: child,
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: SingleChildScrollView(
+                child: child,
+              ),
+            ),
           ),
         ],
       ),
@@ -504,7 +626,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
   }
 
   Widget _buildOrganizationsList(
-      List<Organization> organizations, DatabaseProvider db) {
+      List<Organization> organizations, SuperAdminBackendProvider db) {
     if (organizations.isEmpty) {
       return const _EmptyHint(text: 'No organizations yet');
     }
@@ -524,22 +646,26 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
             _selectedZoneId = null;
           }),
           onEdit: () => _showOrganizationModal(organization: org, db: db),
-          onDelete: () {
-            db.delete('organizations', org.id);
-            setState(() {
-              if (_selectedOrganizationId == org.id) {
-                _selectedOrganizationId = null;
-                _selectedSiteId = null;
-                _selectedZoneId = null;
-              }
-            });
+          onDelete: () async {
+            try {
+              await db.delete('organizations', org.id);
+              setState(() {
+                if (_selectedOrganizationId == org.id) {
+                  _selectedOrganizationId = null;
+                  _selectedSiteId = null;
+                  _selectedZoneId = null;
+                }
+              });
+            } catch (e) {
+              if (mounted) _showApiError(e);
+            }
           },
         );
       }).toList(),
     );
   }
 
-  Widget _buildSitesList(List<Site> sites, DatabaseProvider db) {
+  Widget _buildSitesList(List<Site> sites, SuperAdminBackendProvider db) {
     if (_selectedOrganizationId == null) {
       return const _EmptyHint(text: 'Select an organization');
     }
@@ -549,30 +675,39 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
     return Column(
       children: sites.map((site) {
         final selected = site.id == _selectedSiteId;
+        final zonesCount = db.zones.where((z) => z.siteId == site.id).length;
         return _ListTileCard(
           selected: selected,
           title: site.name,
           subtitle: site.location,
-          onTap: () => setState(() {
-            _selectedSiteId = site.id;
-            _selectedZoneId = null;
-          }),
-          onEdit: () => _showSiteModal(site: site, db: db),
-          onDelete: () {
-            db.delete('sites', site.id);
+          badge: '$zonesCount zones',
+          onTap: () {
             setState(() {
-              if (_selectedSiteId == site.id) {
-                _selectedSiteId = null;
-                _selectedZoneId = null;
-              }
+              _selectedSiteId = site.id;
+              _selectedZoneId = null;
             });
+            db.loadZones(site.id);
+          },
+          onEdit: () => _showSiteModal(site: site, db: db),
+          onDelete: () async {
+            try {
+              await db.delete('sites', site.id);
+              setState(() {
+                if (_selectedSiteId == site.id) {
+                  _selectedSiteId = null;
+                  _selectedZoneId = null;
+                }
+              });
+            } catch (e) {
+              if (mounted) _showApiError(e);
+            }
           },
         );
       }).toList(),
     );
   }
 
-  Widget _buildZonesList(List<Zone> zones, DatabaseProvider db) {
+  Widget _buildZonesList(List<Zone> zones, SuperAdminBackendProvider db) {
     if (_selectedSiteId == null) {
       return const _EmptyHint(text: 'Select a site');
     }
@@ -588,11 +723,15 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
           subtitle: 'Zone',
           onTap: () => setState(() => _selectedZoneId = zone.id),
           onEdit: () => _showZoneModal(zone: zone, db: db),
-          onDelete: () {
-            db.delete('zones', zone.id);
-            setState(() {
-              if (_selectedZoneId == zone.id) _selectedZoneId = null;
-            });
+          onDelete: () async {
+            try {
+              await db.delete('zones', zone.id);
+              setState(() {
+                if (_selectedZoneId == zone.id) _selectedZoneId = null;
+              });
+            } catch (e) {
+              if (mounted) _showApiError(e);
+            }
           },
         );
       }).toList(),

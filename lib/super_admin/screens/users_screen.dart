@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/user.dart';
-import '../providers/super_admin_database_provider.dart';
+import '../providers/super_admin_backend_provider.dart';
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
@@ -26,6 +26,17 @@ class _UsersScreenState extends State<UsersScreen> {
   String _name = '';
   String _email = '';
   String _role = 'operator';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final db = context.read<SuperAdminBackendProvider>();
+      await db.loadOrganizations();
+      await db.loadUsers();
+    });
+  }
 
   @override
   void dispose() {
@@ -77,7 +88,7 @@ class _UsersScreenState extends State<UsersScreen> {
     var useTemplateTab = user == null;
     var selectedTemplate = 0;
     final parentContext = context;
-    final db = parentContext.read<DatabaseProvider>();
+    final db = parentContext.read<SuperAdminBackendProvider>();
 
     String normalizeRole(String value) {
       final lower = value.trim().toLowerCase();
@@ -94,10 +105,11 @@ class _UsersScreenState extends State<UsersScreen> {
           final isLight = theme.brightness == Brightness.light;
           final isDialogLight = theme.brightness == Brightness.light;
 
-          void saveUser() {
+          Future<void> saveUser() async {
             final name = nameController.text.trim();
             final email = emailController.text.trim();
             final role = normalizeRole(roleController.text);
+            final organizationName = organizationController.text.trim();
 
             if (name.isEmpty || email.isEmpty) {
               ScaffoldMessenger.of(parentContext).showSnackBar(
@@ -105,19 +117,38 @@ class _UsersScreenState extends State<UsersScreen> {
               );
               return;
             }
+            if (db.organizations.isEmpty) {
+              ScaffoldMessenger.of(parentContext).showSnackBar(
+                const SnackBar(content: Text('Please create organization first')),
+              );
+              return;
+            }
+            final selectedOrg = db.organizations.firstWhere(
+              (o) => o.name.toLowerCase() == organizationName.toLowerCase(),
+              orElse: () => db.organizations.first,
+            );
 
             final payload = {
               'name': name,
               'email': email,
               'role': role,
+              'organization_id': selectedOrg.id,
+              'password': 'Temp@12345',
             };
-
-            if (_editingId == null) {
-              db.create('users', payload);
-            } else {
-              db.update('users', _editingId!, payload);
+            try {
+              if (_editingId == null) {
+                await db.create('users', payload);
+              } else {
+                await db.update('users', _editingId!, payload);
+              }
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+            } catch (e) {
+              if (parentContext.mounted) {
+                ScaffoldMessenger.of(parentContext).showSnackBar(
+                  SnackBar(content: Text('Failed to save user: $e')),
+                );
+              }
             }
-            Navigator.pop(dialogContext);
           }
 
           return Dialog(
@@ -460,10 +491,6 @@ class _UsersScreenState extends State<UsersScreen> {
       ),
     );
 
-    nameController.dispose();
-    emailController.dispose();
-    roleController.dispose();
-    organizationController.dispose();
   }
 
   Widget _tabOption({
@@ -615,7 +642,7 @@ class _UsersScreenState extends State<UsersScreen> {
 
   Map<String, Set<String>> _defaultAccessForUser(
     User user,
-    DatabaseProvider db,
+    SuperAdminBackendProvider db,
   ) {
     final index = db.users.indexOf(user).clamp(0, 9999);
     final isAdmin = user.role == 'admin';
@@ -658,7 +685,7 @@ class _UsersScreenState extends State<UsersScreen> {
     };
   }
 
-  void _showAccessDialog(BuildContext context, User user, DatabaseProvider db) {
+  void _showAccessDialog(BuildContext context, User user, SuperAdminBackendProvider db) {
     final defaultAccess = _defaultAccessForUser(user, db);
     final defaultOrganizations = defaultAccess['organizations'] ?? <String>{};
     final defaultSites = defaultAccess['sites'] ?? <String>{};
@@ -1321,7 +1348,7 @@ class _UsersScreenState extends State<UsersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<DatabaseProvider>(
+    return Consumer<SuperAdminBackendProvider>(
       builder: (context, db, child) {
         final isLight = Theme.of(context).brightness == Brightness.light;
         final users = _applyFilters(db.users);
@@ -1518,19 +1545,22 @@ class _UsersScreenState extends State<UsersScreen> {
                 ...users.map((user) {
                   final restricted = _restrictedUsers.contains(user.id);
                   final userIndex = db.users.indexOf(user);
+                  final safeUserIndex = userIndex < 0 ? 0 : userIndex;
                   final site = db.sites.isNotEmpty
-                      ? db.sites[userIndex % db.sites.length].name
+                      ? db.sites[safeUserIndex % db.sites.length].name
                       : 'No Site';
                   final zone = db.zones.isNotEmpty
-                      ? db.zones[userIndex % db.zones.length].name
+                      ? db.zones[safeUserIndex % db.zones.length].name
                       : 'No Zone';
-                  final sensorCodes = db.sensors
-                      .where((s) =>
-                          s.deviceId ==
-                          db.devices[userIndex % db.devices.length].id)
-                      .take(2)
-                      .map((s) => s.serialNumber)
-                      .toList();
+                  final sensorCodes = db.devices.isEmpty
+                      ? <String>[]
+                      : db.sensors
+                          .where((s) =>
+                              s.deviceId ==
+                              db.devices[safeUserIndex % db.devices.length].id)
+                          .take(2)
+                          .map((s) => s.serialNumber)
+                          .toList();
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
@@ -1666,7 +1696,20 @@ class _UsersScreenState extends State<UsersScreen> {
                             _iconAction(
                               icon: Icons.delete_outline,
                               iconColor: Colors.red,
-                              onTap: () => db.delete('users', user.id),
+                              onTap: () async {
+                                try {
+                                  await db.delete('users', user.id);
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content:
+                                            Text('Failed to delete user: $e'),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
                             ),
                           ],
                         ),
@@ -1738,7 +1781,7 @@ class _UsersScreenState extends State<UsersScreen> {
 
   Widget _buildUsersListView(
     BuildContext context,
-    DatabaseProvider db,
+    SuperAdminBackendProvider db,
     List<User> users,
   ) {
     final isLight = Theme.of(context).brightness == Brightness.light;
@@ -1752,18 +1795,22 @@ class _UsersScreenState extends State<UsersScreen> {
         children: users.map((user) {
           final restricted = _restrictedUsers.contains(user.id);
           final userIndex = db.users.indexOf(user);
+          final safeUserIndex = userIndex < 0 ? 0 : userIndex;
           final site = db.sites.isNotEmpty
-              ? db.sites[userIndex % db.sites.length].name
+              ? db.sites[safeUserIndex % db.sites.length].name
               : 'No Site';
           final zone = db.zones.isNotEmpty
-              ? db.zones[userIndex % db.zones.length].name
+              ? db.zones[safeUserIndex % db.zones.length].name
               : 'No Zone';
-          final sensorCodes = db.sensors
-              .where((s) =>
-                  s.deviceId == db.devices[userIndex % db.devices.length].id)
-              .take(3)
-              .map((s) => s.serialNumber)
-              .toList();
+          final sensorCodes = db.devices.isEmpty
+              ? <String>[]
+              : db.sensors
+                  .where((s) =>
+                      s.deviceId ==
+                      db.devices[safeUserIndex % db.devices.length].id)
+                  .take(3)
+                  .map((s) => s.serialNumber)
+                  .toList();
           final details = <String>[
             user.role,
             restricted ? 'restricted' : 'active',
@@ -1895,7 +1942,19 @@ class _UsersScreenState extends State<UsersScreen> {
                     _iconAction(
                       icon: Icons.delete_outline,
                       iconColor: Colors.red,
-                      onTap: () => db.delete('users', user.id),
+                      onTap: () async {
+                        try {
+                          await db.delete('users', user.id);
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to delete user: $e'),
+                              ),
+                            );
+                          }
+                        }
+                      },
                     ),
                   ],
                 ),

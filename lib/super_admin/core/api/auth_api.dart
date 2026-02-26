@@ -65,16 +65,40 @@ class AuthApi {
   static const String baseUrl = 'http://103.211.202.145:8091';
 
   static Future<LoginResponse> login(LoginRequest request) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/v1/auth/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(request.toJson()),
-    );
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/api/v1/auth/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(request.toJson()),
+          )
+          .timeout(const Duration(seconds: 20));
 
-    if (response.statusCode == 200) {
-      return LoginResponse.fromJson(jsonDecode(response.body));
-    } else {
-      throw Exception('Login failed: ${response.body}');
+      if (response.statusCode == 200) {
+        final parsed = jsonDecode(response.body) as Map<String, dynamic>;
+        return LoginResponse.fromJson(parsed);
+      }
+      throw AuthApiException('Login failed: ${response.body}');
+    } catch (e) {
+      final text = e.toString();
+      if (text.contains('XMLHttpRequest error')) {
+        throw AuthApiException(
+          'CORS blocked login request. Backend must allow OPTIONS/POST for /api/v1/auth/login from this origin.',
+        );
+      }
+      if (text.contains('TimeoutException')) {
+        throw AuthApiException('Login request timed out. Please try again.');
+      }
+      if (e is AuthApiException) rethrow;
+      throw AuthApiException('Login failed: $e');
     }
   }
+}
+
+class AuthApiException implements Exception {
+  final String message;
+  AuthApiException(this.message);
+
+  @override
+  String toString() => message;
 }

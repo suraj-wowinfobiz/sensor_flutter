@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../api/api_client.dart';
 import '../api/super_admin_login_api.dart';
+import '../providers/super_admin_riverpod_provider.dart';
 import 'admin_screen.dart';
 
-class SuperAdminLoginScreen extends StatefulWidget {
+class SuperAdminLoginScreen extends ConsumerStatefulWidget {
   const SuperAdminLoginScreen({super.key});
 
   @override
-  State<SuperAdminLoginScreen> createState() => _SuperAdminLoginScreenState();
+  ConsumerState<SuperAdminLoginScreen> createState() =>
+      _SuperAdminLoginScreenState();
 }
 
-class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
+class _SuperAdminLoginScreenState extends ConsumerState<SuperAdminLoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _isLoading = false;
-  bool _obscurePassword = true;
 
   Future<void> _login() async {
     if (_emailController.text.trim().isEmpty ||
@@ -25,7 +27,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    ref.read(superAdminLoginLoadingStateProvider.notifier).state = true;
 
     try {
       print('Calling login API...');
@@ -38,6 +40,8 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
       if (!mounted) return;
 
       if (response.status.toUpperCase() == 'SUCCESS') {
+        await ApiClient.setAuthToken(response.body.token);
+        if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const AdminScreen()),
         );
@@ -53,12 +57,17 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
         SnackBar(content: Text('Login failed: $e')),
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        ref.read(superAdminLoginLoadingStateProvider.notifier).state = false;
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = ref.watch(superAdminLoginLoadingStateProvider);
+    final obscurePassword =
+        ref.watch(superAdminLoginObscurePasswordStateProvider);
     final isLight = Theme.of(context).brightness == Brightness.light;
     final titleColor =
         isLight ? const Color(0xFF1A2B3C) : const Color(0xFFD7E8F6);
@@ -157,7 +166,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: _passwordController,
-                  obscureText: _obscurePassword,
+                  obscureText: obscurePassword,
                   decoration: InputDecoration(
                     hintText: '••••••••',
                     hintStyle: TextStyle(
@@ -166,13 +175,16 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                     fillColor: inputFill,
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword
+                        obscurePassword
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
                         color: subColor,
                       ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed: () => ref
+                          .read(
+                              superAdminLoginObscurePasswordStateProvider
+                                  .notifier)
+                          .state = !obscurePassword,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -195,7 +207,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _login,
+                    onPressed: isLoading ? null : _login,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primary,
                       foregroundColor: Colors.white,
@@ -204,7 +216,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                       ),
                       elevation: 0,
                     ),
-                    child: _isLoading
+                    child: isLoading
                         ? const SizedBox(
                             width: 24,
                             height: 24,

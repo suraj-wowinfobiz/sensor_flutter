@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../shared/models/threshold_rule.dart';
-import '../providers/super_admin_database_provider.dart';
+import '../providers/super_admin_backend_provider.dart';
 import '../api/analytics_live_api.dart';
 
 class AnalyticsScreen extends StatefulWidget {
@@ -68,7 +68,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<DatabaseProvider>(
+    return Consumer<SuperAdminBackendProvider>(
       builder: (context, db, child) {
         final graphThresholds =
             db.thresholdRulesForGraph(ThresholdGraphTarget.analyticsMain);
@@ -436,7 +436,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _buildFilterPanel(
     BuildContext context,
-    DatabaseProvider db,
+    SuperAdminBackendProvider db,
     int filteredCount,
   ) {
     final isCompact = MediaQuery.of(context).size.width < 1180;

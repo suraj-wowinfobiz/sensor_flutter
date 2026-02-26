@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/device.dart';
-import '../providers/super_admin_database_provider.dart';
+import '../providers/super_admin_backend_provider.dart';
 
 class DevicesScreen extends StatefulWidget {
   const DevicesScreen({super.key});
@@ -34,8 +34,23 @@ class _DevicesScreenState extends State<DevicesScreen> {
   String _zoneFilter = 'all';
   String _locationFilter = 'all';
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
+      await db.loadSites();
+      for (final site in db.sites) {
+        await db.loadZones(site.id);
+      }
+      await db.loadDevices();
+      await db.loadSensors();
+    });
+  }
+
   void _showDeviceModal({Device? device}) {
-    final db = Provider.of<DatabaseProvider>(context, listen: false);
+    final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
     final isLight = Theme.of(context).brightness == Brightness.light;
     final subColor =
         isLight ? const Color(0xFF5A6F7D) : const Color(0xFFAEC4D7);
@@ -322,30 +337,44 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         children: [
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: () {
-                                final provider = Provider.of<DatabaseProvider>(
+                              onPressed: () async {
+                                final provider = Provider.of<SuperAdminBackendProvider>(
                                   context,
                                   listen: false,
                                 );
                                 final status = _dataTransmissionEnabled
                                     ? 'active'
                                     : 'inactive';
-                                if (_editingId == null) {
-                                  provider.create('devices', {
-                                    'device_code': _deviceCode.trim(),
-                                    'site_id': _siteId,
-                                    'zone_id': _zoneId,
-                                    'status': status,
-                                  });
-                                } else {
-                                  provider.update('devices', _editingId!, {
-                                    'device_code': _deviceCode.trim(),
-                                    'site_id': _siteId,
-                                    'zone_id': _zoneId,
-                                    'status': status,
-                                  });
+                                try {
+                                  if (_editingId == null) {
+                                    await provider.create('devices', {
+                                      'device_code': _deviceCode.trim(),
+                                      'serial_number': _serialNumber.trim(),
+                                      'firmware_version': '1.0.0',
+                                      'site_id': _siteId,
+                                      'zone_id': _zoneId,
+                                      'status': status,
+                                    });
+                                  } else {
+                                    await provider.update('devices', _editingId!, {
+                                      'device_code': _deviceCode.trim(),
+                                      'serial_number': _serialNumber.trim(),
+                                      'firmware_version': '1.0.0',
+                                      'site_id': _siteId,
+                                      'zone_id': _zoneId,
+                                      'status': status,
+                                    });
+                                  }
+                                  if (context.mounted) Navigator.pop(context);
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Failed to save device: $e'),
+                                      ),
+                                    );
+                                  }
                                 }
-                                Navigator.pop(context);
                               },
                               style: ElevatedButton.styleFrom(
                                 padding:
@@ -540,10 +569,12 @@ class _DevicesScreenState extends State<DevicesScreen> {
     return '$d/$m/${date.year}';
   }
 
-  void _togglePower(DatabaseProvider db, Device device) {
+  Future<void> _togglePower(SuperAdminBackendProvider db, Device device) async {
     final next = device.status == 'active' ? 'inactive' : 'active';
-    db.update('devices', device.id, {
+    await db.update('devices', device.id, {
       'device_code': device.deviceCode,
+      'serial_number': device.deviceCode,
+      'firmware_version': '1.0.0',
       'site_id': device.siteId,
       'zone_id': device.zoneId,
       'status': next,
@@ -552,7 +583,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
 
   bool _hasWebhook(int index) => index.isEven;
 
-  bool _matchesFilters(DatabaseProvider db, Device device) {
+  bool _matchesFilters(SuperAdminBackendProvider db, Device device) {
     final globalIndex = db.devices.indexOf(device);
     final safeIndex = globalIndex < 0 ? 0 : globalIndex;
     final serial = _serialFor(safeIndex).toLowerCase();
@@ -583,7 +614,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<DatabaseProvider>(
+    return Consumer<SuperAdminBackendProvider>(
       builder: (context, db, child) {
         final devices =
             db.devices.where((d) => _matchesFilters(db, d)).toList();
@@ -926,7 +957,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
   }
 
   Widget _buildGrid(
-      BuildContext context, DatabaseProvider db, List<Device> devices) {
+      BuildContext context, SuperAdminBackendProvider db, List<Device> devices) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
@@ -980,7 +1011,17 @@ class _DevicesScreenState extends State<DevicesScreen> {
               zone: zoneName ?? 'Unknown',
               onEdit: () => _showDeviceModal(device: device),
               onPower: () => _togglePower(db, device),
-              onDelete: () => db.delete('devices', device.id),
+              onDelete: () async {
+                try {
+                  await db.delete('devices', device.id);
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to delete device: $e')),
+                    );
+                  }
+                }
+              },
             );
           },
         );
@@ -989,7 +1030,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
   }
 
   Widget _buildList(
-      BuildContext context, DatabaseProvider db, List<Device> devices) {
+      BuildContext context, SuperAdminBackendProvider db, List<Device> devices) {
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -1090,7 +1131,19 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
-                    onPressed: () => db.delete('devices', device.id),
+                    onPressed: () async {
+                      try {
+                        await db.delete('devices', device.id);
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to delete device: $e'),
+                            ),
+                          );
+                        }
+                      }
+                    },
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
                     visualDensity: VisualDensity.compact,
                   ),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../super_admin/core/responsive/responsive_extensions.dart';
-import '../providers/user_admin_database_provider.dart';
+import '../providers/user_admin_riverpod_provider.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';
 import 'alerts_screen.dart';
@@ -14,14 +14,14 @@ import 'settings_screen.dart';
 import 'user_admin_login_screen.dart';
 import 'users_screen.dart';
 
-class UserAdminScreen extends StatefulWidget {
+class UserAdminScreen extends ConsumerStatefulWidget {
   const UserAdminScreen({super.key});
 
   @override
-  State<UserAdminScreen> createState() => _UserAdminScreenState();
+  ConsumerState<UserAdminScreen> createState() => _UserAdminScreenState();
 }
 
-class _UserAdminScreenState extends State<UserAdminScreen>
+class _UserAdminScreenState extends ConsumerState<UserAdminScreen>
     with SingleTickerProviderStateMixin {
   bool _isMenuOpen = false;
   String _currentView = 'dashboard';
@@ -94,7 +94,7 @@ class _UserAdminScreenState extends State<UserAdminScreen>
   }
 
   List<UserAdminNotificationItem> _notifications() {
-    final db = context.read<UserAdminDatabaseProvider>();
+    final db = ref.read(userAdminDatabaseChangeNotifierProvider);
     final items = db.alerts.where((a) => !a.isResolved).toList()
       ..sort((a, b) => b.triggeredAt.compareTo(a.triggeredAt));
     return items

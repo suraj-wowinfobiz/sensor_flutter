@@ -6,3 +6,19 @@ final engineerDatabaseChangeNotifierProvider =
     ChangeNotifierProvider<EngineerDatabaseProvider>(
   (ref) => EngineerDatabaseProvider(),
 );
+
+final engineerCurrentViewStateProvider =
+    StateProvider<String>((ref) => 'dashboard');
+
+final engineerIsLoadingStateProvider = StateProvider<bool>((ref) => false);
+
+final engineerSelectedDeviceIdStateProvider =
+    StateProvider<String?>((ref) => null);
+
+final engineerSelectedSensorIdStateProvider =
+    StateProvider<String?>((ref) => null);
+
+final engineerLoginLoadingStateProvider = StateProvider<bool>((ref) => false);
+
+final engineerLoginObscurePasswordStateProvider =
+    StateProvider<bool>((ref) => true);

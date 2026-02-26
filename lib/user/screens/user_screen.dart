@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../super_admin/core/responsive/responsive_extensions.dart';
-import '../providers/user_database_provider.dart';
+import '../providers/user_riverpod_provider.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';
 import 'alerts_screen.dart';
@@ -14,14 +14,14 @@ import 'user_login_screen.dart';
 import 'sensors_screen.dart';
 import 'settings_screen.dart';
 
-class UserScreen extends StatefulWidget {
+class UserScreen extends ConsumerStatefulWidget {
   const UserScreen({super.key});
 
   @override
-  State<UserScreen> createState() => _UserScreenState();
+  ConsumerState<UserScreen> createState() => _UserScreenState();
 }
 
-class _UserScreenState extends State<UserScreen>
+class _UserScreenState extends ConsumerState<UserScreen>
     with SingleTickerProviderStateMixin {
   bool _isMenuOpen = false;
   String _currentView = 'dashboard';
@@ -94,7 +94,7 @@ class _UserScreenState extends State<UserScreen>
   }
 
   List<UserNotificationItem> _notifications() {
-    final db = context.read<UserDatabaseProvider>();
+    final db = ref.read(userDatabaseChangeNotifierProvider);
     final items = db.alerts.where((a) => !a.isResolved).toList()
       ..sort((a, b) => b.triggeredAt.compareTo(a.triggeredAt));
     return items

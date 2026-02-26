@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ReportsScreen extends StatelessWidget {
+import '../providers/super_admin_api_riverpod_provider.dart';
+
+class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final reportsAsync = ref.watch(superAdminReportsApiProvider);
+    final reports = reportsAsync.valueOrNull ?? const <Map<String, dynamic>>[];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(18),
@@ -48,9 +53,11 @@ class ReportsScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Theme.of(context).dividerColor),
               ),
-              child: const Text(
-                'No reports generated yet.',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              child: Text(
+                reports.isEmpty
+                    ? 'No reports generated yet.'
+                    : 'Loaded ${reports.length} report(s) from API.',
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
               ),
             ),
           ],

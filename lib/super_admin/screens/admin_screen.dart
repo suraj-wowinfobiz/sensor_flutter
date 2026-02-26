@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../main_page.dart';
 import '../core/responsive/responsive_extensions.dart';
-import '../providers/super_admin_database_provider.dart';
+import '../providers/super_admin_riverpod_provider.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';
 import 'alerts_screen.dart';
@@ -19,14 +19,14 @@ import 'sensors_screen.dart';
 import 'thresholds_screen.dart';
 import 'users_screen.dart';
 
-class AdminScreen extends StatefulWidget {
+class AdminScreen extends ConsumerStatefulWidget {
   const AdminScreen({super.key});
 
   @override
-  State<AdminScreen> createState() => _AdminScreenState();
+  ConsumerState<AdminScreen> createState() => _AdminScreenState();
 }
 
-class _AdminScreenState extends State<AdminScreen>
+class _AdminScreenState extends ConsumerState<AdminScreen>
     with SingleTickerProviderStateMixin {
   bool _isMenuOpen = false;
   String _currentView = 'dashboard';
@@ -98,7 +98,7 @@ class _AdminScreenState extends State<AdminScreen>
   }
 
   List<AdminNotificationItem> _notifications() {
-    final db = context.read<DatabaseProvider>();
+    final db = ref.read(superAdminBackendChangeNotifierProvider);
     final items = db.alerts.where((a) => !a.isResolved).toList()
       ..sort((a, b) => b.triggeredAt.compareTo(a.triggeredAt));
     return items

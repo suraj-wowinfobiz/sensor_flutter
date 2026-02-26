@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/sensor.dart';
-import '../providers/super_admin_database_provider.dart';
+import '../providers/super_admin_backend_provider.dart';
 
 class SensorsScreen extends StatefulWidget {
   const SensorsScreen({super.key});
@@ -34,8 +34,20 @@ class _SensorsScreenState extends State<SensorsScreen> {
   String _locationFilter = 'all';
   final Set<String> _inactiveSensors = {};
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
+      await db.loadSites();
+      await db.loadDevices();
+      await db.loadSensors();
+    });
+  }
+
   void _showSensorModal({Sensor? sensor}) {
-    final db = Provider.of<DatabaseProvider>(context, listen: false);
+    final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
     final isLight = Theme.of(context).brightness == Brightness.light;
     final subColor =
         isLight ? const Color(0xFF5A6F7D) : const Color(0xFFAEC4D7);
@@ -293,25 +305,39 @@ class _SensorsScreenState extends State<SensorsScreen> {
                         children: [
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: () {
-                                final provider = Provider.of<DatabaseProvider>(
+                              onPressed: () async {
+                                final provider = Provider.of<SuperAdminBackendProvider>(
                                   context,
                                   listen: false,
                                 );
-                                if (_editingId == null) {
-                                  provider.create('sensors', {
-                                    'serial_number': _serialNumber.trim(),
-                                    'device_id': _deviceId,
-                                    'sensor_type_id': _sensorTypeId,
-                                  });
-                                } else {
-                                  provider.update('sensors', _editingId!, {
-                                    'serial_number': _serialNumber.trim(),
-                                    'device_id': _deviceId,
-                                    'sensor_type_id': _sensorTypeId,
-                                  });
+                                try {
+                                  if (_editingId == null) {
+                                    await provider.create('sensors', {
+                                      'serial_number': _serialNumber.trim(),
+                                      'device_id': _deviceId,
+                                      'sensor_type_id': _sensorTypeId,
+                                      'status': 'ACTIVE',
+                                      'unit': '',
+                                    });
+                                  } else {
+                                    await provider.update('sensors', _editingId!, {
+                                      'serial_number': _serialNumber.trim(),
+                                      'device_id': _deviceId,
+                                      'sensor_type_id': _sensorTypeId,
+                                      'status': 'ACTIVE',
+                                      'unit': '',
+                                    });
+                                  }
+                                  if (context.mounted) Navigator.pop(context);
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Failed to save sensor: $e'),
+                                      ),
+                                    );
+                                  }
                                 }
-                                Navigator.pop(context);
                               },
                               style: ElevatedButton.styleFrom(
                                 padding:
@@ -496,7 +522,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
         'Y007G'
       ][index % 6]}';
 
-  String _sensorTypeLabel(String id, DatabaseProvider db) {
+  String _sensorTypeLabel(String id, SuperAdminBackendProvider db) {
     return db.sensorTypes
             .where((t) => t.id == id)
             .map((t) => t.name)
@@ -539,7 +565,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
     });
   }
 
-  bool _matchesFilters(DatabaseProvider db, Sensor sensor) {
+  bool _matchesFilters(SuperAdminBackendProvider db, Sensor sensor) {
     final globalIndex = db.sensors.indexOf(sensor);
     final safeIndex = globalIndex < 0 ? 0 : globalIndex;
     final type = _sensorTypeLabel(sensor.sensorTypeId, db);
@@ -578,7 +604,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<DatabaseProvider>(
+    return Consumer<SuperAdminBackendProvider>(
       builder: (context, db, child) {
         final sensors =
             db.sensors.where((s) => _matchesFilters(db, s)).toList();
@@ -726,7 +752,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
 
   Widget _buildFiltersPanel(
     BuildContext context,
-    DatabaseProvider db,
+    SuperAdminBackendProvider db,
     int filteredCount,
     int totalCount,
   ) {
@@ -945,7 +971,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
 
   Widget _buildGrid(
     BuildContext context,
-    DatabaseProvider db,
+    SuperAdminBackendProvider db,
     List<Sensor> sensors,
   ) {
     return LayoutBuilder(
@@ -1007,7 +1033,17 @@ class _SensorsScreenState extends State<SensorsScreen> {
               status: isActive ? 'active' : 'inactive',
               onEdit: () => _showSensorModal(sensor: sensor),
               onPower: () => _togglePower(sensor.id),
-              onDelete: () => db.delete('sensors', sensor.id),
+              onDelete: () async {
+                try {
+                  await db.delete('sensors', sensor.id);
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to delete sensor: $e')),
+                    );
+                  }
+                }
+              },
             );
           },
         );
@@ -1017,7 +1053,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
 
   Widget _buildList(
     BuildContext context,
-    DatabaseProvider db,
+    SuperAdminBackendProvider db,
     List<Sensor> sensors,
   ) {
     return ListView.separated(
@@ -1136,7 +1172,19 @@ class _SensorsScreenState extends State<SensorsScreen> {
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
-                    onPressed: () => db.delete('sensors', sensor.id),
+                    onPressed: () async {
+                      try {
+                        await db.delete('sensors', sensor.id);
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to delete sensor: $e'),
+                            ),
+                          );
+                        }
+                      }
+                    },
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
                     visualDensity: VisualDensity.compact,
                   ),

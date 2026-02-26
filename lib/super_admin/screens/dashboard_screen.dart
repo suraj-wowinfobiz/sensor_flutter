@@ -3,22 +3,23 @@ import 'dart:math';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../shared/models/threshold_rule.dart';
-import '../providers/super_admin_database_provider.dart';
+import '../providers/super_admin_api_riverpod_provider.dart';
+import '../providers/super_admin_riverpod_provider.dart';
 import '../services/analytics_sse_service.dart';
 
-class DashboardScreen extends StatefulWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   final bool embeddedScroll;
 
   const DashboardScreen({super.key, this.embeddedScroll = false});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   final AnalyticsSseService _sseService = AnalyticsSseService();
   final List<FlSpot> _liveData = [];
   int _dataPointIndex = 0;
@@ -61,47 +62,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final content = Consumer<DatabaseProvider>(
-      builder: (context, db, child) {
-        final activeAlerts = db.getActiveAlerts().length;
-        final avgTilt = db.sensors.isEmpty
-            ? 0.0
-            : db.sensors
-                    .map((s) => s.lastReading.abs())
-                    .reduce((a, b) => a + b) /
-                db.sensors.length;
-        final maxTilt = db.sensors.isEmpty
-            ? 0.0
-            : db.sensors
-                .map((s) => s.lastReading.abs())
-                .reduce((a, b) => max(a, b));
+    final db = ref.watch(superAdminBackendChangeNotifierProvider);
+    final statsApi = ref.watch(superAdminDashboardStatsApiProvider).valueOrNull;
+    final activeAlerts =
+        (statsApi?['activeAlerts'] as num?)?.toInt() ?? db.getActiveAlerts().length;
+    final avgTilt = (statsApi?['averageTilt'] as num?)?.toDouble() ??
+        (db.sensors.isEmpty
+        ? 0.0
+        : db.sensors.map((s) => s.lastReading.abs()).reduce((a, b) => a + b) /
+            db.sensors.length);
+    final maxTilt = (statsApi?['maxTilt'] as num?)?.toDouble() ??
+        (db.sensors.isEmpty
+        ? 0.0
+        : db.sensors.map((s) => s.lastReading.abs()).reduce((a, b) => max(a, b)));
 
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildTopStats(context, avgTilt, maxTilt, activeAlerts),
-              const SizedBox(height: 18),
-              _buildRealtimeCard(context),
-              const SizedBox(height: 18),
-              _buildAnalyticsGrid(context),
-              const SizedBox(height: 18),
-              _buildScatterCard(context),
-              const SizedBox(height: 18),
-              _buildSensorReadingsCard(context),
-              const SizedBox(height: 18),
-              _buildBottomLiveStats(context),
-              const SizedBox(height: 18),
-              _buildMultiSensorComparison(context),
-              const SizedBox(height: 18),
-              _buildStatisticalAnalysis(context),
-              const SizedBox(height: 18),
-              _buildHourlyHeatmap(context),
-            ],
-          ),
-        );
-      },
+    final content = Padding(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildTopStats(context, avgTilt, maxTilt, activeAlerts),
+          const SizedBox(height: 18),
+          _buildRealtimeCard(context),
+          const SizedBox(height: 18),
+          _buildAnalyticsGrid(context),
+          const SizedBox(height: 18),
+          _buildScatterCard(context),
+          const SizedBox(height: 18),
+          _buildSensorReadingsCard(context),
+          const SizedBox(height: 18),
+          _buildBottomLiveStats(context),
+          const SizedBox(height: 18),
+          _buildMultiSensorComparison(context),
+          const SizedBox(height: 18),
+          _buildStatisticalAnalysis(context),
+          const SizedBox(height: 18),
+          _buildHourlyHeatmap(context),
+        ],
+      ),
     );
 
     if (widget.embeddedScroll) return content;
@@ -1409,7 +1407,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     BuildContext context,
     ThresholdGraphTarget target,
   ) {
-    final db = context.watch<DatabaseProvider>();
+    final db = ref.watch(superAdminBackendChangeNotifierProvider);
     final rules = db.thresholdRulesForGraph(target);
 
     return rules

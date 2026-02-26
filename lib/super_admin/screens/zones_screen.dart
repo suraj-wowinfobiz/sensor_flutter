@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/zone.dart';
-import '../providers/super_admin_database_provider.dart';
+import '../providers/super_admin_backend_provider.dart';
 import '../widgets/crud_modal.dart';
 import '../widgets/crud_table.dart';
 
@@ -18,8 +18,21 @@ class _ZonesScreenState extends State<ZonesScreen> {
   String _name = '';
   String _siteId = '';
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
+      await db.loadSites();
+      for (final site in db.sites) {
+        await db.loadZones(site.id);
+      }
+    });
+  }
+
   void _showZoneModal({Zone? zone}) {
-    final db = Provider.of<DatabaseProvider>(context, listen: false);
+    final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
 
     if (zone != null) {
       _editingId = zone.id;
@@ -55,20 +68,28 @@ class _ZonesScreenState extends State<ZonesScreen> {
                     .toList(),
               },
             ],
-            onSave: () {
-              final db = Provider.of<DatabaseProvider>(context, listen: false);
-              if (_editingId == null) {
-                db.create('zones', {
-                  'name': _name,
-                  'site_id': _siteId,
-                });
-              } else {
-                db.update('zones', _editingId!, {
-                  'name': _name,
-                  'site_id': _siteId,
-                });
+            onSave: () async {
+              final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
+              try {
+                if (_editingId == null) {
+                  await db.create('zones', {
+                    'name': _name,
+                    'site_id': _siteId,
+                  });
+                } else {
+                  await db.update('zones', _editingId!, {
+                    'name': _name,
+                    'site_id': _siteId,
+                  });
+                }
+                if (context.mounted) Navigator.pop(context);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to save zone: $e')),
+                  );
+                }
               }
-              Navigator.pop(context);
             },
             onCancel: () => Navigator.pop(context),
           );
@@ -79,7 +100,7 @@ class _ZonesScreenState extends State<ZonesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<DatabaseProvider>(
+    return Consumer<SuperAdminBackendProvider>(
       builder: (context, db, child) {
         return CrudTable(
           title: 'Zones',
@@ -93,7 +114,17 @@ class _ZonesScreenState extends State<ZonesScreen> {
               .toList(),
           onAdd: () => _showZoneModal(),
           onEdit: (index) => _showZoneModal(zone: db.zones[index]),
-          onDelete: (index) => db.delete('zones', db.zones[index].id),
+          onDelete: (index) async {
+            try {
+              await db.delete('zones', db.zones[index].id);
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to delete zone: $e')),
+                );
+              }
+            }
+          },
         );
       },
     );

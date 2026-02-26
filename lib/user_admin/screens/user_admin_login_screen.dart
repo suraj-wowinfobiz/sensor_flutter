@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../user_admin_page.dart';
-import '../../super_admin/widgets/login_preferences_button.dart';
+import '../providers/user_admin_riverpod_provider.dart';
 
-class UserAdminLoginScreen extends StatefulWidget {
+class UserAdminLoginScreen extends ConsumerStatefulWidget {
   const UserAdminLoginScreen({super.key});
 
   @override
-  State<UserAdminLoginScreen> createState() => _UserAdminLoginScreenState();
+  ConsumerState<UserAdminLoginScreen> createState() =>
+      _UserAdminLoginScreenState();
 }
 
-class _UserAdminLoginScreenState extends State<UserAdminLoginScreen> {
+class _UserAdminLoginScreenState extends ConsumerState<UserAdminLoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _isLoading = false;
-  bool _obscurePassword = true;
 
   void _login() {
     if (_emailController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
@@ -24,11 +24,11 @@ class _UserAdminLoginScreenState extends State<UserAdminLoginScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    ref.read(userAdminLoginLoadingStateProvider.notifier).state = true;
 
     Future.delayed(const Duration(milliseconds: 500), () {
       if (!mounted) return;
-      setState(() => _isLoading = false);
+      ref.read(userAdminLoginLoadingStateProvider.notifier).state = false;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const UserAdminPage()),
       );
@@ -37,6 +37,9 @@ class _UserAdminLoginScreenState extends State<UserAdminLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = ref.watch(userAdminLoginLoadingStateProvider);
+    final obscurePassword =
+        ref.watch(userAdminLoginObscurePasswordStateProvider);
     final isLight = Theme.of(context).brightness == Brightness.light;
     final titleColor = isLight ? const Color(0xFF1A2B3C) : const Color(0xFFD7E8F6);
     final subColor = isLight ? const Color(0xFF5F7285) : const Color(0xFF9DB7D2);
@@ -130,7 +133,7 @@ class _UserAdminLoginScreenState extends State<UserAdminLoginScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: _passwordController,
-                  obscureText: _obscurePassword,
+                  obscureText: obscurePassword,
                   decoration: InputDecoration(
                     hintText: '••••••••',
                     hintStyle: TextStyle(color: subColor, fontSize: 20, letterSpacing: 2),
@@ -138,10 +141,12 @@ class _UserAdminLoginScreenState extends State<UserAdminLoginScreen> {
                     fillColor: inputFill,
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                         color: subColor,
                       ),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed: () => ref
+                          .read(userAdminLoginObscurePasswordStateProvider.notifier)
+                          .state = !obscurePassword,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -163,7 +168,7 @@ class _UserAdminLoginScreenState extends State<UserAdminLoginScreen> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _login,
+                    onPressed: isLoading ? null : _login,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primary,
                       foregroundColor: Colors.white,
@@ -172,7 +177,7 @@ class _UserAdminLoginScreenState extends State<UserAdminLoginScreen> {
                       ),
                       elevation: 0,
                     ),
-                    child: _isLoading
+                    child: isLoading
                         ? const SizedBox(
                             width: 24,
                             height: 24,

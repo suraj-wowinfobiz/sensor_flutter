@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/site.dart';
-import '../providers/super_admin_database_provider.dart';
+import '../providers/super_admin_backend_provider.dart';
 import '../widgets/crud_modal.dart';
 import '../widgets/crud_table.dart';
 
@@ -19,8 +19,19 @@ class _SitesScreenState extends State<SitesScreen> {
   String _location = '';
   String _organizationId = '';
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
+      await db.loadOrganizations();
+      await db.loadSites();
+    });
+  }
+
   void _showSiteModal({Site? site}) {
-    final db = Provider.of<DatabaseProvider>(context, listen: false);
+    final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
 
     if (site != null) {
       _editingId = site.id;
@@ -66,22 +77,30 @@ class _SitesScreenState extends State<SitesScreen> {
                     .toList(),
               },
             ],
-            onSave: () {
-              final db = Provider.of<DatabaseProvider>(context, listen: false);
-              if (_editingId == null) {
-                db.create('sites', {
-                  'name': _name,
-                  'location': _location,
-                  'organization_id': _organizationId,
-                });
-              } else {
-                db.update('sites', _editingId!, {
-                  'name': _name,
-                  'location': _location,
-                  'organization_id': _organizationId,
-                });
+            onSave: () async {
+              final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
+              try {
+                if (_editingId == null) {
+                  await db.create('sites', {
+                    'name': _name,
+                    'location': _location,
+                    'organization_id': _organizationId,
+                  });
+                } else {
+                  await db.update('sites', _editingId!, {
+                    'name': _name,
+                    'location': _location,
+                    'organization_id': _organizationId,
+                  });
+                }
+                if (context.mounted) Navigator.pop(context);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to save site: $e')),
+                  );
+                }
               }
-              Navigator.pop(context);
             },
             onCancel: () => Navigator.pop(context),
           );
@@ -96,7 +115,7 @@ class _SitesScreenState extends State<SitesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<DatabaseProvider>(
+    return Consumer<SuperAdminBackendProvider>(
       builder: (context, db, child) {
         return CrudTable(
           title: 'Sites',
@@ -114,7 +133,17 @@ class _SitesScreenState extends State<SitesScreen> {
               .toList(),
           onAdd: () => _showSiteModal(),
           onEdit: (index) => _showSiteModal(site: db.sites[index]),
-          onDelete: (index) => db.delete('sites', db.sites[index].id),
+          onDelete: (index) async {
+            try {
+              await db.delete('sites', db.sites[index].id);
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to delete site: $e')),
+                );
+              }
+            }
+          },
         );
       },
     );

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../super_admin/core/responsive/responsive_extensions.dart';
-import '../providers/engineer_database_provider.dart';
+import '../providers/engineer_riverpod_provider.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';
 import 'alerts_screen.dart';
@@ -14,14 +14,14 @@ import 'devices_screen.dart';
 import 'engineer_login_screen.dart';
 import 'sensors_screen.dart';
 
-class EngineerScreen extends StatefulWidget {
+class EngineerScreen extends ConsumerStatefulWidget {
   const EngineerScreen({super.key});
 
   @override
-  State<EngineerScreen> createState() => _EngineerScreenState();
+  ConsumerState<EngineerScreen> createState() => _EngineerScreenState();
 }
 
-class _EngineerScreenState extends State<EngineerScreen>
+class _EngineerScreenState extends ConsumerState<EngineerScreen>
     with SingleTickerProviderStateMixin {
   bool _isMenuOpen = false;
   String _currentView = 'dashboard';
@@ -94,7 +94,7 @@ class _EngineerScreenState extends State<EngineerScreen>
   }
 
   List<EngineerNotificationItem> _notifications() {
-    final db = context.read<EngineerDatabaseProvider>();
+    final db = ref.read(engineerDatabaseChangeNotifierProvider);
     final items = db.alerts.where((a) => !a.isResolved).toList()
       ..sort((a, b) => b.triggeredAt.compareTo(a.triggeredAt));
     return items

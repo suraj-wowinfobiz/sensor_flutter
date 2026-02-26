@@ -1,1105 +1,535 @@
-# API Endpoints Documentation
+# Services API Documentation (Frontend Integration)
 
-This document outlines all possible API endpoints for the Industrial Sensor Monitoring System.
+This document is generated from current controller and DTO code in this repository.
 
-## Base URL
-```
-https://api.monitoring-system.com/v1
-```
+Base gateway URL:
+- `http://<host>:8091`
 
----
+All paths below are gateway paths.
 
-## Authentication
+## 1. Authentication Service
 
-### POST /auth/login
-Login to the system.
+Base paths:
+- `/api/v1/auth`
+- `/api/v1/super-admins`
+- `/api/v1/admins`
+- `/api/v1/users`
+- `/api/v1/vendors`
+- `/api/v1/vendors-engineer`
 
-**Request:**
+Response envelope (`MessageResponseDTO`):
 ```json
 {
-  "email": "user@example.com",
-  "password": "password123"
+  "message": "string",
+  "status": "SUCCESS|FAILED",
+  "body": {}
 }
 ```
 
-**Response:**
+Request DTOs:
+- `LoginRequest`: `{ "email": "string", "password": "string", "role": "string" }`
+- `OtpRequest`: `{ "email": "string" }`
+- `SuperAdminOtpCreateRequest`: `{ "name": "string", "email": "string", "password": "string", "otp": "string" }`
+- `SuperAdminCreateRequest`: `{ "name": "string", "email": "string", "password": "string" }`
+- `AdminCreateRequest`: `{ "name": "string", "email": "string", "password": "string", "maxUsersAllowed": 0, "organizationId": 0 }`
+- `UserCreateRequest`: `{ "name": "string", "email": "string", "password": "string", "organizationId": 0 }`
+- `VendorCreateRequest`: `{ "name": "string", "email": "string", "password": "string", "organizationId": 0 }`
+- `VendorEngineerCreateRequest`: `{ "name": "string", "email": "string", "password": "string", "organizationId": 0 }`
+- `AccessAssignmentRequest`: `{ "principalType": "string", "principalId": 0, "siteId": 0, "zoneId": 0 }`
+
+Key endpoint contracts:
+- `POST /api/v1/auth/login`
+  - Request: `LoginRequest`
+  - Response body commonly contains `AuthResponse`: `{ "principalId": 0, "principalType": "string", "token": "jwt" }`
+- `POST /api/v1/auth/logout`
+  - Request: no body
+  - Response: `MessageResponseDTO`
+- `POST /api/v1/auth/otp/super-admin`
+  - Request: `OtpRequest`
+  - Response: `MessageResponseDTO`
+- `POST /api/v1/auth/verified`
+  - Request: `SuperAdminOtpCreateRequest`
+  - Response: `MessageResponseDTO`
+- `POST /api/v1/super-admins`
+  - Request: `SuperAdminCreateRequest`
+  - Response: `MessageResponseDTO`
+- `POST /api/v1/super-admins/admins`
+  - Request: `AdminCreateRequest`
+  - Response: `MessageResponseDTO`
+- `POST /api/v1/super-admins/admins/{adminId}/users`
+  - Request: `UserCreateRequest`
+  - Response: `MessageResponseDTO`
+- `POST /api/v1/super-admins/access/assign`
+  - Request: `AccessAssignmentRequest`
+  - Response: `MessageResponseDTO`
+- `POST /api/v1/super-admins/access/revoke`
+  - Request: `AccessAssignmentRequest`
+  - Response: `MessageResponseDTO`
+- `POST /api/v1/admins/users`
+  - Request: `UserCreateRequest`
+  - Response: `MessageResponseDTO`
+- `POST /api/v1/admins/access/assign`
+  - Request: `AccessAssignmentRequest`
+  - Response: `MessageResponseDTO`
+- `POST /api/v1/admins/access/revoke`
+  - Request: `AccessAssignmentRequest`
+  - Response: `MessageResponseDTO`
+- `POST /api/v1/users`
+  - Request: `UserCreateRequest`
+  - Response: `MessageResponseDTO`
+- `POST /api/v1/vendors`
+  - Request: `VendorCreateRequest`
+  - Response: `MessageResponseDTO`
+- `POST /api/v1/vendors-engineer/engineers`
+  - Request: `VendorEngineerCreateRequest`
+  - Response: `MessageResponseDTO`
+
+## 2. Organization Service
+
+Base paths:
+- `/api/v1/org`
+- `/api/v1/org/site`
+- `/api/v1/org/zone`
+
+Response envelope (`MessageResponse<T>`):
 ```json
 {
-  "success": true,
-  "data": {
-    "user": {
-      "id": "USER-1234567890",
-      "name": "John Doe",
-      "email": "user@example.com",
-      "role": "user_admin",
-      "organizationId": "ORG-1234567890",
-      "isActive": true,
-      "createdAt": "2024-01-15T10:30:00Z",
-      "lastLogin": "2024-01-20T14:22:00Z",
-      "avatar": "https://avatar.url/user.jpg"
-    },
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-  }
+  "message": "string",
+  "status": true,
+  "body": {}
 }
 ```
 
-### POST /auth/logout
-Logout from the system.
+Request DTOs:
+- `CreateOrganizationRequest`: `{ "name": "string", "email": "string" }`
+- `CreateSiteRequest`: `{ "orgId": "uuid", "name": "string", "location": "string" }`
+- `CreateZoneRequest`: `{ "siteId": "uuid", "name": "string" }`
 
-**Response:**
+Entity response shapes:
+- Organization: `{ "organizationId": "uuid", "name": "string", "email": "string", "status": "ACTIVE|INACTIVE", "createdAt": "timestamp", "sites": [] }`
+- Site: `{ "sitesID": "uuid", "organization": {}, "name": "string", "location": "string", "createdAt": "timestamp", "zones": [] }`
+- Zone: `{ "zoneId": "uuid", "site": {}, "name": "string" }`
+
+Endpoints:
+- `GET /api/v1/org/organization`
+- `GET /api/v1/org/organization/{orgId}`
+- `POST /api/v1/org/organization` with `CreateOrganizationRequest`
+- `PUT /api/v1/org/organization/{orgId}` with `CreateOrganizationRequest`
+- `DELETE /api/v1/org/organization/{orgId}`
+- `GET /api/v1/org/organization/{orgId}/sites`
+- `POST /api/v1/org/organization/{orgId}/sites` with `CreateSiteRequest`
+- `GET /api/v1/org/site/`
+- `GET /api/v1/org/site/{siteId}`
+- `POST /api/v1/org/site/` with `CreateSiteRequest`
+- `PUT /api/v1/org/site/{siteId}` with `CreateSiteRequest`
+- `DELETE /api/v1/org/site/{siteId}`
+- `GET /api/v1/org/site/{siteId}/zones`
+- `POST /api/v1/org/site/{siteId}/zones` with `CreateZoneRequest`
+- `GET /api/v1/org/zone/?siteId={siteId}`
+- `GET /api/v1/org/zone/{zoneId}`
+- `POST /api/v1/org/zone/` with `CreateZoneRequest`
+- `PUT /api/v1/org/zone/{zoneId}` with `CreateZoneRequest`
+- `DELETE /api/v1/org/zone/{zoneId}`
+
+## 3. Device Management Service
+
+Base paths:
+- `/api/v1/device`
+- `/api/v1/sensors`
+- `/api/v1/sensor-parameter`
+- `/api/v1/sensor-type`
+- `/api/v1/ingestion` (device-side ingestion API)
+
+Request/response DTOs:
+- `DeviceDTO`: `{ "id":"uuid", "siteId":"uuid", "serialNumber":"string", "firmwareVersion":"string", "status":"string", "lastHeartBeat":"datetime" }`
+- `SensorDTO`: `{ "sensorId":"uuid", "deviceId":"uuid", "sensorTypeId":"uuid", "name":"string", "status":"string", "unit":"string" }`
+- `SensorParameterDTO`: `{ "sensorParameterId":"uuid", "sensorTypeId":"uuid", "name":"string", "unit":"string", "minValue":0.0, "maxValue":0.0 }`
+- `SensorTypeDTO`: `{ "sensorTypeId":"uuid", "name":"string", "category":"string", "description":"string" }`
+- `SensorReadingDTO`: `{ "readingId":"uuid", "sensorId":"uuid", "sensorParameterId":"uuid", "value":0.0, "timestamp":"iso", "ingestionTime":"iso" }`
+
+Endpoints:
+- Device
+  - `POST /api/v1/device/devices` body `DeviceDTO` -> `DeviceDTO`
+  - `GET /api/v1/device/devices/{deviceId}` -> `DeviceDTO`
+  - `GET /api/v1/device/sites/{siteId}/devices` -> `DeviceDTO[]`
+  - `PUT /api/v1/device/devices/{deviceId}` body `DeviceDTO` -> `DeviceDTO`
+  - `DELETE /api/v1/device/devices/{deviceId}` -> no body
+- Sensor
+  - `POST /api/v1/sensors/devices/{deviceId}/sensors` body `SensorDTO` -> `SensorDTO`
+  - `GET /api/v1/sensors/sensors/{sensorId}` -> `SensorDTO`
+  - `GET /api/v1/sensors/devices/{deviceId}/sensors` -> `SensorDTO[]`
+  - `PUT /api/v1/sensors/sensors/{sensorId}` body `SensorDTO` -> `SensorDTO`
+  - `DELETE /api/v1/sensors/sensors/{sensorId}` -> no body
+- Sensor Parameter
+  - `POST /api/v1/sensor-parameter/sensor-types/{typeId}/parameters` body `SensorParameterDTO` -> `SensorParameterDTO`
+  - `GET /api/v1/sensor-parameter/sensor-types/{typeId}/parameters` -> `SensorParameterDTO[]`
+  - `PUT /api/v1/sensor-parameter/parameters/{parameterId}` body `SensorParameterDTO` -> `SensorParameterDTO`
+  - `DELETE /api/v1/sensor-parameter/parameters/{parameterId}` -> no body
+- Sensor Type
+  - `POST /api/v1/sensor-type/sensor-types` body `SensorTypeDTO` -> `SensorTypeDTO`
+  - `GET /api/v1/sensor-type/sensor-types` -> `SensorTypeDTO[]`
+  - `GET /api/v1/sensor-type/sensor-types/{typeId}` -> `SensorTypeDTO`
+  - `PUT /api/v1/sensor-type/sensor-types/{typeId}` body `SensorTypeDTO` -> `SensorTypeDTO`
+  - `DELETE /api/v1/sensor-type/sensor-types/{typeId}` -> no body
+- Device Ingestion
+  - `POST /api/v1/ingestion/readings` body `SensorReadingDTO` -> `SensorReadingDTO`
+  - `POST /api/v1/ingestion/readings/batch` body `SensorReadingDTO[]` -> `SensorReadingDTO[]`
+  - `GET /api/v1/ingestion/readings?sensorId=&from=&to=` -> `SensorReadingDTO[]`
+  - `GET /api/v1/ingestion/readings/{readingId}` -> `SensorReadingDTO`
+  - `GET /api/v1/ingestion/health` -> `{ "status":"UP", ... }`
+
+## 4. Ingestion Service
+
+Base path:
+- `/api/v1/ingestion`
+
+Primary response DTOs:
+- `SensorReadingResponse`: `{ "status":"SUCCESS", "message":"string", "readingId":"uuid" }`
+- `SensorReadingView`: `{ "readingId":"uuid", "sensorId":"string", "timestamp":"iso", "parameters":{} }`
+
+Input format:
+- Main ingest endpoint accepts JSON / text / form / query values and normalizes payload.
+- Alias ingest route values: `""`, `/`, `/stream`, `/esp32`, `/readings`, `/sensor-data`
+
+Endpoints:
+- `POST /api/v1/ingestion` (also aliases above)
+  - Body can be JSON object, form-like text, or plain text.
+  - Response: `SensorReadingResponse`
+- `GET /api/v1/ingestion/readings?sensorId=&from=&to=` -> `SensorReadingView[]`
+- `GET /api/v1/ingestion/readings/getall` -> `SensorReadingView[]`
+- `GET /api/v1/ingestion/readings/{readingId}` -> `SensorReadingView`
+- `GET /api/v1/ingestion/readings/live` -> `text/event-stream` SSE
+- `GET /api/v1/ingestion/health` -> `{ "status":"UP", "storedReadings": <number> }`
+
+## 5. Processing Service
+
+Base path:
+- `/api/v1/processing`
+
+Response envelope (`ProcessDataResponse<T>`):
 ```json
 {
-  "success": true,
-  "message": "Logged out successfully"
+  "message": "string",
+  "status": true,
+  "body": {}
 }
 ```
 
----
-
-## Users
-
-### GET /users
-Get all users (requires: user_admin or super_admin).
-
-**Query Parameters:**
-- `role` (optional): Filter by role (super_admin, installation_engineer, user_admin, user, vendor)
-- `status` (optional): Filter by status (active, inactive)
-- `search` (optional): Search by name or email
-- `organizationId` (optional): Filter by organization
-
-**Response:**
+Input payload accepted for processing:
 ```json
 {
-  "success": true,
-  "data": [
-    {
-      "id": "USER-1234567890",
-      "name": "John Doe",
-      "email": "john@example.com",
-      "role": "user",
-      "organizationId": "ORG-1234567890",
-      "isActive": true,
-      "createdAt": "2024-01-15T10:30:00Z",
-      "lastLogin": "2024-01-20T14:22:00Z",
-      "accessControl": {
-        "organizationId": "ORG-1234567890",
-        "siteIds": ["SITE-001", "SITE-002"],
-        "zoneIds": ["ZONE-001"],
-        "sensorIds": ["SENSOR-001"],
-        "hasFullOrganizationAccess": false
-      }
-    }
-  ],
-  "total": 1
+  "dataType": "accelerometer|tiltmeter|vibration|...",
+  "sensorId": "uuid|string",
+  "readingId": "uuid|string",
+  "timestamp": "iso|epoch",
+  "parameters": {}
 }
 ```
 
-### GET /users/:id
-Get user by ID.
+Endpoints:
+- `POST /api/v1/processing/process` body `Map<String,Object>` -> `ProcessDataResponse`
+- `GET /api/v1/processing/readings?sensorId=&from=&to=` -> `ProcessDataResponse`
+- `GET /api/v1/processing/readings/{readingId}` -> `ProcessDataResponse`
+- `GET /api/v1/processing/readings/live` -> `text/event-stream` SSE
+- `POST /api/v1/processing/recalculate/{readingId}` -> `ProcessDataResponse`
+- `POST /api/v1/processing/recalculate?sensorId=&from=&to=` -> `ProcessDataResponse`
+- `GET /api/v1/processing/kafka/status` -> `ProcessDataResponse`
+- `GET /api/v1/processing/kafka/threshold-publish-status` -> `ProcessDataResponse`
+- `GET /api/v1/processing/kafka/probe?timeoutMs=3000&maxRecords=5` -> `ProcessDataResponse`
 
-**Response:**
+## 6. Threshold Alert Service
+
+Base paths:
+- `/api/v1/alerts`
+- `/api/v1/thresholds`
+
+Response envelope (`MessageResponse<T>`):
 ```json
 {
-  "success": true,
-  "data": {
-    "id": "USER-1234567890",
-    "name": "John Doe",
-    "email": "john@example.com",
-    "role": "user",
-    "organizationId": "ORG-1234567890",
-    "isActive": true,
-    "createdAt": "2024-01-15T10:30:00Z",
-    "profile": {
-      "phone": "+1234567890",
-      "department": "Operations",
-      "title": "Senior Operator",
-      "timezone": "UTC",
-      "language": "en",
-      "notifications": {
-        "email": true,
-        "sms": true,
-        "whatsapp": false,
-        "push": true,
-        "alertTypes": {
-          "critical": true,
-          "warning": true,
-          "info": false
-        },
-        "deviceUpdates": true,
-        "systemNotifications": true,
-        "dailyDigest": false
-      }
-    }
-  }
+  "message": "string",
+  "status": true,
+  "body": {}
 }
 ```
 
-### POST /users
-Create new user (requires: user_admin or super_admin).
-
-**Request:**
-```json
-{
-  "name": "Jane Smith",
-  "email": "jane@example.com",
-  "role": "user",
-  "organizationId": "ORG-1234567890",
-  "accessControl": {
-    "siteIds": ["SITE-001"],
-    "zoneIds": ["ZONE-001"],
-    "sensorIds": ["SENSOR-001"],
-    "hasFullOrganizationAccess": false
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "USER-9876543210",
-    "name": "Jane Smith",
-    "email": "jane@example.com",
-    "role": "user",
-    "organizationId": "ORG-1234567890",
-    "isActive": true,
-    "createdAt": "2024-01-20T15:45:00Z"
-  }
-}
-```
-
-### PUT /users/:id
-Update user (requires: user_admin or super_admin).
-
-**Request:**
-```json
-{
-  "name": "Jane Smith Updated",
-  "isActive": true,
-  "accessControl": {
-    "siteIds": ["SITE-001", "SITE-002"],
-    "zoneIds": ["ZONE-001", "ZONE-002"],
-    "sensorIds": []
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "USER-9876543210",
-    "name": "Jane Smith Updated",
-    "isActive": true,
-    "updatedAt": "2024-01-21T09:15:00Z"
-  }
-}
-```
-
-### DELETE /users/:id
-Delete user (requires: super_admin).
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "User deleted successfully"
-}
-```
-
----
-
-## Organizations
-
-### GET /organizations
-Get all organizations.
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "ORG-1234567890",
-      "name": "Acme Corporation",
-      "contactEmail": "contact@acme.com",
-      "createdAt": "2024-01-01T00:00:00Z"
-    }
-  ]
-}
-```
-
-### POST /organizations
-Create organization (requires: super_admin).
-
-**Request:**
-```json
-{
-  "name": "New Corp",
-  "contactEmail": "info@newcorp.com"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "ORG-9876543210",
-    "name": "New Corp",
-    "contactEmail": "info@newcorp.com",
-    "createdAt": "2024-01-20T16:00:00Z"
-  }
-}
-```
-
-### PUT /organizations/:id
-Update organization.
-
-**Request:**
-```json
-{
-  "name": "Updated Corp Name",
-  "contactEmail": "contact@updated.com"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "ORG-9876543210",
-    "name": "Updated Corp Name",
-    "contactEmail": "contact@updated.com",
-    "updatedAt": "2024-01-21T10:30:00Z"
-  }
-}
-```
-
-### DELETE /organizations/:id
-Delete organization (requires: super_admin).
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Organization and all associated data deleted"
-}
-```
-
----
-
-## Sites
-
-### GET /sites
-Get all sites.
-
-**Query Parameters:**
-- `organizationId` (optional): Filter by organization
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "SITE-1234567890",
-      "name": "Manufacturing Plant A",
-      "organizationId": "ORG-1234567890",
-      "location": "New York, NY",
-      "createdAt": "2024-01-05T08:00:00Z"
-    }
-  ]
-}
-```
-
-### POST /sites
-Create site.
-
-**Request:**
-```json
-{
-  "name": "Plant B",
-  "organizationId": "ORG-1234567890",
-  "location": "Los Angeles, CA"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "SITE-9876543210",
-    "name": "Plant B",
-    "organizationId": "ORG-1234567890",
-    "location": "Los Angeles, CA",
-    "createdAt": "2024-01-20T16:30:00Z"
-  }
-}
-```
-
-### PUT /sites/:id
-Update site.
-
-**Request:**
-```json
-{
-  "name": "Plant B Updated",
-  "location": "San Francisco, CA"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "SITE-9876543210",
-    "name": "Plant B Updated",
-    "location": "San Francisco, CA",
-    "updatedAt": "2024-01-21T11:00:00Z"
-  }
-}
-```
-
-### DELETE /sites/:id
-Delete site.
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Site deleted successfully"
-}
-```
-
----
-
-## Zones
-
-### GET /zones
-Get all zones.
-
-**Query Parameters:**
-- `siteId` (optional): Filter by site
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "ZONE-1234567890",
-      "name": "Production Floor",
-      "siteId": "SITE-1234567890",
-      "description": "Main production area"
-    }
-  ]
-}
-```
-
-### POST /zones
-Create zone.
-
-**Request:**
-```json
-{
-  "name": "Storage Area",
-  "siteId": "SITE-1234567890",
-  "description": "Temperature-controlled storage"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "ZONE-9876543210",
-    "name": "Storage Area",
-    "siteId": "SITE-1234567890",
-    "description": "Temperature-controlled storage"
-  }
-}
-```
-
----
-
-## Locations
-
-### GET /locations
-Get all locations.
-
-**Query Parameters:**
-- `zoneId` (optional): Filter by zone
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "LOC-1234567890",
-      "name": "Sector A1",
-      "zoneId": "ZONE-1234567890",
-      "coordinates": {
-        "lat": 40.7128,
-        "lng": -74.0060
-      }
-    }
-  ]
-}
-```
-
-### POST /locations
-Create location.
-
-**Request:**
-```json
-{
-  "name": "Sector B2",
-  "zoneId": "ZONE-1234567890",
-  "coordinates": {
-    "lat": 40.7589,
-    "lng": -73.9851
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "LOC-9876543210",
-    "name": "Sector B2",
-    "zoneId": "ZONE-1234567890",
-    "coordinates": {
-      "lat": 40.7589,
-      "lng": -73.9851
-    }
-  }
-}
-```
-
----
-
-## Devices
-
-### GET /devices
-Get all devices.
-
-**Query Parameters:**
-- `status` (optional): Filter by status (active, offline, warning, error)
-- `locationId` (optional): Filter by location
-- `search` (optional): Search by device ID or serial number
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "DEV-1234567890",
-      "deviceId": "DVC-2024-001",
-      "serialNumber": "SN-ABC123",
-      "macId": "00:1B:44:11:3A:B7",
-      "ipUrl": "192.168.1.100",
-      "numberOfChannels": 4,
-      "status": "active",
-      "activationDate": "2024-01-10T09:00:00Z",
-      "locationId": "LOC-1234567890",
-      "coordinates": {
-        "lat": 40.7128,
-        "lng": -74.0060
-      },
-      "wifiConfig": {
-        "ssid": "IndustrialNet",
-        "configured": true
-      },
-      "webhookUrl": "https://webhook.site/device-updates",
-      "dataTransmissionActive": true,
-      "lastSeen": "2024-01-20T18:45:00Z"
-    }
-  ],
-  "total": 1
-}
-```
-
-### POST /devices
-Create device (requires: installation_engineer or super_admin).
-
-**Request:**
-```json
-{
-  "deviceId": "DVC-2024-002",
-  "serialNumber": "SN-XYZ789",
-  "macId": "00:1B:44:22:4B:C8",
-  "ipUrl": "192.168.1.101",
-  "numberOfChannels": 8,
-  "locationId": "LOC-1234567890",
-  "coordinates": {
-    "lat": 40.7589,
-    "lng": -73.9851
-  },
-  "webhookUrl": "https://webhook.site/device-updates",
-  "dataTransmissionActive": true
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "DEV-9876543210",
-    "deviceId": "DVC-2024-002",
-    "status": "active",
-    "activationDate": "2024-01-20T19:00:00Z"
-  }
-}
-```
-
-### PUT /devices/:id
-Update device.
-
-**Request:**
-```json
-{
-  "ipUrl": "192.168.1.102",
-  "numberOfChannels": 8,
-  "dataTransmissionActive": false
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "DEV-9876543210",
-    "ipUrl": "192.168.1.102",
-    "numberOfChannels": 8,
-    "dataTransmissionActive": false,
-    "updatedAt": "2024-01-21T12:00:00Z"
-  }
-}
-```
-
-### DELETE /devices/:id
-Delete device (requires: super_admin).
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Device deleted successfully"
-}
-```
-
----
-
-## Sensors
-
-### GET /sensors
-Get all sensors.
-
-**Query Parameters:**
-- `status` (optional): Filter by status
-- `sensorType` (optional): Filter by type (temperature, humidity, pressure, etc.)
-- `deviceId` (optional): Filter by connected device
-- `search` (optional): Search by sensor ID
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "SEN-1234567890",
-      "sensorId": "SENS-2024-001",
-      "serialNumber": "SN-SENS-001",
-      "macId": "00:1B:44:33:5C:D9",
-      "connectedDeviceId": "DEV-1234567890",
-      "channelNumber": 1,
-      "sensorType": "temperature",
-      "activationDate": "2024-01-10T10:00:00Z",
-      "status": "active",
-      "unit": "°C",
-      "locationId": "LOC-1234567890",
-      "coordinates": {
-        "lat": 40.7128,
-        "lng": -74.0060
-      },
-      "lastReading": {
-        "sensorId": "SENS-2024-001",
-        "timestamp": "2024-01-20T18:50:00Z",
-        "value": 23.5,
-        "unit": "°C"
-      }
-    }
-  ],
-  "total": 1
-}
-```
-
-### POST /sensors
-Create sensor (requires: installation_engineer or super_admin).
-
-**Request:**
-```json
-{
-  "sensorId": "SENS-2024-002",
-  "serialNumber": "SN-SENS-002",
-  "macId": "00:1B:44:44:6D:EA",
-  "connectedDeviceId": "DEV-1234567890",
-  "channelNumber": 2,
-  "sensorType": "humidity",
-  "locationId": "LOC-1234567890",
-  "coordinates": {
-    "lat": 40.7128,
-    "lng": -74.0060
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "SEN-9876543210",
-    "sensorId": "SENS-2024-002",
-    "status": "active",
-    "unit": "%",
-    "activationDate": "2024-01-20T19:30:00Z"
-  }
-}
-```
-
-### PUT /sensors/:id
-Update sensor.
-
-**Request:**
-```json
-{
-  "channelNumber": 3,
-  "locationId": "LOC-9876543210"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "SEN-9876543210",
-    "channelNumber": 3,
-    "locationId": "LOC-9876543210",
-    "updatedAt": "2024-01-21T13:00:00Z"
-  }
-}
-```
-
-### DELETE /sensors/:id
-Delete sensor (requires: super_admin).
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Sensor deleted successfully"
-}
-```
-
----
-
-## Sensor Readings
-
-### GET /sensors/:id/readings
-Get sensor readings.
-
-**Query Parameters:**
-- `startTime` (optional): Start timestamp (ISO 8601)
-- `endTime` (optional): End timestamp (ISO 8601)
-- `limit` (optional): Number of readings (default: 100)
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "sensorId": "SENS-2024-001",
-      "timestamp": "2024-01-20T18:50:00Z",
-      "value": 23.5,
-      "unit": "°C"
-    },
-    {
-      "sensorId": "SENS-2024-001",
-      "timestamp": "2024-01-20T18:51:00Z",
-      "value": 23.7,
-      "unit": "°C"
-    }
-  ],
-  "total": 2
-}
-```
-
-### POST /sensors/:id/readings
-Submit sensor reading (system/device endpoint).
-
-**Request:**
-```json
-{
-  "timestamp": "2024-01-20T19:00:00Z",
-  "value": 24.2
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Reading recorded"
-}
-```
-
----
-
-## Alerts
-
-### GET /alerts
-Get all alerts.
-
-**Query Parameters:**
-- `level` (optional): Filter by level (info, warning, critical)
-- `resolved` (optional): Filter by resolution status (true/false)
-- `sensorId` (optional): Filter by sensor
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "ALERT-1234567890",
-      "thresholdId": "THR-001",
-      "sensorId": "SENS-2024-001",
-      "level": "critical",
-      "message": "Temperature exceeded threshold: 45°C",
-      "triggeredAt": "2024-01-20T18:55:00Z",
-      "acknowledgedAt": null,
-      "acknowledgedBy": null,
-      "resolved": false
-    }
-  ],
-  "total": 1
-}
-```
-
-### PUT /alerts/:id/acknowledge
-Acknowledge an alert.
-
-**Request:**
-```json
-{
-  "acknowledgedBy": "USER-1234567890"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "ALERT-1234567890",
-    "acknowledgedAt": "2024-01-20T19:05:00Z",
-    "acknowledgedBy": "USER-1234567890",
-    "resolved": true
-  }
-}
-```
-
----
-
-## Alert Thresholds
-
-### GET /alert-thresholds
-Get all alert thresholds.
-
-**Query Parameters:**
-- `sensorId` (optional): Filter by sensor
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "THR-001",
-      "sensorId": "SENS-2024-001",
-      "level": "critical",
-      "condition": "above",
-      "value": 40,
-      "enabled": true,
-      "notificationChannels": ["app", "sms", "whatsapp"],
-      "recipients": ["USER-001", "USER-002"]
-    }
-  ]
-}
-```
-
-### POST /alert-thresholds
-Create alert threshold.
-
-**Request:**
-```json
-{
-  "sensorId": "SENS-2024-001",
-  "level": "warning",
-  "condition": "above",
-  "value": 35,
-  "enabled": true,
-  "notificationChannels": ["app"],
-  "recipients": ["USER-001"]
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "THR-002",
-    "sensorId": "SENS-2024-001",
-    "level": "warning",
-    "condition": "above",
-    "value": 35,
-    "enabled": true
-  }
-}
-```
-
----
-
-## Notifications
-
-### GET /notifications
-Get user notifications.
-
-**Query Parameters:**
-- `read` (optional): Filter by read status (true/false)
-- `type` (optional): Filter by type (alert, info, warning, success, system)
-- `priority` (optional): Filter by priority (low, medium, high, critical)
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "NOTIF-1234567890",
-      "userId": "USER-1234567890",
-      "title": "Critical Alert",
-      "message": "Temperature sensor SENS-2024-001 exceeded threshold",
-      "type": "alert",
-      "priority": "critical",
-      "read": false,
-      "createdAt": "2024-01-20T18:55:00Z",
-      "metadata": {
-        "alertId": "ALERT-1234567890",
-        "sensorId": "SENS-2024-001",
-        "location": "Production Floor - Sector A1"
-      }
-    }
-  ],
-  "total": 1,
-  "unreadCount": 1
-}
-```
-
-### PUT /notifications/:id/read
-Mark notification as read.
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "NOTIF-1234567890",
-    "read": true,
-    "readAt": "2024-01-20T19:10:00Z"
-  }
-}
-```
-
-### PUT /notifications/mark-all-read
-Mark all notifications as read.
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "All notifications marked as read",
-  "count": 5
-}
-```
-
----
-
-## Dashboard Metrics
-
-### GET /dashboard/metrics
-Get dashboard overview metrics.
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "totalDevices": 25,
-    "activeDevices": 23,
-    "offlineDevices": 2,
-    "totalSensors": 100,
-    "activeSensors": 98,
-    "activeAlerts": 3,
-    "criticalAlerts": 1
-  }
-}
-```
-
----
-
-## Analytics
-
-### GET /analytics/sensor-statistics
-Get sensor statistics and trends.
-
-**Query Parameters:**
-- `sensorIds` (required): Comma-separated sensor IDs
-- `startTime` (required): Start timestamp
-- `endTime` (required): End timestamp
-- `aggregation` (optional): Data aggregation interval (1m, 5m, 1h, 1d)
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "sensorId": "SENS-2024-001",
-    "period": {
-      "start": "2024-01-20T00:00:00Z",
-      "end": "2024-01-20T23:59:59Z"
-    },
-    "statistics": {
-      "min": 18.5,
-      "max": 32.4,
-      "avg": 24.8,
-      "median": 24.5,
-      "stdDev": 2.3
-    },
-    "readings": 1440,
-    "dataPoints": [
-      {
-        "timestamp": "2024-01-20T00:00:00Z",
-        "value": 22.1
-      }
-    ]
-  }
-}
-```
-
----
-
-## Export
-
-### GET /export/devices
-Export devices to CSV.
-
-**Query Parameters:**
-- `format` (optional): Export format (csv, json) - default: csv
-
-**Response:**
-```
-Device ID,Serial Number,MAC ID,Status,Location,Last Seen
-DVC-2024-001,SN-ABC123,00:1B:44:11:3A:B7,active,Production Floor - Sector A1,2024-01-20T18:45:00Z
-```
-
-### GET /export/sensors
-Export sensors to CSV.
-
-**Response:**
-```
-Sensor ID,Type,Device ID,Channel,Status,Location,Last Reading
-SENS-2024-001,temperature,DVC-2024-001,1,active,Production Floor - Sector A1,23.5°C
-```
-
----
-
-## Error Responses
-
-All endpoints may return the following error responses:
-
-### 400 Bad Request
-```json
-{
-  "success": false,
-  "error": {
-    "code": "INVALID_REQUEST",
-    "message": "Invalid request parameters",
-    "details": {
-      "field": "email",
-      "issue": "Invalid email format"
-    }
-  }
-}
-```
-
-### 401 Unauthorized
-```json
-{
-  "success": false,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Authentication required"
-  }
-}
-```
-
-### 403 Forbidden
-```json
-{
-  "success": false,
-  "error": {
-    "code": "FORBIDDEN",
-    "message": "Insufficient permissions to access this resource"
-  }
-}
-```
-
-### 404 Not Found
-```json
-{
-  "success": false,
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Resource not found"
-  }
-}
-```
-
-### 500 Internal Server Error
-```json
-{
-  "success": false,
-  "error": {
-    "code": "INTERNAL_ERROR",
-    "message": "An unexpected error occurred"
-  }
-}
-```
+Request DTOs:
+- `AlertCreateRequest`: `{ "sensorId":"uuid", "sensorParameterId":"uuid", "alertLevel":"string", "message":"string", "assignedTo":"string" }`
+- `AlertUpdateRequest`: `{ "alertLevel":"string", "message":"string", "status":"string", "assignedTo":"string" }`
+- `AssignAlertRequest`: `{ "assignee":"string" }`
+- `ThresholdCreateRequest`: `{ "sensorParameterId":"uuid", "thresholdProfileId":"uuid", "minThresholdValue":0, "maxThresholdValue":0, "warningLevel":0, "criticalLevel":0 }`
+- `ThresholdProfileCreateRequest`: `{ "name":"string", "description":"string" }`
+
+Response DTOs:
+- `AlertResponse`
+- `ThresholdValueResponse`
+- `ThresholdProfileResponse`
+
+Alert endpoints:
+- `GET /api/v1/alerts?status=&level=&sensorId=&assignedTo=&from=&to=`
+- `GET /api/v1/alerts/{id}`
+- `POST /api/v1/alerts` body `AlertCreateRequest`
+- `PUT /api/v1/alerts/{id}` body `AlertUpdateRequest`
+- `DELETE /api/v1/alerts/{id}`
+- `POST /api/v1/alerts/{id}/resolve`
+- `POST /api/v1/alerts/{id}/acknowledge`
+- `POST /api/v1/alerts/{id}/escalate`
+- `POST /api/v1/alerts/{id}/assign` body `AssignAlertRequest`
+- `GET /api/v1/alerts/active`
+- `GET /api/v1/alerts/resolved`
+- `GET /api/v1/alerts/history`
+- `GET /api/v1/alerts/stats`
+- `GET /api/v1/alerts/summary`
+- `POST /api/v1/alerts/bulk-resolve` body `UUID[]`
+
+Threshold endpoints:
+- `GET /api/v1/thresholds`
+- `GET /api/v1/thresholds/{id}`
+- `POST /api/v1/thresholds` body `ThresholdCreateRequest`
+- `PUT /api/v1/thresholds/{id}` body `ThresholdCreateRequest`
+- `DELETE /api/v1/thresholds/{id}`
+- `GET /api/v1/thresholds/profiles`
+- `GET /api/v1/thresholds/profiles/{id}`
+- `POST /api/v1/thresholds/profiles` body `ThresholdProfileCreateRequest`
+- `PUT /api/v1/thresholds/profiles/{id}` body `ThresholdProfileCreateRequest`
+- `DELETE /api/v1/thresholds/profiles/{id}`
+- `POST /api/v1/thresholds/{id}/apply` body `UUID` (sensorId raw)
+- `POST /api/v1/thresholds/bulk-apply` body `Map<String,Object>`
+- `GET /api/v1/thresholds/defaults`
+- `GET /api/v1/thresholds/kafka/status`
+- `GET /api/v1/thresholds/kafka/probe?timeoutMs=&maxRecords=`
+- `POST /api/v1/thresholds/kafka/replay-to-analytics?maxRecords=`
+
+## 7. Analytics Service
+
+Base paths:
+- `/api/v1/analytics`
+- `/api/v1/dashboard`
+- `/api/v1/stats`
+- `/api/v1/search`
+- `/api/v1/reports`
+- `/api/v1/audit-logs`
+
+Response format:
+- Mostly `ResponseEntity<Map<String,Object>>` or `List<Map<String,Object>>`
+- SSE stream at `/api/v1/analytics/events/live`
+
+Analytics endpoints:
+- `GET /api/v1/analytics/events`
+- `GET /api/v1/analytics/events/live` (SSE)
+- `GET /api/v1/analytics/events/recent?limit=50`
+- `GET /api/v1/analytics/events/alerts`
+- `GET /api/v1/analytics/kafka/status`
+- `GET /api/v1/analytics/dashboard/summary`
+- `GET /api/v1/analytics/dashboard`
+- `GET /api/v1/analytics/overview`
+- `GET /api/v1/analytics/sensors/{id}/trends?from=&to=`
+- `GET /api/v1/analytics/sensors/{id}/predictions?horizon=`
+- `GET /api/v1/analytics/sensors/compare?sensorIds=a,b`
+- `GET /api/v1/analytics/anomalies`
+- `GET /api/v1/analytics/health-score`
+- `GET /api/v1/analytics/distribution`
+- `GET /api/v1/analytics/performance`
+- `GET /api/v1/analytics/utilization`
+- `GET /api/v1/analytics/downtime`
+- `GET /api/v1/analytics/alerts-trend`
+- `GET /api/v1/analytics/sensor-reliability`
+- `GET /api/v1/analytics/device-uptime`
+- `GET /api/v1/analytics/custom-query?query=&from=&to=`
+
+Dashboard endpoints:
+- `GET /api/v1/dashboard/stats`
+- `GET /api/v1/dashboard/overview`
+- `GET /api/v1/dashboard/recent-alerts`
+- `GET /api/v1/dashboard/sensor-status`
+- `GET /api/v1/dashboard/device-status`
+- `GET /api/v1/dashboard/system-health`
+- `GET /api/v1/dashboard/charts/tilt-readings`
+- `GET /api/v1/dashboard/charts/sensor-distribution`
+- `GET /api/v1/dashboard/charts/alerts-trend`
+- `GET /api/v1/dashboard/charts/device-uptime`
+- `GET /api/v1/dashboard/activity-feed`
+- `GET /api/v1/dashboard/quick-stats`
+
+Stats endpoints:
+- `GET /api/v1/stats/overview`
+- `GET /api/v1/stats/sensors`
+- `GET /api/v1/stats/devices`
+- `GET /api/v1/stats/alerts`
+- `GET /api/v1/stats/users`
+- `GET /api/v1/stats/organizations`
+- `GET /api/v1/stats/readings`
+- `GET /api/v1/stats/custom?metric=&from=&to=`
+
+Search endpoints:
+- `GET /api/v1/search?q=&type=&page=&size=`
+- `GET /api/v1/search/sensors?q=&page=&size=`
+- `GET /api/v1/search/devices?q=&page=&size=`
+- `GET /api/v1/search/users?q=&page=&size=`
+- `GET /api/v1/search/organizations?q=&page=&size=`
+- `GET /api/v1/search/global?q=&page=&size=`
+
+Reports endpoints:
+- `GET /api/v1/reports`
+- `GET /api/v1/reports/{id}`
+- `POST /api/v1/reports/generate` body `Map<String,Object>`
+- `GET /api/v1/reports/{id}/download`
+- `DELETE /api/v1/reports/{id}`
+- `GET /api/v1/reports/templates`
+- `GET /api/v1/reports/templates/{id}`
+- `POST /api/v1/reports/templates` body `Map<String,Object>`
+- `PUT /api/v1/reports/templates/{id}` body `Map<String,Object>`
+- `DELETE /api/v1/reports/templates/{id}`
+- `POST /api/v1/reports/schedule` body `Map<String,Object>`
+- `GET /api/v1/reports/scheduled`
+
+Audit log endpoints:
+- `GET /api/v1/audit-logs`
+- `GET /api/v1/audit-logs/{id}`
+- `GET /api/v1/audit-logs/export`
+- `GET /api/v1/audit-logs/stats`
+- `GET /api/v1/audit-logs/user/{userId}`
+- `GET /api/v1/audit-logs/resource/{resourceType}/{resourceId}`
+- `DELETE /api/v1/audit-logs/{id}`
+
+## 8. Notification Service
+
+Base path:
+- `/api/v1/notification`
+
+DTOs:
+- `NotificationRequest`: `{ "userId":"string", "title":"string", "message":"string", "type":"string" }`
+- `NotificationResponse`: `{ "id":"string", "userId":"string", "title":"string", "message":"string", "type":"string", "read":true, "createdAt":"iso" }`
+- `NotificationSettingsRequest`: `{ "emailEnabled":true, "pushEnabled":true, "smsEnabled":false }`
+- `NotificationSettingsResponse`: `{ "userId":"string", "emailEnabled":true, "pushEnabled":true, "smsEnabled":false }`
+- `UnreadCountResponse`: `{ "userId":"string", "unreadCount":0 }`
+
+Endpoints:
+- `GET /api/v1/notification/?userId=...` -> `NotificationResponse[]`
+- `GET /api/v1/notification/{notificationId}?userId=...` -> `NotificationResponse`
+- `POST /api/v1/notification/` body `NotificationRequest` -> `"string message"`
+- `DELETE /api/v1/notification/{notificationId}?userId=...` -> `"string message"`
+- `GET /api/v1/notification/unread?userId=...` -> `NotificationResponse[]`
+- `GET /api/v1/notification/unread/count?userId=...` -> `UnreadCountResponse`
+- `POST /api/v1/notification/{notificationId}/mark-read?userId=...` -> `NotificationResponse`
+- `POST /api/v1/notification/mark-all-read?userId=...` -> `NotificationResponse[]`
+- `GET /api/v1/notification/settings?userId=...` -> `NotificationSettingsResponse`
+- `PUT /api/v1/notification/settings?userId=...` body `NotificationSettingsRequest` -> `NotificationSettingsResponse`
+- `POST /api/v1/notification/test?userId=...` -> `"string message"`
+
+## 9. Configuration Service
+
+Base path families:
+- `/api/v1/config*`
+- `/api/v1/calibrations`
+- `/api/v1/comments`
+- `/api/v1/favorites`
+- `/api/v1/webhooks`
+- `/api/v1/tags`
+- `/api/v1/integrations`
+- `/api/v1/locations`
+- `/api/v1/maintenance`
+- `/api/v1/schedules`, `/api/v1/jobs`
+- `/api/v1/roles`, `/api/v1/permissions`
+- `/api/v1/upload`, `/api/v1/download`, `/api/v1/files`
+- `/api/v1/import`, `/api/v1/export`
+- `/api/v1/batch`
+- `/api/v1/health`, `/api/v1/system/*`, `/api/v1/version`
+
+Important response behavior:
+- Most endpoints return `JsonNode` or `List<JsonNode>`.
+- Request bodies are mostly flexible `JsonNode` payloads.
+- File download endpoint returns binary: `GET /api/v1/files/{id}` returns `ResponseEntity<byte[]>`.
+
+Core endpoint groups:
+- Config:
+  - `GET/PUT /api/v1/config`
+  - `GET/PUT /api/v1/configsystem`
+  - `GET/PUT /api/v1/confignotifications`
+  - `GET/PUT /api/v1/configthresholds`
+  - `GET/PUT /api/v1/configalerts`
+  - `GET /api/v1/configbackup`
+  - `POST /api/v1/configbackup/create`
+  - `POST /api/v1/configbackup/restore`
+  - `GET /api/v1/configbackup/list`
+  - `DELETE /api/v1/configbackup/{id}`
+  - `GET/PUT /api/v1/configemail`
+  - `POST /api/v1/config/test-email`
+- Batch:
+  - `POST /api/v1/batch/sensors/create`
+  - `POST /api/v1/batch/sensors/update`
+  - `POST /api/v1/batch/sensors/delete`
+  - `POST /api/v1/batch/devices/update`
+  - `POST /api/v1/batch/alerts/resolve`
+  - `POST /api/v1/batch/users/create`
+  - `POST /api/v1/batch/thresholds/apply`
+  - `POST /api/v1/batch/export`
+- Calibrations:
+  - `GET /api/v1/calibrations`
+  - `GET /api/v1/calibrations/{id}`
+  - `POST /api/v1/calibrations`
+  - `GET /api/v1/calibrations/history`
+  - `GET /api/v1/calibrations/due`
+  - `POST /api/v1/calibrations/bulk`
+- Comments:
+  - `GET /api/v1/comments`
+  - `GET /api/v1/comments/{id}`
+  - `POST /api/v1/comments`
+  - `PUT /api/v1/comments/{id}`
+  - `DELETE /api/v1/comments/{id}`
+  - `GET /api/v1/comments/resource/{resourceType}/{resourceId}`
+  - `POST /api/v1/comments/{id}/reply`
+- Favorites:
+  - `GET/POST /api/v1/favorites`
+  - `DELETE /api/v1/favorites/{id}`
+  - `GET /api/v1/favorites/sensors`
+  - `GET /api/v1/favorites/devices`
+  - `GET /api/v1/favorites/sites`
+- Webhooks / Tags / Integrations / Maintenance:
+  - Standard CRUD + action endpoints exactly as controller paths define.
+- Location:
+  - `GET /api/v1/locations`
+  - `GET /api/v1/locations/nearby`
+  - `POST /api/v1/locations/geocode`
+  - `POST /api/v1/locations/reverse-geocode`
+  - `GET /api/v1/locations/map-data`
+- Schedules / Roles:
+  - `GET/POST /api/v1/schedules`
+  - `GET/PUT/DELETE /api/v1/schedules/{id}`
+  - `POST /api/v1/schedules/{id}/run`
+  - `GET /api/v1/schedules/{id}/history`
+  - `GET /api/v1/jobs/status`
+  - `GET/POST /api/v1/roles`
+  - `GET/PUT/DELETE /api/v1/roles/{id}`
+  - `GET /api/v1/permissions`
+  - `GET /api/v1/permissions/{id}`
+  - `POST /api/v1/roles/{id}/permissions`
+  - `GET /api/v1/roles/{id}/users`
+  - `POST /api/v1/roles/{id}/assign-user`
+- File and import/export:
+  - `POST /api/v1/upload/sensor-config` (`multipart/form-data`, field `file`)
+  - `POST /api/v1/upload/device-config` (`multipart/form-data`, field `file`)
+  - `POST /api/v1/upload/bulk-import` (`multipart/form-data`, field `file`)
+  - `POST /api/v1/upload/avatar` (`multipart/form-data`, field `file`)
+  - `POST /api/v1/upload/document` (`multipart/form-data`, field `file`)
+  - `GET /api/v1/download/template/{type}`
+  - `GET /api/v1/download/export/{id}`
+  - `GET /api/v1/files/{id}` -> file bytes
+  - `POST /api/v1/import/sensors|devices|users` with JSON body
+  - `GET /api/v1/export/sensors|devices|readings`
+- System health:
+  - `GET /api/v1/health`
+  - `GET /api/v1/health/detailed`
+  - `GET /api/v1/version`
+  - `GET /api/v1/system/status|info|metrics|logs|performance|database-status|cache-status`
+  - `POST /api/v1/system/cache-clear`
+  - `POST /api/v1/system/maintenance-mode` body JSON
+
+## Notes for Frontend Team
+
+- Date/time fields are primarily ISO-8601 strings unless endpoint explicitly uses epoch.
+- IDs are UUID for most services except auth/notification where several IDs are numeric/string.
+- SSE endpoints:
+  - `/api/v1/ingestion/readings/live`
+  - `/api/v1/processing/readings/live`
+  - `/api/v1/analytics/events/live`
+- For SSE in web frontend use `EventSource` (not standard XHR JSON flow).

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../api/alerts_api.dart';
 import '../models/alert.dart';
-import '../providers/super_admin_database_provider.dart';
+import '../providers/super_admin_api_riverpod_provider.dart';
+import '../providers/super_admin_riverpod_provider.dart';
 
-class AlertsScreen extends StatelessWidget {
+class AlertsScreen extends ConsumerWidget {
   const AlertsScreen({super.key});
 
   String _formatDate(DateTime date) {
@@ -46,17 +48,24 @@ class AlertsScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isLight = Theme.of(context).brightness == Brightness.light;
-    return Consumer<DatabaseProvider>(
-      builder: (context, db, child) {
-        final activeAlerts = db.alerts.where((a) => !a.isResolved).toList();
-        final criticalCount =
-            activeAlerts.where((a) => a.alertLevel == 'critical').length;
-        final warningCount =
-            activeAlerts.where((a) => a.alertLevel != 'critical').length;
+    final alertsAsync = ref.watch(superAdminAlertsApiProvider);
+    final fallbackDb = ref.watch(superAdminBackendChangeNotifierProvider);
+    final apiAlerts = alertsAsync.maybeWhen(
+      data: (value) => value,
+      orElse: () => const <Alert>[],
+    );
+    final sourceAlerts = apiAlerts.isNotEmpty
+        ? apiAlerts
+        : fallbackDb.alerts.where((a) => !a.isResolved).toList();
+    final activeAlerts = sourceAlerts.where((a) => !a.isResolved).toList();
+    final criticalCount =
+        activeAlerts.where((a) => a.alertLevel == 'critical').length;
+    final warningCount =
+        activeAlerts.where((a) => a.alertLevel != 'critical').length;
 
-        return SingleChildScrollView(
+    return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,12 +97,17 @@ class AlertsScreen extends StatelessWidget {
                 warningCount: warningCount,
               ),
               const SizedBox(height: 16),
-              _buildActiveAlertsPanel(context, db, activeAlerts),
+              _buildActiveAlertsPanel(
+                context,
+                activeAlerts,
+                onAcknowledge: (alertId) async {
+                  await AlertsApi.resolveAlert(alertId);
+                  ref.invalidate(superAdminAlertsApiProvider);
+                },
+              ),
             ],
           ),
         );
-      },
-    );
   }
 
   Widget _buildSummaryCards({
@@ -230,8 +244,8 @@ class AlertsScreen extends StatelessWidget {
 
   Widget _buildActiveAlertsPanel(
     BuildContext context,
-    DatabaseProvider db,
     List<Alert> activeAlerts,
+    {required Future<void> Function(String alertId) onAcknowledge}
   ) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
@@ -351,7 +365,7 @@ class AlertsScreen extends StatelessWidget {
                             _actionButton(
                               context,
                               label: 'Acknowledge',
-                              onTap: () => db.resolveAlert(alert.id),
+                              onTap: () => onAcknowledge(alert.id),
                             ),
                             _actionButton(
                               context,
@@ -413,7 +427,7 @@ class AlertsScreen extends StatelessWidget {
                                 _actionButton(
                                   context,
                                   label: 'Acknowledge',
-                                  onTap: () => db.resolveAlert(alert.id),
+                                  onTap: () => onAcknowledge(alert.id),
                                 ),
                                 _actionButton(
                                   context,

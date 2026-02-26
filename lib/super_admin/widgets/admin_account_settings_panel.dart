@@ -6,7 +6,7 @@ import '../../main_page.dart';
 import '../core/theme/custom_theme_tokens.dart';
 import '../providers/theme_provider.dart';
 import '../shared/models/threshold_rule.dart';
-import '../providers/super_admin_database_provider.dart';
+import '../providers/super_admin_backend_provider.dart';
 
 enum _SettingsTab {
   profile,
@@ -1435,7 +1435,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final subColor =
         isLight ? const Color(0xFF4f6b82) : const Color(0xFF9db7d2);
-    final db = context.watch<DatabaseProvider>();
+    final db = context.watch<SuperAdminBackendProvider>();
     final thresholds = db.sortedThresholdRules;
 
     return _sectionContainer(
@@ -1593,7 +1593,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
 
   void _showThresholdDialog(
     BuildContext context, {
-    required DatabaseProvider db,
+    required SuperAdminBackendProvider db,
     ThresholdRule? existing,
   }) {
     final labelController = TextEditingController(text: existing?.label ?? '');
