@@ -99,9 +99,12 @@ jobs:
           echo === VERIFYING COPIED FILES ===
           dir "C:\Users\Administrator\Desktop\sensor_web\website"
           
-          echo === STOP IIS ===
-          iisreset /stop
-          timeout /t 5 /nobreak
+          echo === CONFIGURE IIS SITE ON PORT 9087 ===
+          powershell -Command "Import-Module WebAdministration; if (Test-Path 'IIS:\Sites\SensorWeb') { Remove-WebSite -Name 'SensorWeb' }; New-WebSite -Name 'SensorWeb' -Port 9087 -PhysicalPath 'C:\Users\Administrator\Desktop\sensor_web\website' -Force"
+          
+          echo === ADD FIREWALL RULE FOR PORT 9087 ===
+          netsh advfirewall firewall delete rule name="SensorWeb Port 9087" protocol=TCP localport=9087
+          netsh advfirewall firewall add rule name="SensorWeb Port 9087" dir=in action=allow protocol=TCP localport=9087
           
           echo === CREATE WEB.CONFIG ===
           cd "C:\Users\Administrator\Desktop\sensor_web\website"
@@ -120,8 +123,9 @@ jobs:
           echo === SET PERMISSIONS ===
           icacls "C:\Users\Administrator\Desktop\sensor_web\website" /grant IIS_IUSRS:(OI)(CI)F /T
           
-          echo === START IIS ===
-          iisreset /start
+          echo === START IIS SITE ===
+          powershell -Command "Import-Module WebAdministration; Start-WebSite -Name 'SensorWeb'"
           
           echo === DEPLOYMENT COMPLETE ===
+          echo Site is now running on http://103.211.202.145:9087
           dir
