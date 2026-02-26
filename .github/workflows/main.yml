@@ -76,7 +76,7 @@ jobs:
         key: ${{ secrets.VM_SSH_KEY }}
         port: 12856
         source: "deploy-files/*"
-        target: "C:/Users/Administrator/Desktop/sensor_web/website"
+        target: "/cygdrive/c/Users/Administrator/Desktop/sensor_web/website"
         strip_components: 1
 
     # 9️⃣ Deploy to Windows VM
