@@ -3,7 +3,7 @@ name: Deploy Flutter Web to Windows VM (IIS)
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   deploy:
