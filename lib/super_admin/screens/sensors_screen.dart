@@ -1,82 +1,77 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/device.dart';
-import '../providers/database_provider.dart';
+import '../models/sensor.dart';
+import '../providers/super_admin_database_provider.dart';
 
-class DevicesScreen extends StatefulWidget {
-  const DevicesScreen({super.key});
+class SensorsScreen extends StatefulWidget {
+  const SensorsScreen({super.key});
 
   @override
-  State<DevicesScreen> createState() => _DevicesScreenState();
+  State<SensorsScreen> createState() => _SensorsScreenState();
 }
 
-class _DevicesScreenState extends State<DevicesScreen> {
+class _SensorsScreenState extends State<SensorsScreen> {
   String? _editingId;
-  String _deviceCode = '';
-  String _siteId = '';
-  String _zoneId = '';
   String _serialNumber = '';
+  String _deviceId = '';
+  String _sensorTypeId = '';
+  String _sensorCodeInput = '';
   String _macAddress = '';
-  String _ipUrl = '';
-  String _channelsCount = '4';
-  String _webhookUrl = 'https://api.example.com/webhook';
+  String _channelNumber = '1';
+  String _organizationId = '';
   String _latitude = '37.7749';
   String _longitude = '-122.4194';
-  bool _dataTransmissionEnabled = true;
   bool _showFilters = false;
   bool _isListView = false;
   String _searchQuery = '';
   String _statusFilter = 'all';
-  String _webhookFilter = 'all';
+  String _typeFilter = 'all';
+  String _deviceFilter = 'all';
   String _organizationFilter = 'all';
   String _siteFilter = 'all';
   String _zoneFilter = 'all';
   String _locationFilter = 'all';
+  final Set<String> _inactiveSensors = {};
 
-  void _showDeviceModal({Device? device}) {
+  void _showSensorModal({Sensor? sensor}) {
     final db = Provider.of<DatabaseProvider>(context, listen: false);
     final isLight = Theme.of(context).brightness == Brightness.light;
     final subColor =
         isLight ? const Color(0xFF5A6F7D) : const Color(0xFFAEC4D7);
-    final defaultSiteId = db.sites.isNotEmpty ? db.sites.first.id : '';
-    final defaultZoneId = db.zones.isNotEmpty ? db.zones.first.id : '';
+    final defaultDeviceId = db.devices.isNotEmpty ? db.devices.first.id : '';
+    final defaultTypeId =
+        db.sensorTypes.isNotEmpty ? db.sensorTypes.first.id : '';
+    final defaultOrgId = db.sites.isNotEmpty ? db.sites.first.id : '';
 
-    if (device != null) {
-      final index = db.devices.indexOf(device);
-      _editingId = device.id;
-      _deviceCode = device.deviceCode;
-      _siteId = device.siteId;
-      _zoneId = device.zoneId;
-      _serialNumber = _serialFor(index < 0 ? 0 : index);
-      _macAddress = _macFor(index < 0 ? 0 : index);
-      _ipUrl = _ipFor(index < 0 ? 0 : index);
-      _channelsCount =
-          '${db.sensors.where((s) => s.deviceId == device.id).length}';
-      if (_channelsCount == '0') _channelsCount = '4';
-      _latitude = '37.7749';
-      _longitude = '-122.4194';
-      _dataTransmissionEnabled = device.status == 'active';
+    if (sensor != null) {
+      final index = db.sensors.indexOf(sensor);
+      _editingId = sensor.id;
+      _serialNumber = sensor.serialNumber;
+      _deviceId = sensor.deviceId;
+      _sensorTypeId = sensor.sensorTypeId;
+      _sensorCodeInput = _sensorCodeFor(index < 0 ? 0 : index);
+      _macAddress =
+          '9E:55:DE:5E:${(56 + (index < 0 ? 0 : index)).toRadixString(16).padLeft(2, '0').toUpperCase()}:18';
+      _channelNumber = '${_channelFor(index < 0 ? 0 : index)}';
+      _organizationId = defaultOrgId;
     } else {
       _editingId = null;
-      _deviceCode =
-          'DEV-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      _sensorCodeInput =
+          'SEN-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
       _serialNumber =
           'SNMLQ${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
-      _macAddress = _macFor(db.devices.length);
-      _ipUrl = _ipFor(db.devices.length);
-      _channelsCount = '4';
-      _siteId = defaultSiteId;
-      _zoneId = defaultZoneId;
-      _latitude = '37.7749';
-      _longitude = '-122.4194';
-      _dataTransmissionEnabled = true;
+      _macAddress = '9E:55:DE:5E:56:18';
+      _channelNumber = '1';
+      _deviceId = defaultDeviceId;
+      _sensorTypeId = defaultTypeId;
+      _organizationId = defaultOrgId;
     }
 
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
-      barrierLabel: 'Device Form',
+      barrierLabel: 'Sensor Form',
       transitionDuration: const Duration(milliseconds: 120),
       pageBuilder: (context, animation, secondaryAnimation) => StatefulBuilder(
         builder: (context, setState) {
@@ -88,7 +83,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
             insetPadding:
                 const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640, maxHeight: 760),
+              constraints: const BoxConstraints(maxWidth: 640, maxHeight: 740),
               child: Container(
                 padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
                 decoration: BoxDecoration(
@@ -117,15 +112,15 @@ class _DevicesScreenState extends State<DevicesScreen> {
                               children: [
                                 Text(
                                   _editingId == null
-                                      ? 'Add New Device'
-                                      : 'Edit Device',
+                                      ? 'Add New Sensor'
+                                      : 'Edit Sensor',
                                   style: const TextStyle(
                                       fontSize: 26,
                                       fontWeight: FontWeight.w800),
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  'Configure device parameters and network settings',
+                                  'Configure sensor parameters and device connection',
                                   style:
                                       TextStyle(fontSize: 14, color: subColor),
                                 ),
@@ -147,9 +142,10 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         children: [
                           Expanded(
                             child: _dialogTextField(
-                              label: 'Device ID',
-                              value: _deviceCode,
-                              onChanged: (v) => setState(() => _deviceCode = v),
+                              label: 'Sensor ID',
+                              value: _sensorCodeInput,
+                              onChanged: (v) =>
+                                  setState(() => _sensorCodeInput = v),
                             ),
                           ),
                           const SizedBox(width: 14),
@@ -164,41 +160,58 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
+                      _dialogTextField(
+                        label: 'MAC Address',
+                        value: _macAddress,
+                        onChanged: (v) => setState(() => _macAddress = v),
+                      ),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
-                            child: _dialogTextField(
-                              label: 'MAC Address',
-                              value: _macAddress,
-                              onChanged: (v) => setState(() => _macAddress = v),
+                            child: _dialogDropdown(
+                              label: 'Connected Device',
+                              value: _deviceId.isEmpty ? null : _deviceId,
+                              hint: 'Select a device',
+                              items: db.devices
+                                  .map((device) => DropdownMenuItem<String>(
+                                        value: device.id,
+                                        child: Text(device.deviceCode),
+                                      ))
+                                  .toList(),
+                              onChanged: (value) =>
+                                  setState(() => _deviceId = value ?? ''),
                             ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
                             child: _dialogTextField(
-                              label: 'IP Address / URL',
-                              value: _ipUrl,
-                              onChanged: (v) => setState(() => _ipUrl = v),
+                              label: 'Channel Number',
+                              value: _channelNumber,
+                              onChanged: (v) =>
+                                  setState(() => _channelNumber = v),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      _dialogTextField(
-                        label: 'Number of Channels',
-                        value: _channelsCount,
-                        onChanged: (v) => setState(() => _channelsCount = v),
-                      ),
-                      const SizedBox(height: 12),
-                      _dialogTextField(
-                        label: 'Webhook URL',
-                        value: _webhookUrl,
-                        onChanged: (v) => setState(() => _webhookUrl = v),
+                      _dialogDropdown(
+                        label: 'Sensor Type',
+                        value: _sensorTypeId.isEmpty ? null : _sensorTypeId,
+                        hint: 'Select sensor type',
+                        items: db.sensorTypes
+                            .map((type) => DropdownMenuItem<String>(
+                                  value: type.id,
+                                  child: Text(type.name),
+                                ))
+                            .toList(),
+                        onChanged: (value) =>
+                            setState(() => _sensorTypeId = value ?? ''),
                       ),
                       const SizedBox(height: 12),
                       _dialogDropdown(
-                        label: 'Organization *',
-                        value: _siteId.isEmpty ? null : _siteId,
+                        label: 'Organization',
+                        value: _organizationId.isEmpty ? null : _organizationId,
                         hint: 'Select organization',
                         items: db.sites
                             .map((site) => DropdownMenuItem<String>(
@@ -206,16 +219,10 @@ class _DevicesScreenState extends State<DevicesScreen> {
                                   child: Text(site.name),
                                 ))
                             .toList(),
-                        onChanged: (value) => setState(() {
-                          _siteId = value ?? '';
-                          final firstZone = db.zones
-                              .where((z) => z.siteId == _siteId)
-                              .map((z) => z.id)
-                              .firstOrNull;
-                          _zoneId = firstZone ?? defaultZoneId;
-                        }),
+                        onChanged: (value) =>
+                            setState(() => _organizationId = value ?? ''),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 16),
                       LayoutBuilder(
                         builder: (context, constraints) {
                           final compact = constraints.maxWidth < 560;
@@ -281,42 +288,6 @@ class _DevicesScreenState extends State<DevicesScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          border:
-                              Border.all(color: Theme.of(context).dividerColor),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Data Transmission',
-                                    style: TextStyle(
-                                        fontSize: 30 > 22 ? 22 : 20,
-                                        fontWeight: FontWeight.w700),
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Enable device to send data',
-                                    style: TextStyle(color: subColor),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Switch(
-                              value: _dataTransmissionEnabled,
-                              onChanged: (v) =>
-                                  setState(() => _dataTransmissionEnabled = v),
-                            ),
-                          ],
-                        ),
-                      ),
                       const SizedBox(height: 16),
                       Row(
                         children: [
@@ -327,22 +298,17 @@ class _DevicesScreenState extends State<DevicesScreen> {
                                   context,
                                   listen: false,
                                 );
-                                final status = _dataTransmissionEnabled
-                                    ? 'active'
-                                    : 'inactive';
                                 if (_editingId == null) {
-                                  provider.create('devices', {
-                                    'device_code': _deviceCode.trim(),
-                                    'site_id': _siteId,
-                                    'zone_id': _zoneId,
-                                    'status': status,
+                                  provider.create('sensors', {
+                                    'serial_number': _serialNumber.trim(),
+                                    'device_id': _deviceId,
+                                    'sensor_type_id': _sensorTypeId,
                                   });
                                 } else {
-                                  provider.update('devices', _editingId!, {
-                                    'device_code': _deviceCode.trim(),
-                                    'site_id': _siteId,
-                                    'zone_id': _zoneId,
-                                    'status': status,
+                                  provider.update('sensors', _editingId!, {
+                                    'serial_number': _serialNumber.trim(),
+                                    'device_id': _deviceId,
+                                    'sensor_type_id': _sensorTypeId,
                                   });
                                 }
                                 Navigator.pop(context);
@@ -357,11 +323,9 @@ class _DevicesScreenState extends State<DevicesScreen> {
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                               ),
-                              child: Text(
-                                _editingId == null
-                                    ? 'Add Device'
-                                    : 'Save Device',
-                              ),
+                              child: Text(_editingId == null
+                                  ? 'Add Sensor'
+                                  : 'Save Sensor'),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -523,59 +487,90 @@ class _DevicesScreenState extends State<DevicesScreen> {
     return item.value ?? '';
   }
 
-  String _macFor(int index) {
-    return '00:1B:44:${(0x10 + index).toRadixString(16).padLeft(2, '0').toUpperCase()}:'
-        '${(0x22 + (index * 2)).toRadixString(16).padLeft(2, '0').toUpperCase()}:'
-        '${(0xA0 + index).toRadixString(16).padLeft(2, '0').toUpperCase()}';
+  String _sensorCodeFor(int index) => 'SEN-${[
+        'H002B',
+        'P003C',
+        'V004D',
+        'T005E',
+        'X006F',
+        'Y007G'
+      ][index % 6]}';
+
+  String _sensorTypeLabel(String id, DatabaseProvider db) {
+    return db.sensorTypes
+            .where((t) => t.id == id)
+            .map((t) => t.name)
+            .firstOrNull ??
+        'Sensor';
   }
 
-  String _serialFor(int index) =>
-      'SN202400${index + 1}${String.fromCharCode(65 + index)}';
-
-  String _ipFor(int index) => '192.168.1.${100 + index}';
-
-  String _date(DateTime date) {
-    final d = date.day.toString().padLeft(2, '0');
-    final m = date.month.toString().padLeft(2, '0');
-    return '$d/$m/${date.year}';
+  IconData _iconForType(String type) {
+    final lower = type.toLowerCase();
+    if (lower.contains('humidity')) return Icons.water_drop_outlined;
+    if (lower.contains('pressure')) return Icons.speed_outlined;
+    if (lower.contains('vibration')) return Icons.waves_outlined;
+    if (lower.contains('temperature') || lower.contains('thermal')) {
+      return Icons.device_thermostat_outlined;
+    }
+    if (lower.contains('tilt') || lower.contains('inclinometer')) {
+      return Icons.show_chart;
+    }
+    return Icons.sensors;
   }
 
-  void _togglePower(DatabaseProvider db, Device device) {
-    final next = device.status == 'active' ? 'inactive' : 'active';
-    db.update('devices', device.id, {
-      'device_code': device.deviceCode,
-      'site_id': device.siteId,
-      'zone_id': device.zoneId,
-      'status': next,
+  String _unitForType(String type) {
+    final lower = type.toLowerCase();
+    if (lower.contains('humidity')) return '%';
+    if (lower.contains('pressure')) return 'Pa';
+    if (lower.contains('vibration')) return 'mm/s';
+    if (lower.contains('temperature') || lower.contains('thermal')) return '°C';
+    return '°';
+  }
+
+  int _channelFor(int index) => (index % 4) + 1;
+
+  void _togglePower(String sensorId) {
+    setState(() {
+      if (_inactiveSensors.contains(sensorId)) {
+        _inactiveSensors.remove(sensorId);
+      } else {
+        _inactiveSensors.add(sensorId);
+      }
     });
   }
 
-  bool _hasWebhook(int index) => index.isEven;
-
-  bool _matchesFilters(DatabaseProvider db, Device device) {
-    final globalIndex = db.devices.indexOf(device);
+  bool _matchesFilters(DatabaseProvider db, Sensor sensor) {
+    final globalIndex = db.sensors.indexOf(sensor);
     final safeIndex = globalIndex < 0 ? 0 : globalIndex;
-    final serial = _serialFor(safeIndex).toLowerCase();
-    final mac = _macFor(safeIndex).toLowerCase();
-    final ip = _ipFor(safeIndex).toLowerCase();
+    final type = _sensorTypeLabel(sensor.sensorTypeId, db);
+    final deviceName = db.devices
+            .where((d) => d.id == sensor.deviceId)
+            .map((d) => d.deviceCode)
+            .firstOrNull ??
+        '';
+    final sensorCode = _sensorCodeFor(safeIndex);
     final query = _searchQuery.trim().toLowerCase();
 
     if (query.isNotEmpty) {
-      final matchesQuery = device.deviceCode.toLowerCase().contains(query) ||
-          serial.contains(query) ||
-          mac.contains(query) ||
-          ip.contains(query);
+      final matchesQuery = sensorCode.toLowerCase().contains(query) ||
+          sensor.serialNumber.toLowerCase().contains(query) ||
+          deviceName.toLowerCase().contains(query) ||
+          type.toLowerCase().contains(query);
       if (!matchesQuery) return false;
     }
 
-    if (_statusFilter != 'all' && device.status != _statusFilter) {
+    if (_statusFilter != 'all') {
+      final isActive = !_inactiveSensors.contains(sensor.id);
+      if (_statusFilter == 'active' && !isActive) return false;
+      if (_statusFilter == 'inactive' && isActive) return false;
+    }
+
+    if (_typeFilter != 'all' && sensor.sensorTypeId != _typeFilter) {
       return false;
     }
 
-    if (_webhookFilter != 'all') {
-      final hasWebhook = _hasWebhook(safeIndex);
-      if (_webhookFilter == 'configured' && !hasWebhook) return false;
-      if (_webhookFilter == 'not_configured' && hasWebhook) return false;
+    if (_deviceFilter != 'all' && sensor.deviceId != _deviceFilter) {
+      return false;
     }
 
     return true;
@@ -585,8 +580,8 @@ class _DevicesScreenState extends State<DevicesScreen> {
   Widget build(BuildContext context) {
     return Consumer<DatabaseProvider>(
       builder: (context, db, child) {
-        final devices =
-            db.devices.where((d) => _matchesFilters(db, d)).toList();
+        final sensors =
+            db.sensors.where((s) => _matchesFilters(db, s)).toList();
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
@@ -596,12 +591,13 @@ class _DevicesScreenState extends State<DevicesScreen> {
               _buildHeader(context),
               if (_showFilters) ...[
                 const SizedBox(height: 18),
-                _buildFiltersPanel(context, devices.length, db.devices.length),
+                _buildFiltersPanel(
+                    context, db, sensors.length, db.sensors.length),
               ],
               const SizedBox(height: 18),
               _isListView
-                  ? _buildList(context, db, devices)
-                  : _buildGrid(context, db, devices),
+                  ? _buildList(context, db, sensors)
+                  : _buildGrid(context, db, sensors),
             ],
           ),
         );
@@ -621,7 +617,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Device Management',
+              'Sensor Management',
               style: TextStyle(
                 fontSize: 34,
                 fontWeight: FontWeight.w800,
@@ -632,7 +628,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
             ),
             const SizedBox(height: 2),
             Text(
-              'Configure and monitor sensor devices',
+              'Configure and monitor sensors',
               style: TextStyle(
                 fontSize: 15,
                 color:
@@ -646,11 +642,13 @@ class _DevicesScreenState extends State<DevicesScreen> {
           runSpacing: 8,
           children: [
             _headerButton(
+              context: context,
               label: 'Filters',
               icon: Icons.filter_list,
               onTap: () => setState(() => _showFilters = !_showFilters),
             ),
             _headerButton(
+              context: context,
               label: _isListView ? 'Cards' : 'List',
               icon: _isListView
                   ? Icons.grid_view_rounded
@@ -658,6 +656,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
               onTap: () => setState(() => _isListView = !_isListView),
             ),
             _headerButton(
+              context: context,
               label: 'Export',
               icon: Icons.upload_outlined,
               onTap: () {
@@ -667,10 +666,11 @@ class _DevicesScreenState extends State<DevicesScreen> {
               },
             ),
             _headerButton(
+              context: context,
               label: 'Add',
               icon: Icons.add,
               primary: true,
-              onTap: () => _showDeviceModal(),
+              onTap: () => _showSensorModal(),
             ),
           ],
         ),
@@ -679,47 +679,41 @@ class _DevicesScreenState extends State<DevicesScreen> {
   }
 
   Widget _headerButton({
+    required BuildContext context,
     required String label,
     required IconData icon,
     required VoidCallback onTap,
     bool primary = false,
   }) {
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final bg = primary
+        ? const Color(0xFF0f729c)
+        : (isLight ? const Color(0xFFe6eff3) : const Color(0xFF243E52));
+    final border = primary
+        ? const Color(0xFF0f729c)
+        : (isLight ? const Color(0xFFc8d6dd) : Theme.of(context).dividerColor);
+    final fg = primary
+        ? Colors.white
+        : (isLight ? const Color(0xFF18313f) : const Color(0xFFD7E8F6));
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         decoration: BoxDecoration(
-          color: primary
-              ? const Color(0xFF0f729c)
-              : (isLight ? const Color(0xFFe6eff3) : const Color(0xFF243E52)),
+          color: bg,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: primary
-                ? const Color(0xFF0f729c)
-                : Theme.of(context).dividerColor,
-          ),
+          border: Border.all(color: border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon,
-                size: 19,
-                color: primary
-                    ? Colors.white
-                    : (isLight
-                        ? const Color(0xFF18313f)
-                        : const Color(0xFFD7E8F6))),
+            Icon(icon, size: 19, color: fg),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                color: primary
-                    ? Colors.white
-                    : (isLight
-                        ? const Color(0xFF18313f)
-                        : const Color(0xFFD7E8F6)),
+                color: fg,
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
@@ -731,8 +725,16 @@ class _DevicesScreenState extends State<DevicesScreen> {
   }
 
   Widget _buildFiltersPanel(
-      BuildContext context, int filteredCount, int totalCount) {
+    BuildContext context,
+    DatabaseProvider db,
+    int filteredCount,
+    int totalCount,
+  ) {
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final titleColor =
+        isLight ? const Color(0xFF243946) : const Color(0xFFD8E8F5);
+    final mutedColor =
+        isLight ? const Color(0xFF60717c) : const Color(0xFF9FB4C6);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
@@ -745,12 +747,11 @@ class _DevicesScreenState extends State<DevicesScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Filter Devices',
+            'Filter Sensors',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color:
-                  isLight ? const Color(0xFF243946) : const Color(0xFFD7E8F6),
+              color: titleColor,
             ),
           ),
           const SizedBox(height: 16),
@@ -765,7 +766,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                   onChanged: (value) => setState(() => _searchQuery = value),
                   decoration: _filterFieldDecoration(
                     label: 'Search',
-                    hint: 'Device ID, Serial, MAC, IP...',
+                    hint: 'Sensor ID, Serial, MAC...',
                     icon: Icons.search,
                   ),
                 ),
@@ -780,9 +781,6 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     DropdownMenuItem(value: 'active', child: Text('Active')),
                     DropdownMenuItem(
                         value: 'inactive', child: Text('Inactive')),
-                    DropdownMenuItem(
-                        value: 'maintenance', child: Text('Maintenance')),
-                    DropdownMenuItem(value: 'retired', child: Text('Retired')),
                   ],
                   onChanged: (value) =>
                       setState(() => _statusFilter = value ?? 'all'),
@@ -791,17 +789,39 @@ class _DevicesScreenState extends State<DevicesScreen> {
               SizedBox(
                 width: 190,
                 child: DropdownButtonFormField<String>(
-                  value: _webhookFilter,
-                  decoration: _filterFieldDecoration(label: 'Webhook'),
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('All')),
-                    DropdownMenuItem(
-                        value: 'configured', child: Text('Configured')),
-                    DropdownMenuItem(
-                        value: 'not_configured', child: Text('Not Configured')),
+                  value: _typeFilter,
+                  decoration: _filterFieldDecoration(label: 'Sensor Type'),
+                  items: [
+                    const DropdownMenuItem(
+                        value: 'all', child: Text('All Types')),
+                    ...db.sensorTypes.map(
+                      (type) => DropdownMenuItem(
+                        value: type.id,
+                        child: Text(type.name),
+                      ),
+                    ),
                   ],
                   onChanged: (value) =>
-                      setState(() => _webhookFilter = value ?? 'all'),
+                      setState(() => _typeFilter = value ?? 'all'),
+                ),
+              ),
+              SizedBox(
+                width: 190,
+                child: DropdownButtonFormField<String>(
+                  value: _deviceFilter,
+                  decoration: _filterFieldDecoration(label: 'Device'),
+                  items: [
+                    const DropdownMenuItem(
+                        value: 'all', child: Text('All Devices')),
+                    ...db.devices.map(
+                      (device) => DropdownMenuItem(
+                        value: device.id,
+                        child: Text(device.deviceCode),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _deviceFilter = value ?? 'all'),
                 ),
               ),
               Container(
@@ -810,17 +830,17 @@ class _DevicesScreenState extends State<DevicesScreen> {
                 decoration: BoxDecoration(
                   color: isLight
                       ? const Color(0xFFe6eff3)
-                      : const Color(0xFF253F52),
+                      : const Color(0xFF243E52),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  'Showing $filteredCount of $totalCount devices',
+                  'Showing $filteredCount of $totalCount sensors',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: isLight
                         ? const Color(0xFF324956)
-                        : const Color(0xFFD7E8F6),
+                        : const Color(0xFFD4E5F2),
                   ),
                 ),
               ),
@@ -834,8 +854,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,
-              color:
-                  isLight ? const Color(0xFF60717c) : const Color(0xFFBBD0E0),
+              color: mutedColor,
             ),
           ),
           const SizedBox(height: 12),
@@ -897,15 +916,14 @@ class _DevicesScreenState extends State<DevicesScreen> {
     String? hint,
     IconData? icon,
   }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return InputDecoration(
       labelText: label,
       hintText: hint,
       prefixIcon: icon == null ? null : Icon(icon, size: 20),
       isDense: true,
       filled: true,
-      fillColor: Theme.of(context).brightness == Brightness.light
-          ? const Color(0xFFF4F8FA)
-          : const Color(0xFF1E3A52),
+      fillColor: isLight ? const Color(0xFFF4F8FA) : const Color(0xFF223B4E),
       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -926,7 +944,10 @@ class _DevicesScreenState extends State<DevicesScreen> {
   }
 
   Widget _buildGrid(
-      BuildContext context, DatabaseProvider db, List<Device> devices) {
+    BuildContext context,
+    DatabaseProvider db,
+    List<Sensor> sensors,
+  ) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
@@ -946,7 +967,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: devices.length,
+          itemCount: sensors.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
             crossAxisSpacing: 16,
@@ -954,33 +975,39 @@ class _DevicesScreenState extends State<DevicesScreen> {
             childAspectRatio: ratio,
           ),
           itemBuilder: (context, index) {
-            final device = devices[index];
-            final globalIndex = db.devices.indexOf(device);
+            final sensor = sensors[index];
+            final globalIndex = db.sensors.indexOf(sensor);
+            final type = _sensorTypeLabel(sensor.sensorTypeId, db);
+            final deviceName = db.devices
+                    .where((d) => d.id == sensor.deviceId)
+                    .map((d) => d.deviceCode)
+                    .firstOrNull ??
+                'Unassigned';
+            final isActive = !_inactiveSensors.contains(sensor.id);
             final siteName = db.sites
-                .where((s) => s.id == device.siteId)
-                .map((s) => s.name)
-                .firstOrNull;
-            final zoneName = db.zones
-                .where((z) => z.id == device.zoneId)
-                .map((z) => z.name)
-                .firstOrNull;
-            final channels =
-                db.sensors.where((s) => s.deviceId == device.id).length;
-            final location = siteName ?? 'Location not set';
+                    .where((s) =>
+                        s.id ==
+                        db.devices
+                            .where((d) => d.id == sensor.deviceId)
+                            .map((d) => d.siteId)
+                            .firstOrNull)
+                    .map((s) => s.name)
+                    .firstOrNull ??
+                'Location not set';
 
-            return _DeviceCard(
-              title: device.deviceCode,
-              serial: _serialFor(globalIndex < 0 ? index : globalIndex),
-              status: device.status,
-              mac: _macFor(globalIndex < 0 ? index : globalIndex),
-              ip: _ipFor(globalIndex < 0 ? index : globalIndex),
-              channels: channels == 0 ? 4 + index : channels,
-              lastSeen: _date(device.installedAt),
-              location: location,
-              zone: zoneName ?? 'Unknown',
-              onEdit: () => _showDeviceModal(device: device),
-              onPower: () => _togglePower(db, device),
-              onDelete: () => db.delete('devices', device.id),
+            return _SensorCard(
+              title: _sensorCodeFor(globalIndex < 0 ? index : globalIndex),
+              sensorType: type,
+              serial: sensor.serialNumber,
+              connectedDevice: deviceName,
+              channel: _channelFor(globalIndex < 0 ? index : globalIndex),
+              unit: _unitForType(type),
+              location: siteName,
+              icon: _iconForType(type),
+              status: isActive ? 'active' : 'inactive',
+              onEdit: () => _showSensorModal(sensor: sensor),
+              onPower: () => _togglePower(sensor.id),
+              onDelete: () => db.delete('sensors', sensor.id),
             );
           },
         );
@@ -989,32 +1016,43 @@ class _DevicesScreenState extends State<DevicesScreen> {
   }
 
   Widget _buildList(
-      BuildContext context, DatabaseProvider db, List<Device> devices) {
+    BuildContext context,
+    DatabaseProvider db,
+    List<Sensor> sensors,
+  ) {
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: devices.length,
+      itemCount: sensors.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
-        final device = devices[index];
-        final globalIndex = db.devices.indexOf(device);
+        final sensor = sensors[index];
+        final globalIndex = db.sensors.indexOf(sensor);
         final safeIndex = globalIndex < 0 ? index : globalIndex;
+        final type = _sensorTypeLabel(sensor.sensorTypeId, db);
+        final deviceName = db.devices
+                .where((d) => d.id == sensor.deviceId)
+                .map((d) => d.deviceCode)
+                .firstOrNull ??
+            'Unassigned';
         final siteName = db.sites
-            .where((s) => s.id == device.siteId)
-            .map((s) => s.name)
-            .firstOrNull;
-        final zoneName = db.zones
-            .where((z) => z.id == device.zoneId)
-            .map((z) => z.name)
-            .firstOrNull;
-        final channels =
-            db.sensors.where((s) => s.deviceId == device.id).length;
-        final location = siteName ?? 'Location not set';
-        final statusColor = device.status == 'active'
+                .where((s) =>
+                    s.id ==
+                    db.devices
+                        .where((d) => d.id == sensor.deviceId)
+                        .map((d) => d.siteId)
+                        .firstOrNull)
+                .map((s) => s.name)
+                .firstOrNull ??
+            'Location not set';
+        final status =
+            _inactiveSensors.contains(sensor.id) ? 'inactive' : 'active';
+        final isLight = Theme.of(context).brightness == Brightness.light;
+        final statusColor = status == 'active'
             ? const Color(0xFF0ca15f)
-            : const Color(0xFF8397a3);
+            : (isLight ? const Color(0xFF8397a3) : const Color(0xFF9FB4C6));
         final metaLine =
-            '${_macFor(safeIndex)} • ${_ipFor(safeIndex)} • ${channels == 0 ? 4 + index : channels} • ${_date(device.installedAt)} • $location • ${zoneName ?? 'Unknown'}';
+            '${sensor.serialNumber} • $deviceName • ${_channelFor(safeIndex)} • ${_unitForType(type)} • $siteName';
 
         return Container(
           padding: const EdgeInsets.all(14),
@@ -1028,12 +1066,15 @@ class _DevicesScreenState extends State<DevicesScreen> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.memory,
-                      size: 20, color: Theme.of(context).colorScheme.primary),
+                  Icon(
+                    _iconForType(type),
+                    size: 20,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${device.deviceCode} • ${_serialFor(safeIndex)}',
+                      '${_sensorCodeFor(safeIndex)} • $type',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -1041,7 +1082,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         fontWeight: FontWeight.w800,
                         color: Theme.of(context).brightness == Brightness.light
                             ? const Color(0xFF152733)
-                            : const Color(0xFFD7E8F6),
+                            : const Color(0xFFE2EDF8),
                       ),
                     ),
                   ),
@@ -1053,7 +1094,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      device.status,
+                      status,
                       style: TextStyle(
                         color: statusColor,
                         fontSize: 12,
@@ -1080,17 +1121,22 @@ class _DevicesScreenState extends State<DevicesScreen> {
               Row(
                 children: [
                   IconButton(
-                    onPressed: () => _showDeviceModal(device: device),
-                    icon: const Icon(Icons.edit_outlined),
+                    onPressed: () => _showSensorModal(sensor: sensor),
+                    icon: Icon(
+                      Icons.edit_outlined,
+                      color: isLight
+                          ? const Color(0xFF2F4654)
+                          : const Color(0xFFBBD0E0),
+                    ),
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
-                    onPressed: () => _togglePower(db, device),
-                    icon: const Icon(Icons.power_settings_new),
+                    onPressed: () => _togglePower(sensor.id),
+                    icon: Icon(Icons.power_settings_new, color: statusColor),
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
-                    onPressed: () => db.delete('devices', device.id),
+                    onPressed: () => db.delete('sensors', sensor.id),
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
                     visualDensity: VisualDensity.compact,
                   ),
@@ -1104,30 +1150,30 @@ class _DevicesScreenState extends State<DevicesScreen> {
   }
 }
 
-class _DeviceCard extends StatelessWidget {
+class _SensorCard extends StatelessWidget {
   final String title;
+  final String sensorType;
   final String serial;
-  final String status;
-  final String mac;
-  final String ip;
-  final int channels;
-  final String lastSeen;
+  final String connectedDevice;
+  final int channel;
+  final String unit;
   final String location;
-  final String zone;
+  final IconData icon;
+  final String status;
   final VoidCallback onEdit;
   final VoidCallback onPower;
   final VoidCallback onDelete;
 
-  const _DeviceCard({
+  const _SensorCard({
     required this.title,
+    required this.sensorType,
     required this.serial,
-    required this.status,
-    required this.mac,
-    required this.ip,
-    required this.channels,
-    required this.lastSeen,
+    required this.connectedDevice,
+    required this.channel,
+    required this.unit,
     required this.location,
-    required this.zone,
+    required this.icon,
+    required this.status,
     required this.onEdit,
     required this.onPower,
     required this.onDelete,
@@ -1135,9 +1181,8 @@ class _DeviceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
     final isActive = status == 'active';
-    final isOffline = status == 'inactive' || status == 'retired';
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final statusColor =
         isActive ? const Color(0xFF0ca15f) : const Color(0xFF8397a3);
 
@@ -1149,7 +1194,7 @@ class _DeviceCard extends StatelessWidget {
         border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isLight ? 0.04 : 0.18),
+            color: Colors.black.withValues(alpha: isLight ? 0.04 : 0.16),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -1165,12 +1210,15 @@ class _DeviceCard extends StatelessWidget {
                 height: 52,
                 decoration: BoxDecoration(
                   color: isLight
-                      ? const Color(0xFFdbe7ed)
-                      : const Color(0xFF2B4659),
+                      ? const Color(0xFFdfe3ef)
+                      : const Color(0xFF2A3F54),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(Icons.memory,
-                    color: Theme.of(context).colorScheme.primary, size: 26),
+                child: Icon(
+                  icon,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 26,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1182,20 +1230,20 @@ class _DeviceCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 22,
+                        fontSize: 30 > 22 ? 30 - 8 : 22,
                         fontWeight: FontWeight.w800,
                         color: isLight
                             ? const Color(0xFF152733)
-                            : const Color(0xFFD7E8F6),
+                            : const Color(0xFFE2EDF8),
                       ),
                     ),
                     Text(
-                      serial,
+                      sensorType,
                       style: TextStyle(
                         fontSize: 14,
                         color: isLight
                             ? const Color(0xFF60717c)
-                            : const Color(0xFFBBD0E0),
+                            : const Color(0xFF9FB4C6),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1221,19 +1269,15 @@ class _DeviceCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(child: _meta(context, 'MAC Address', mac)),
-              const SizedBox(width: 10),
-              Expanded(child: _meta(context, 'IP Address', ip)),
-            ],
-          ),
+          _meta(context, 'Serial Number', serial),
+          const SizedBox(height: 8),
+          _meta(context, 'Connected Device', connectedDevice),
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(child: _meta(context, 'Channels', '$channels')),
+              Expanded(child: _meta(context, 'Channel', '$channel')),
               const SizedBox(width: 10),
-              Expanded(child: _meta(context, 'Last Seen', lastSeen)),
+              Expanded(child: _meta(context, 'Unit', unit)),
             ],
           ),
           const SizedBox(height: 10),
@@ -1242,13 +1286,16 @@ class _DeviceCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color:
-                  isLight ? const Color(0xFFe9f0f4) : const Color(0xFF253F52),
+                  isLight ? const Color(0xFFe9f0f4) : const Color(0xFF233C4F),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
-                Icon(Icons.location_on_outlined,
-                    size: 18, color: Theme.of(context).colorScheme.primary),
+                Icon(
+                  Icons.location_on_outlined,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -1258,7 +1305,7 @@ class _DeviceCard extends StatelessWidget {
                     style: TextStyle(
                       color: isLight
                           ? const Color(0xFF2c404d)
-                          : const Color(0xFFD7E8F6),
+                          : const Color(0xFFD3E4F2),
                       fontSize: 13,
                     ),
                   ),
@@ -1266,63 +1313,21 @@ class _DeviceCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.wifi,
-                      size: 18,
-                      color: isOffline ? Colors.grey : const Color(0xFF0ca15f)),
-                  const SizedBox(width: 6),
-                  Text(
-                    isOffline ? 'Disconnected' : 'WiFi Connected',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isOffline
-                          ? const Color(0xFF7f8f98)
-                          : const Color(0xFF0ca15f),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isLight
-                      ? const Color(0xFFe8edf1)
-                      : const Color(0xFF253F52),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Theme.of(context).dividerColor),
-                ),
-                child: Text(
-                  zone,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: isLight
-                        ? const Color(0xFF243946)
-                        : const Color(0xFFD7E8F6),
-                  ),
-                ),
-              ),
-            ],
-          ),
           const Spacer(),
           Row(
             children: [
-              _iconButton(context, icon: Icons.edit_outlined, onTap: onEdit),
-              const SizedBox(width: 8),
-              _iconButton(context,
-                  icon: Icons.power_settings_new, onTap: onPower),
+              _iconButton(
+                  context: context, icon: Icons.edit_outlined, onTap: onEdit),
               const SizedBox(width: 8),
               _iconButton(
-                context,
+                context: context,
+                icon: Icons.power_settings_new,
+                onTap: onPower,
+                iconColor: statusColor,
+              ),
+              const SizedBox(width: 8),
+              _iconButton(
+                context: context,
                 icon: Icons.delete_outline,
                 onTap: onDelete,
                 iconColor: Colors.red,
@@ -1343,7 +1348,7 @@ class _DeviceCard extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: isLight ? const Color(0xFF60717c) : const Color(0xFFBBD0E0),
+            color: isLight ? const Color(0xFF60717c) : const Color(0xFF9FB4C6),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -1354,7 +1359,7 @@ class _DeviceCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 18,
-            color: isLight ? const Color(0xFF152733) : const Color(0xFFD7E8F6),
+            color: isLight ? const Color(0xFF152733) : const Color(0xFFE2EDF8),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -1362,13 +1367,15 @@ class _DeviceCard extends StatelessWidget {
     );
   }
 
-  Widget _iconButton(
-    BuildContext context, {
+  Widget _iconButton({
+    required BuildContext context,
     required IconData icon,
     required VoidCallback onTap,
-    Color iconColor = const Color(0xFF2f4654),
+    Color? iconColor,
   }) {
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final resolvedIconColor = iconColor ??
+        (isLight ? const Color(0xFF2F4654) : const Color(0xFFBBD0E0));
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -1380,13 +1387,7 @@ class _DeviceCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: Theme.of(context).dividerColor),
         ),
-        child: Icon(
-          icon,
-          size: 20,
-          color: iconColor == const Color(0xFF2f4654) && !isLight
-              ? const Color(0xFFD7E8F6)
-              : iconColor,
-        ),
+        child: Icon(icon, size: 20, color: resolvedIconColor),
       ),
     );
   }

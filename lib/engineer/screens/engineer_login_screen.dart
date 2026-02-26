@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../pages/engineer_page.dart';
-import '../../widgets/login_preferences_button.dart';
+import '../engineer_page.dart';
+import '../../super_admin/widgets/login_preferences_button.dart';
 
 class EngineerLoginScreen extends StatefulWidget {
   const EngineerLoginScreen({super.key});

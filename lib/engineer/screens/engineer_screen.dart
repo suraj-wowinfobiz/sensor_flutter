@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/responsive/responsive_extensions.dart';
+import '../../super_admin/core/responsive/responsive_extensions.dart';
 import '../providers/engineer_database_provider.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';

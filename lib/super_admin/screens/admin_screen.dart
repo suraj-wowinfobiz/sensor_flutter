@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
+import '../../main_page.dart';
 import '../core/responsive/responsive_extensions.dart';
-import '../providers/database_provider.dart';
+import '../providers/super_admin_database_provider.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/side_menu.dart';
 import 'alerts_screen.dart';
@@ -12,7 +13,6 @@ import 'audit_screen.dart';
 import 'config_screen.dart';
 import 'dashboard_screen.dart';
 import 'devices_screen.dart';
-import 'login_screen.dart';
 import 'organizations_screen.dart';
 import 'reports_screen.dart';
 import 'sensors_screen.dart';
@@ -66,7 +66,7 @@ class _AdminScreenState extends State<AdminScreen>
 
   void _logout() {
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(builder: (_) => const MainPage()),
       (route) => false,
     );
   }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/user.dart';
-import '../providers/database_provider.dart';
+import '../providers/super_admin_database_provider.dart';
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});

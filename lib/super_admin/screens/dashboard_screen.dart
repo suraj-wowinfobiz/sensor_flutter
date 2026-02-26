@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:fl_chart/fl_chart.dart';
@@ -5,12 +6,58 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../shared/models/threshold_rule.dart';
-import '../providers/database_provider.dart';
+import '../providers/super_admin_database_provider.dart';
+import '../services/analytics_sse_service.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   final bool embeddedScroll;
 
   const DashboardScreen({super.key, this.embeddedScroll = false});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final AnalyticsSseService _sseService = AnalyticsSseService();
+  final List<FlSpot> _liveData = [];
+  int _dataPointIndex = 0;
+  StreamSubscription? _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _connectToSSE();
+  }
+
+  void _connectToSSE() async {
+    await _sseService.connect();
+    _subscription = _sseService.stream.listen((data) {
+      if (mounted && data['eventType'] == 'analytics-live') {
+        setState(() {
+          final value = (data['x'] ?? 0).toDouble() / 1000000000000;
+          debugPrint('➕ Adding SSE point: x=$_dataPointIndex, y=$value');
+          _liveData.add(FlSpot(_dataPointIndex.toDouble(), value));
+          _dataPointIndex++;
+          if (_liveData.length > 65) {
+            _liveData.removeAt(0);
+            for (int i = 0; i < _liveData.length; i++) {
+              _liveData[i] = FlSpot(i.toDouble(), _liveData[i].y);
+            }
+            _dataPointIndex = _liveData.length;
+          }
+          debugPrint('📊 Total points: ${_liveData.length}');
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    _sseService.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +104,7 @@ class DashboardScreen extends StatelessWidget {
       },
     );
 
-    if (embeddedScroll) return content;
+    if (widget.embeddedScroll) return content;
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -161,7 +208,19 @@ class DashboardScreen extends StatelessWidget {
                         color: _titleColor(context),
                       ),
                     ),
-                  )
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _liveData.isEmpty ? Colors.orange : Colors.green,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _liveData.isEmpty ? 'Waiting...' : 'Live ${_liveData.length} pts',
+                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ],
               ),
               Wrap(
@@ -239,12 +298,14 @@ class DashboardScreen extends StatelessWidget {
                 ),
                 lineBarsData: [
                   LineChartBarData(
-                    spots: List.generate(65, (i) {
-                      final y = 47 +
-                          (sin(i / 5) * 6) +
-                          (Random(i + 2).nextDouble() * 16);
-                      return FlSpot(i.toDouble(), y);
-                    }),
+                    spots: _liveData.isEmpty
+                        ? List.generate(65, (i) {
+                            final y = 47 +
+                                (sin(i / 5) * 6) +
+                                (Random(i + 2).nextDouble() * 16);
+                            return FlSpot(i.toDouble(), y);
+                          })
+                        : _liveData,
                     isCurved: true,
                     color: const Color(0xFF0f9ca0),
                     barWidth: 3,

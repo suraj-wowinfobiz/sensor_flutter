@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../widgets/login_preferences_button.dart';
+import '../api/super_admin_login_api.dart';
 import 'admin_screen.dart';
 
 class SuperAdminLoginScreen extends StatefulWidget {
@@ -16,8 +16,9 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
-  void _login() {
-    if (_emailController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
+  Future<void> _login() async {
+    if (_emailController.text.trim().isEmpty ||
+        _passwordController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter email and password')),
       );
@@ -26,22 +27,47 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
 
     setState(() => _isLoading = true);
 
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const AdminScreen()),
+    try {
+      print('Calling login API...');
+      final response = await SuperAdminLoginApi.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
       );
-    });
+      print('API Response: status=${response.status}, message=${response.message}');
+
+      if (!mounted) return;
+
+      if (response.status.toUpperCase() == 'SUCCESS') {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const AdminScreen()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login failed')),
+        );
+      }
+    } catch (e) {
+      print('Login error: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login failed: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final titleColor = isLight ? const Color(0xFF1A2B3C) : const Color(0xFFD7E8F6);
-    final subColor = isLight ? const Color(0xFF5F7285) : const Color(0xFF9DB7D2);
-    final labelColor = isLight ? const Color(0xFF2D3E50) : const Color(0xFFD7E8F6);
-    final inputFill = isLight ? const Color(0xFFF8FAFB) : const Color(0xFF1E3A52);
+    final titleColor =
+        isLight ? const Color(0xFF1A2B3C) : const Color(0xFFD7E8F6);
+    final subColor =
+        isLight ? const Color(0xFF5F7285) : const Color(0xFF9DB7D2);
+    final labelColor =
+        isLight ? const Color(0xFF2D3E50) : const Color(0xFFD7E8F6);
+    final inputFill =
+        isLight ? const Color(0xFFF8FAFB) : const Color(0xFF1E3A52);
     final borderColor = Theme.of(context).dividerColor;
     final primary = Theme.of(context).colorScheme.primary;
 
@@ -115,7 +141,8 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide(color: primary, width: 2),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 18),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -133,15 +160,19 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     hintText: '••••••••',
-                    hintStyle: TextStyle(color: subColor, fontSize: 20, letterSpacing: 2),
+                    hintStyle: TextStyle(
+                        color: subColor, fontSize: 20, letterSpacing: 2),
                     filled: true,
                     fillColor: inputFill,
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        _obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
                         color: subColor,
                       ),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -155,7 +186,8 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide(color: primary, width: 2),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 18),
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -178,7 +210,8 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : const Text(

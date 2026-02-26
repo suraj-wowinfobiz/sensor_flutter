@@ -5,9 +5,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 
-import 'core/providers/theme_riverpod_provider.dart';
-import 'screens/login_screen.dart';
-import 'screens/super_admin_login_screen.dart';
+import 'main_page.dart';
+import 'super_admin/core/providers/theme_riverpod_provider.dart';
+import 'super_admin/screens/super_admin_login_screen.dart';
 import 'user/screens/user_login_screen.dart';
 import 'user_admin/screens/user_admin_login_screen.dart';
 import 'engineer/screens/engineer_login_screen.dart';
@@ -93,7 +93,7 @@ class _AppRoot extends ConsumerWidget {
             child: child ?? const SizedBox.shrink(),
           );
         },
-        home: const LoginScreen(),
+        home: const MainPage(),
         routes: {
           '/login/user': (context) => const UserLoginScreen(),
           '/login/user-admin': (context) => const UserAdminLoginScreen(),

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../api/organization_api.dart';
 import '../models/organization.dart';
 import '../models/site.dart';
 import '../models/zone.dart';
-import '../providers/database_provider.dart';
+import '../providers/super_admin_database_provider.dart';
 import '../widgets/crud_modal.dart';
 
 class OrganizationsScreen extends StatefulWidget {
@@ -86,22 +87,40 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                 ],
               },
             ],
-            onSave: () {
+            onSave: () async {
               if (organization == null) {
-                db.create('organizations', {
-                  'name': name,
-                  'email': email,
-                  'status': status,
-                  'owner_user_id': db.users.first.id,
-                });
+                try {
+                  final response = await OrganizationApi.createOrganization(
+                    name: name,
+                    email: email,
+                  );
+                  db.create('organizations', {
+                    'name': response.body.name,
+                    'email': response.body.email,
+                    'status': response.body.status.toLowerCase(),
+                    'owner_user_id': db.users.first.id,
+                  });
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(response.message)),
+                    );
+                    Navigator.pop(context);
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e')),
+                    );
+                  }
+                }
               } else {
                 db.update('organizations', organization.id, {
                   'name': name,
                   'email': email,
                   'status': status,
                 });
+                Navigator.pop(context);
               }
-              Navigator.pop(context);
             },
             onCancel: () => Navigator.pop(context),
           );

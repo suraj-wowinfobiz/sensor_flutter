@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:fl_chart/fl_chart.dart';
@@ -5,7 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../shared/models/threshold_rule.dart';
-import '../providers/database_provider.dart';
+import '../providers/super_admin_database_provider.dart';
+import '../api/analytics_live_api.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -28,6 +30,41 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   String _siteFilter = 'all';
   String _zoneFilter = 'all';
   String _locationFilter = 'all';
+  
+  final List<FlSpot> _liveData = [];
+  int _dataPointIndex = 0;
+  StreamSubscription? _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _startLiveDataFetch();
+  }
+
+  void _startLiveDataFetch() {
+    _subscription = AnalyticsLiveApi.connectToLiveStream().listen((event) {
+      if (mounted && !_paused) {
+        setState(() {
+          final value = event.x / 1000000000000;
+          _liveData.add(FlSpot(_dataPointIndex.toDouble(), value));
+          _dataPointIndex++;
+          if (_liveData.length > 40) {
+            _liveData.removeAt(0);
+            for (int i = 0; i < _liveData.length; i++) {
+              _liveData[i] = FlSpot(i.toDouble(), _liveData[i].y);
+            }
+            _dataPointIndex = _liveData.length;
+          }
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -303,74 +340,56 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       },
                     ),
                     const SizedBox(height: 14),
-                    _buildThresholdLegend(graphThresholds),
-                    const SizedBox(height: 10),
-                    if (selected == null)
-                      const SizedBox(
-                        height: 400,
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.insert_chart_outlined,
-                                  size: 64, color: Color(0xFF93A6B2)),
-                              SizedBox(height: 12),
-                              Text(
-                                'Select a sensor to view analytics',
-                                style: TextStyle(
-                                  fontSize: 30,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF4A6270),
-                                ),
-                              ),
-                              SizedBox(height: 6),
-                              Text(
-                                'Use the filters above to find sensors, then select one to visualize its data',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: Color(0xFF657C89),
-                                ),
-                              ),
-                            ],
+                    Row(
+                      children: [
+                        Icon(
+                          _liveData.isNotEmpty ? Icons.circle : Icons.circle_outlined,
+                          size: 12,
+                          color: _liveData.isNotEmpty ? Colors.green : Colors.orange,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _liveData.isNotEmpty ? 'Receiving Data' : 'Waiting for data...',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _liveData.isNotEmpty ? Colors.green : Colors.orange,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      )
-                    else
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Sensor: ${selected.serialNumber}  |  Last reading: ${selected.lastReading.toStringAsFixed(2)}°',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF4F6573),
-                              fontWeight: FontWeight.w600,
-                            ),
+                        const SizedBox(width: 16),
+                        Text(
+                          'Data points: ${_liveData.length}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF4F6573),
+                            fontWeight: FontWeight.w600,
                           ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: 400,
-                            child: LineChart(
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    _buildThresholdLegend(graphThresholds),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 400,
+                      child: _liveData.isEmpty
+                          ? const Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CircularProgressIndicator(),
+                                  SizedBox(height: 12),
+                                  Text('Waiting for live data...'),
+                                ],
+                              ),
+                            )
+                          : LineChart(
                               LineChartData(
-                                minY: -3,
-                                maxY: 6,
-                                extraLinesData: ExtraLinesData(
-                                  horizontalLines: graphThresholds
-                                      .map(
-                                        (threshold) => HorizontalLine(
-                                          y: threshold.value,
-                                          color: threshold.color,
-                                          strokeWidth: 1.8,
-                                          dashArray: const [6, 4],
-                                        ),
-                                      )
-                                      .toList(),
-                                ),
+                                minY: _liveData.map((e) => e.y).reduce((a, b) => a < b ? a : b) - 0.5,
+                                maxY: _liveData.map((e) => e.y).reduce((a, b) => a > b ? a : b) + 0.5,
                                 gridData: FlGridData(
                                   show: true,
                                   drawVerticalLine: false,
-                                  horizontalInterval: 1,
                                   getDrawingHorizontalLine: (_) =>
                                       const FlLine(color: Color(0xFFD2DBE0)),
                                 ),
@@ -395,44 +414,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                 ),
                                 lineBarsData: [
                                   LineChartBarData(
-                                    spots: List.generate(40, (i) {
-                                      final base = selected.lastReading;
-                                      final noise =
-                                          (Random(i + 21).nextDouble() - 0.5) *
-                                              (_paused ? 0.2 : 1.3);
-                                      return FlSpot(i.toDouble(), base + noise);
-                                    }),
+                                    spots: _liveData,
                                     isCurved: true,
                                     color: const Color(0xFF0f8f92),
                                     barWidth: 2.5,
                                     dotData: const FlDotData(show: false),
                                   ),
-                                  if (_compareMode != 'none')
-                                    LineChartBarData(
-                                      spots: List.generate(40, (i) {
-                                        final offset =
-                                            _compareMode == 'both' ? 1.4 : 0.9;
-                                        final noise =
-                                            (Random(i + 77).nextDouble() -
-                                                    0.5) *
-                                                1.1;
-                                        return FlSpot(
-                                            i.toDouble(),
-                                            selected.lastReading +
-                                                offset +
-                                                noise);
-                                      }),
-                                      isCurved: true,
-                                      color: const Color(0xFF5973D8),
-                                      barWidth: 2.0,
-                                      dotData: const FlDotData(show: false),
-                                    ),
                                 ],
                               ),
                             ),
-                          ),
-                        ],
-                      ),
+                    ),
                   ],
                 ),
               ),

@@ -15,9 +15,9 @@ import '../models/threshold_profile.dart';
 import '../models/threshold_value.dart';
 import '../models/user.dart';
 import '../models/zone.dart';
-import '../../super_admin/shared/models/threshold_rule.dart';
+import '../shared/models/threshold_rule.dart';
 
-class UserAdminDatabaseProvider extends ChangeNotifier {
+class DatabaseProvider extends ChangeNotifier {
   late List<Organization> organizations;
   late List<Site> sites;
   late List<Zone> zones;
@@ -73,7 +73,7 @@ class UserAdminDatabaseProvider extends ChangeNotifier {
     ),
   ];
 
-  UserAdminDatabaseProvider() {
+  DatabaseProvider() {
     _initializeData();
   }
 

@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../main_page.dart';
 import '../core/theme/custom_theme_tokens.dart';
 import '../providers/theme_provider.dart';
 import '../shared/models/threshold_rule.dart';
-import '../providers/database_provider.dart';
-import '../screens/login_screen.dart';
+import '../providers/super_admin_database_provider.dart';
 
 enum _SettingsTab {
   profile,
@@ -1012,7 +1012,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
               onPressed: () {
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(
-                    builder: (_) => const LoginScreen(),
+                    builder: (_) => const MainPage(),
                   ),
                   (route) => false,
                 );
@@ -1414,7 +1414,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
               onPressed: () {
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(
-                    builder: (_) => const LoginScreen(),
+                    builder: (_) => const MainPage(),
                   ),
                   (route) => false,
                 );

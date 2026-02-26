@@ -5,9 +5,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/theme/custom_theme_tokens.dart';
-import '../../services/live_readings_service.dart';
-import '../../shared/models/threshold_rule.dart';
+import '../../super_admin/core/theme/custom_theme_tokens.dart';
+import '../../super_admin/services/live_readings_service.dart';
+import '../../super_admin/shared/models/threshold_rule.dart';
 import '../providers/user_database_provider.dart';
 
 class UserDashboardScreen extends StatefulWidget {

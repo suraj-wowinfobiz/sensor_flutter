@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../core/responsive/adaptive_gap.dart';
-import '../../core/responsive/adaptive_text.dart';
-import '../../core/responsive/responsive_extensions.dart';
-import '../../core/responsive/responsive_values.dart';
+import '../../super_admin/core/responsive/adaptive_gap.dart';
+import '../../super_admin/core/responsive/adaptive_text.dart';
+import '../../super_admin/core/responsive/responsive_extensions.dart';
+import '../../super_admin/core/responsive/responsive_values.dart';
 
 class UserCrudModal extends StatelessWidget {
   final String title;

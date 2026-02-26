@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/zone.dart';
-import '../providers/database_provider.dart';
+import '../providers/super_admin_database_provider.dart';
 import '../widgets/crud_modal.dart';
 import '../widgets/crud_table.dart';
 

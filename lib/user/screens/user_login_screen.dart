@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../pages/user_page.dart';
-import '../../widgets/login_preferences_button.dart';
+import '../user_page.dart';
+import '../../super_admin/widgets/login_preferences_button.dart';
 
 class UserLoginScreen extends StatefulWidget {
   const UserLoginScreen({super.key});

@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/theme/custom_theme_tokens.dart';
-import '../../providers/theme_provider.dart';
-import '../../shared/models/threshold_rule.dart';
+import '../../super_admin/core/theme/custom_theme_tokens.dart';
+import '../../super_admin/providers/theme_provider.dart';
+import '../../super_admin/shared/models/threshold_rule.dart';
 import '../providers/user_admin_database_provider.dart';
 import '../screens/user_admin_login_screen.dart';
 
