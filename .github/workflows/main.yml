@@ -8,124 +8,98 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      VM_PORT: 12856
+      IIS_SITE_NAME: SensorWeb
+      IIS_SITE_PORT: 8097
+      IIS_SITE_ROOT: C:\Users\Administrator\Desktop\sensor_web\website
 
     steps:
-    # 1️⃣ Checkout
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 2️⃣ Setup Flutter
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.27.0'
         channel: 'stable'
 
-    # 3️⃣ Install dependencies
     - name: Install dependencies
       run: flutter pub get
 
-    # 4️⃣ Create .env (required by pubspec)
     - name: Create env file
       run: |
         mkdir -p assets
         echo "API_BASE_URL=http://103.211.202.145:8091/user-auth-service" > assets/.env
 
-    # 5️⃣ Build Flutter Web
     - name: Build Flutter Web
       run: flutter build web --release
 
-    # 6️⃣ Prepare files for SCP
-    - name: Prepare files for SCP
+    - name: Prepare deploy files
       run: |
         TMP_DIR=$GITHUB_WORKSPACE/deploy-files
         mkdir -p $TMP_DIR
-        
-        # Copy all web files individually instead of creating archive
-        cp -r build/web/* $TMP_DIR/
-        
+
+        # Keep hidden files too (if present)
+        cp -R build/web/. "$TMP_DIR/"
+
+        # Ensure IIS serves Flutter static assets correctly
+        cat > "$TMP_DIR/web.config" << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <configuration>
+          <system.webServer>
+            <defaultDocument>
+              <files>
+                <clear />
+                <add value="index.html" />
+              </files>
+            </defaultDocument>
+            <staticContent>
+              <mimeMap fileExtension=".wasm" mimeType="application/wasm" />
+              <mimeMap fileExtension=".json" mimeType="application/json" />
+              <mimeMap fileExtension=".webp" mimeType="image/webp" />
+            </staticContent>
+          </system.webServer>
+        </configuration>
+        EOF
+
         chmod -R 755 $TMP_DIR
         ls -la $TMP_DIR
 
-    # 7️⃣ Cleanup and prepare directory
-    - name: Cleanup and prepare directory
+    - name: Cleanup and prepare target directory
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
-        port: 12856
+        port: ${{ env.VM_PORT }}
+        script_stop: true
         script: |
-          echo === ENSURING DIRECTORY EXISTS ===
-          if not exist "C:\Users\Administrator\Desktop\sensor_web" (
-            mkdir "C:\Users\Administrator\Desktop\sensor_web"
-          )
-          
-          echo === CLEANUP EXISTING WEBSITE ===
-          if exist "C:\Users\Administrator\Desktop\sensor_web\website" (
-            rmdir /S /Q "C:\Users\Administrator\Desktop\sensor_web\website"
-          )
-          mkdir "C:\Users\Administrator\Desktop\sensor_web\website"
+          powershell -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; $root = '${{ env.IIS_SITE_ROOT }}'; New-Item -ItemType Directory -Path $root -Force | Out-Null; Remove-Item -Path ($root + '\*') -Recurse -Force -ErrorAction SilentlyContinue"
 
-    # 8️⃣ Copy files to Windows VM using SFTP
     - name: Copy files to Windows VM
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -p 12856 ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
-        
-        cd deploy-files
-        sftp -P 12856 -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
-        cd C:/Users/Administrator/Desktop/sensor_web/website
-        put -r *
-        bye
-        EOF
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USER }}
+        key: ${{ secrets.VM_SSH_KEY }}
+        port: ${{ env.VM_PORT }}
+        source: "deploy-files/*"
+        target: "C:/Users/Administrator/Desktop/sensor_web/website"
+        strip_components: 1
 
-    # 9️⃣ Deploy to Windows VM
-    - name: Deploy to Windows VM
+    - name: Configure IIS and verify deployment
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
-        port: 12856
+        port: ${{ env.VM_PORT }}
+        script_stop: true
         script: |
-          echo === ENSURING DIRECTORY EXISTS ===
-          if not exist "C:\Users\Administrator\Desktop\sensor_web\website" (
-            mkdir "C:\Users\Administrator\Desktop\sensor_web\website"
-          )
-          
-          echo === VERIFYING COPIED FILES ===
+          powershell -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; Import-Module WebAdministration; $siteName='${{ env.IIS_SITE_NAME }}'; $port=${{ env.IIS_SITE_PORT }}; $root='${{ env.IIS_SITE_ROOT }}'; if (-not (Test-Path $root)) { throw 'Site root does not exist: ' + $root }; if (Get-WebSite -Name $siteName -ErrorAction SilentlyContinue) { Remove-WebSite -Name $siteName }; New-WebSite -Name $siteName -Port $port -PhysicalPath $root -Force | Out-Null; Set-ItemProperty ('IIS:\Sites\' + $siteName) -Name applicationPool -Value 'DefaultAppPool'; Start-WebSite -Name $siteName"
+          netsh advfirewall firewall delete rule name="${{ env.IIS_SITE_NAME }} Port ${{ env.IIS_SITE_PORT }}" protocol=TCP localport=${{ env.IIS_SITE_PORT }} || echo Firewall rule did not exist
+          netsh advfirewall firewall add rule name="${{ env.IIS_SITE_NAME }} Port ${{ env.IIS_SITE_PORT }}" dir=in action=allow protocol=TCP localport=${{ env.IIS_SITE_PORT }}
+          icacls "C:\Users\Administrator\Desktop\sensor_web\website" /grant IIS_IUSRS:(OI)(CI)RX /T
           dir "C:\Users\Administrator\Desktop\sensor_web\website"
-          
-          echo === CONFIGURE IIS SITE ON PORT 8097 ===
-          powershell -Command "Import-Module WebAdministration; if (Test-Path 'IIS:\Sites\SensorWeb') { Remove-WebSite -Name 'SensorWeb' }; New-WebSite -Name 'SensorWeb' -Port 8097 -PhysicalPath 'C:\Users\Administrator\Desktop\sensor_web\website' -Force"
-          
-          echo === ADD FIREWALL RULE FOR PORT 8097 ===
-          netsh advfirewall firewall delete rule name="SensorWeb Port 8097" protocol=TCP localport=8097
-          netsh advfirewall firewall add rule name="SensorWeb Port 8097" dir=in action=allow protocol=TCP localport=8097
-          
-          echo === CREATE WEB.CONFIG ===
-          cd "C:\Users\Administrator\Desktop\sensor_web\website"
-          echo ^<?xml version="1.0" encoding="UTF-8"?^> > web.config
-          echo ^<configuration^> >> web.config
-          echo   ^<system.webServer^> >> web.config
-          echo     ^<defaultDocument^> >> web.config
-          echo       ^<files^> >> web.config
-          echo         ^<clear /^> >> web.config
-          echo         ^<add value="index.html" /^> >> web.config
-          echo       ^</files^> >> web.config
-          echo     ^</defaultDocument^> >> web.config
-          echo   ^</system.webServer^> >> web.config
-          echo ^</configuration^> >> web.config
-          
-          echo === SET PERMISSIONS ===
-          icacls "C:\Users\Administrator\Desktop\sensor_web\website" /grant IIS_IUSRS:(OI)(CI)F /T
-          
-          echo === START IIS SITE ===
-          powershell -Command "Import-Module WebAdministration; Start-WebSite -Name 'SensorWeb'"
-          
-          echo === DEPLOYMENT COMPLETE ===
-          echo Site is now running on http://103.211.202.145:8097
-          dir
+          echo Site is running on http://103.211.202.145:${{ env.IIS_SITE_PORT }}
