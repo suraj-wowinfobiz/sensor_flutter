@@ -21,8 +21,44 @@ class UsersApi {
         'name': name,
         'email': email,
         'password': password,
-        'organizationId': organizationId,
+        'organizationId': _organizationIdValue(organizationId),
         'role': role,
+      },
+    );
+    return _asMap(response.body);
+  }
+
+  static Future<Map<String, dynamic>> createAdminUser({
+    required String name,
+    required String email,
+    required String organizationId,
+    required String password,
+  }) async {
+    final response = await ApiClient.post(
+      '/api/v1/users',
+      data: {
+        'name': name,
+        'email': email,
+        'password': password,
+        'organizationId': _organizationIdValue(organizationId),
+      },
+    );
+    return _asMap(response.body);
+  }
+
+  static Future<Map<String, dynamic>> createVendor({
+    required String name,
+    required String email,
+    required String organizationId,
+    required String password,
+  }) async {
+    final response = await ApiClient.post(
+      '/api/v1/vendors',
+      data: {
+        'name': name,
+        'email': email,
+        'password': password,
+        'organizationId': _organizationIdValue(organizationId),
       },
     );
     return _asMap(response.body);
@@ -53,5 +89,10 @@ class UsersApi {
     if (body is Map<String, dynamic>) return body;
     if (body is Map) return body.cast<String, dynamic>();
     return const {};
+  }
+
+  static dynamic _organizationIdValue(String organizationId) {
+    // Return as string - API expects UUID
+    return organizationId.trim();
   }
 }

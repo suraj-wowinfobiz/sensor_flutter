@@ -50,11 +50,9 @@ class EngineerDashboardScreen extends StatelessWidget {
               const SizedBox(height: 18),
               _buildBottomLiveStats(context),
               const SizedBox(height: 18),
-              _buildMultiSensorComparison(context),
+              _buildTiltRangeDistribution(context, db),
               const SizedBox(height: 18),
-              _buildStatisticalAnalysis(context),
-              const SizedBox(height: 18),
-              _buildHourlyHeatmap(context),
+              _buildTopTiltSensorsCard(context, db),
             ],
           ),
         );
@@ -907,6 +905,247 @@ class EngineerDashboardScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildTiltRangeDistribution(BuildContext context, dynamic db) {
+    final readings = (db.sensors as List)
+        .map((sensor) => (sensor.lastReading as num).abs().toDouble())
+        .toList();
+    final bins = [0, 0, 0, 0];
+    for (final value in readings) {
+      if (value < 0.5) {
+        bins[0]++;
+      } else if (value < 1.0) {
+        bins[1]++;
+      } else if (value < 1.5) {
+        bins[2]++;
+      } else {
+        bins[3]++;
+      }
+    }
+    final labels = ['0-0.5°', '0.5-1.0°', '1.0-1.5°', '>1.5°'];
+    final maxCount = bins.reduce(max).clamp(1, 999);
+
+    return _DashboardPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _panelTitle(
+            context,
+            'Tilt Range Distribution',
+            Icons.bar_chart_rounded,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Shows how many sensors are in each tilt severity band.',
+            style: TextStyle(fontSize: 12, color: _mutedTextColor(context)),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 270,
+            child: BarChart(
+              BarChartData(
+                minY: 0,
+                maxY: (maxCount + 1).toDouble(),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 1,
+                  getDrawingHorizontalLine: (_) =>
+                      const FlLine(color: Color(0xFFd2dbe0)),
+                ),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border(
+                    left: BorderSide(color: Colors.blueGrey.shade200),
+                    bottom: BorderSide(color: Colors.blueGrey.shade200),
+                    top: BorderSide.none,
+                    right: BorderSide.none,
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: true, reservedSize: 28),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, _) {
+                        final index = value.toInt();
+                        if (index < 0 || index >= labels.length) {
+                          return const SizedBox.shrink();
+                        }
+                        return Text(
+                          labels[index],
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: _mutedTextColor(context),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                barGroups: List.generate(labels.length, (index) {
+                  final count = bins[index];
+                  final color = index <= 1
+                      ? const Color(0xFF0ca15f)
+                      : index == 2
+                          ? const Color(0xFFd39a00)
+                          : const Color(0xFFea3e43);
+                  return BarChartGroupData(
+                    x: index,
+                    barRods: [
+                      BarChartRodData(
+                        toY: count.toDouble(),
+                        width: 34,
+                        color: color,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  );
+                }),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopTiltSensorsCard(BuildContext context, dynamic db) {
+    final sensors = List.of(db.sensors as List);
+    sensors.sort(
+      (a, b) =>
+          (b.lastReading as num).abs().compareTo((a.lastReading as num).abs()),
+    );
+    final topSensors = sensors.take(5).toList();
+    final maxTilt = topSensors.isEmpty
+        ? 1.0
+        : topSensors
+            .map((sensor) => (sensor.lastReading as num).abs().toDouble())
+            .reduce(max);
+
+    return _DashboardPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _panelTitle(
+            context,
+            'Top Sensors By Tilt',
+            Icons.leaderboard_outlined,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Highest current tilt sensors to review first.',
+            style: TextStyle(fontSize: 12, color: _mutedTextColor(context)),
+          ),
+          const SizedBox(height: 12),
+          if (topSensors.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  'No sensor data available.',
+                  style: TextStyle(color: _mutedTextColor(context)),
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 300,
+              child: BarChart(
+                BarChartData(
+                  minY: 0,
+                  maxY: max(2.0, maxTilt + 0.5),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: 0.5,
+                    getDrawingHorizontalLine: (_) =>
+                        const FlLine(color: Color(0xFFd2dbe0)),
+                  ),
+                  borderData: FlBorderData(
+                    show: true,
+                    border: Border(
+                      left: BorderSide(color: Colors.blueGrey.shade200),
+                      bottom: BorderSide(color: Colors.blueGrey.shade200),
+                      top: BorderSide.none,
+                      right: BorderSide.none,
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    leftTitles: const AxisTitles(
+                      sideTitles:
+                          SideTitles(showTitles: true, reservedSize: 30),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, _) {
+                          final index = value.toInt();
+                          if (index < 0 || index >= topSensors.length) {
+                            return const SizedBox.shrink();
+                          }
+                          final sensor = topSensors[index];
+                          final label =
+                              (sensor.serialNumber ?? sensor.id).toString();
+                          final shortLabel = label.length > 8
+                              ? '${label.substring(0, 8)}…'
+                              : label;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              shortLabel,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: _mutedTextColor(context),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  barGroups: List.generate(topSensors.length, (index) {
+                    final value =
+                        (topSensors[index].lastReading as num).abs().toDouble();
+                    final color = value >= 1.5
+                        ? const Color(0xFFea3e43)
+                        : value >= 1.0
+                            ? const Color(0xFFd39a00)
+                            : const Color(0xFF0ca15f);
+                    return BarChartGroupData(
+                      x: index,
+                      barRods: [
+                        BarChartRodData(
+                          toY: value,
+                          width: 30,
+                          color: color,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ],
+                    );
+                  }),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ignore: unused_element
   Widget _buildMultiSensorComparison(BuildContext context) {
     final timeLabels = List.generate(11, (i) => '15:0${(i / 2).floor()}');
     final lineColors = [
@@ -1124,6 +1363,7 @@ class EngineerDashboardScreen extends StatelessWidget {
     );
   }
 
+  // ignore: unused_element
   Widget _buildStatisticalAnalysis(BuildContext context) {
     const sensors = [
       'SEN-H002B',
@@ -1237,6 +1477,7 @@ class EngineerDashboardScreen extends StatelessWidget {
     );
   }
 
+  // ignore: unused_element
   Widget _buildHourlyHeatmap(BuildContext context) {
     final values = List.generate(24, (i) => Random(i + 91).nextDouble() * 57.7);
     final maxValue = values.reduce(max);

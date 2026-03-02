@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../super_admin/api/organization_api.dart' as org_api;
 import '../models/alert.dart';
 import '../models/audit_log.dart';
 import '../models/config.dart';
@@ -91,6 +92,20 @@ class UserAdminDatabaseProvider extends ChangeNotifier {
       if (c == 'y') return chars[random.nextInt(4) + 8];
       return c;
     }).join();
+  }
+
+  String _asString(dynamic value, [String fallback = '']) {
+    if (value == null) return fallback;
+    final parsed = value.toString().trim();
+    return parsed.isEmpty ? fallback : parsed;
+  }
+
+  DateTime _asDate(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String && value.trim().isNotEmpty) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+    return DateTime.now();
   }
 
   void _initializeData() {
@@ -331,6 +346,194 @@ class UserAdminDatabaseProvider extends ChangeNotifier {
       backupFrequency: 'daily',
       apiRateLimit: 1000,
     );
+  }
+
+  Future<void> loadOrganizations() async {
+    final res = await org_api.OrgServiceApi.getAllOrganizations();
+    final body = res.body;
+    if (body is! List) {
+      organizations = [];
+      notifyListeners();
+      return;
+    }
+
+    organizations = body.map((json) {
+      final item = json as Map;
+      return Organization(
+        id: _asString(item['organizationId']),
+        name: _asString(item['name'], 'Organization'),
+        email: _asString(item['email']),
+        status: _asString(item['status'], 'active').toLowerCase(),
+        ownerUserId: _asString(item['ownerUserId']),
+        createdAt: _asDate(item['createdAt']),
+      );
+    }).toList();
+    notifyListeners();
+  }
+
+  Future<void> loadSites() async {
+    final res = await org_api.OrgServiceApi.getAllSites();
+    final body = res.body;
+    if (body is! List) {
+      sites = [];
+      notifyListeners();
+      return;
+    }
+
+    final mappedSites = <String, Site>{};
+    for (final raw in body) {
+      if (raw is! Map) continue;
+      final org = raw['organization'];
+      final id = _asString(raw['sitesID']);
+      if (id.isEmpty) continue;
+      mappedSites[id] = Site(
+        id: id,
+        organizationId: org is Map ? _asString(org['organizationId']) : '',
+        name: _asString(raw['name']),
+        location: _asString(raw['location']),
+        createdAt: _asDate(raw['createdAt']),
+      );
+    }
+
+    final hasMissingOrganization = mappedSites.values.any(
+      (s) => s.organizationId.trim().isEmpty,
+    );
+    if (hasMissingOrganization && organizations.isNotEmpty) {
+      for (final org in organizations) {
+        try {
+          final orgSitesRes =
+              await org_api.OrgServiceApi.getOrganizationSites(org.id);
+          final orgBody = orgSitesRes.body;
+          if (orgBody is! Map) continue;
+          final rawSites = orgBody['sites'];
+          if (rawSites is! List) continue;
+          for (final raw in rawSites) {
+            if (raw is! Map) continue;
+            final id = _asString(raw['sitesID']);
+            if (id.isEmpty) continue;
+            final existing = mappedSites[id];
+            mappedSites[id] = Site(
+              id: id,
+              organizationId: org.id,
+              name: _asString(raw['name'], existing?.name ?? ''),
+              location: _asString(raw['location'], existing?.location ?? ''),
+              createdAt: _asDate(raw['createdAt'] ?? existing?.createdAt),
+            );
+          }
+        } catch (_) {
+          // Keep base site list when enrichment endpoint fails for one org.
+        }
+      }
+    }
+
+    sites = mappedSites.values.toList();
+    notifyListeners();
+  }
+
+  Future<void> loadZones(String siteId) async {
+    final res = await org_api.OrgServiceApi.getZonesBySite(siteId);
+    final body = res.body;
+    if (body is! List) {
+      zones.removeWhere((z) => z.siteId == siteId);
+      notifyListeners();
+      return;
+    }
+
+    final newZones = body.map((json) {
+      final item = json as Map;
+      final site = item['site'];
+      return Zone(
+        id: _asString(item['zoneId']),
+        siteId: site is Map ? _asString(site['sitesID'], siteId) : siteId,
+        name: _asString(item['name']),
+      );
+    }).toList();
+
+    zones.removeWhere((z) => z.siteId == siteId);
+    zones.addAll(newZones);
+    notifyListeners();
+  }
+
+  Future<void> createOrganization({
+    required String name,
+    required String email,
+  }) async {
+    await org_api.OrgServiceApi.createOrganization(name, email);
+    await loadOrganizations();
+  }
+
+  Future<void> updateOrganization({
+    required String organizationId,
+    required String name,
+    required String email,
+  }) async {
+    await org_api.OrgServiceApi.updateOrganization(organizationId, name, email);
+    await loadOrganizations();
+  }
+
+  Future<void> deleteOrganization(String organizationId) async {
+    await org_api.OrgServiceApi.deleteOrganization(organizationId);
+    await loadOrganizations();
+    await loadSites();
+  }
+
+  Future<void> createSite({
+    required String organizationId,
+    required String name,
+    required String location,
+  }) async {
+    await org_api.OrgServiceApi.createSiteForOrganization(
+      organizationId,
+      name,
+      location,
+    );
+    await loadSites();
+  }
+
+  Future<void> updateSite({
+    required String siteId,
+    required String organizationId,
+    required String name,
+    required String location,
+  }) async {
+    await org_api.OrgServiceApi.updateSite(
+      siteId,
+      name,
+      location,
+      orgId: organizationId,
+    );
+    await loadSites();
+  }
+
+  Future<void> deleteSite(String siteId) async {
+    await org_api.OrgServiceApi.deleteSite(siteId);
+    await loadSites();
+    zones.removeWhere((z) => z.siteId == siteId);
+    notifyListeners();
+  }
+
+  Future<void> createZone({
+    required String siteId,
+    required String name,
+  }) async {
+    await org_api.OrgServiceApi.createZone(siteId, name);
+    await loadZones(siteId);
+  }
+
+  Future<void> updateZone({
+    required String zoneId,
+    required String siteId,
+    required String name,
+  }) async {
+    await org_api.OrgServiceApi.updateZone(zoneId, name, siteId: siteId);
+    await loadZones(siteId);
+  }
+
+  Future<void> deleteZone(String zoneId) async {
+    await org_api.OrgServiceApi.deleteZone(zoneId);
+    zones.removeWhere((z) => z.id == zoneId);
+    devices.removeWhere((d) => d.zoneId == zoneId);
+    notifyListeners();
   }
 
   void create(String view, Map<String, dynamic> data) {

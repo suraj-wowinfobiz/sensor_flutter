@@ -6,6 +6,7 @@ class ApiClient {
 
   static const String baseUrl = 'http://103.211.202.145:8091';
   static const String _tokenStorageKey = 'super_admin_auth_token';
+  static const Duration _requestDeadline = Duration(seconds: 30);
   static String? _authToken;
   static bool _tokenLoaded = false;
 
@@ -14,7 +15,12 @@ class ApiClient {
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 20),
       receiveTimeout: const Duration(seconds: 20),
-      headers: const {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
     ),
   );
 
@@ -56,10 +62,13 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
   }) async {
     await _ensureTokenLoaded();
-    final response = await _dio.get<dynamic>(
-      path,
-      queryParameters: queryParameters,
-    );
+    final response = await _dio
+        .get<dynamic>(
+          path,
+          queryParameters: queryParameters,
+        )
+        .timeout(_requestDeadline);
+    print('🌐 GET $path -> statusCode=${response.statusCode}, data=${response.data}');
     return ApiEnvelope.fromResponse(response.data);
   }
 
@@ -67,13 +76,17 @@ class ApiClient {
     String path, {
     Object? data,
     Map<String, dynamic>? queryParameters,
+    Map<String, String>? headers,
   }) async {
     await _ensureTokenLoaded();
-    final response = await _dio.post<dynamic>(
-      path,
-      data: data,
-      queryParameters: queryParameters,
-    );
+    final response = await _dio
+        .post<dynamic>(
+          path,
+          data: data,
+          queryParameters: queryParameters,
+          options: headers != null ? Options(headers: headers) : null,
+        )
+        .timeout(_requestDeadline);
     return ApiEnvelope.fromResponse(response.data);
   }
 
@@ -83,11 +96,13 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
   }) async {
     await _ensureTokenLoaded();
-    final response = await _dio.put<dynamic>(
-      path,
-      data: data,
-      queryParameters: queryParameters,
-    );
+    final response = await _dio
+        .put<dynamic>(
+          path,
+          data: data,
+          queryParameters: queryParameters,
+        )
+        .timeout(_requestDeadline);
     return ApiEnvelope.fromResponse(response.data);
   }
 
@@ -97,11 +112,13 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
   }) async {
     await _ensureTokenLoaded();
-    final response = await _dio.delete<dynamic>(
-      path,
-      data: data,
-      queryParameters: queryParameters,
-    );
+    final response = await _dio
+        .delete<dynamic>(
+          path,
+          data: data,
+          queryParameters: queryParameters,
+        )
+        .timeout(_requestDeadline);
     return ApiEnvelope.fromResponse(response.data);
   }
 }
@@ -124,22 +141,20 @@ class ApiEnvelope {
       return const ApiEnvelope(message: 'Empty response', status: false);
     }
     if (json is Map<String, dynamic>) {
-      if (json.containsKey('message') ||
-          json.containsKey('status') ||
-          json.containsKey('body')) {
+      // Only treat as envelope if it has 'body' key (the actual envelope structure)
+      if (json.containsKey('body')) {
         return ApiEnvelope(
           message: json['message']?.toString(),
           status: json['status'],
           body: json['body'],
         );
       }
+      // Otherwise, the entire response IS the data
       return ApiEnvelope(message: 'OK', status: true, body: json);
     }
     if (json is Map) {
       final mapped = json.cast<String, dynamic>();
-      if (mapped.containsKey('message') ||
-          mapped.containsKey('status') ||
-          mapped.containsKey('body')) {
+      if (mapped.containsKey('body')) {
         return ApiEnvelope(
           message: mapped['message']?.toString(),
           status: mapped['status'],

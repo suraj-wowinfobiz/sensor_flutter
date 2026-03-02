@@ -1,13 +1,29 @@
 import 'api_client.dart';
 
 class SensorApi {
-  static Future<List<Map<String, dynamic>>> getSensorsByDevice(
-    String deviceId,
-  ) async {
-    final response = await ApiClient.get('/api/v1/sensors/devices/$deviceId/sensors');
+  // Endpoints aligned with API_DOCUMENTATION.json (device-service).
+  static const String _sensorsBase = '/api/v1/sensors/sensors';
+
+  static Future<List<Map<String, dynamic>>> getAllSensors() async {
+    final response = await ApiClient.get('/api/v1/sensors/get-all');
     final body = response.body;
     if (body is! List) return const [];
     return body.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
+  }
+
+  static Future<List<Map<String, dynamic>>> getSensorsByDevice(
+    String deviceId,
+  ) async {
+    final response =
+        await ApiClient.get('/api/v1/sensors/devices/$deviceId/sensors');
+    final body = response.body;
+    if (body is! List) return const [];
+    return body.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
+  }
+
+  static Future<Map<String, dynamic>> getSensorById(String sensorId) async {
+    final response = await ApiClient.get('$_sensorsBase/$sensorId');
+    return _asMap(response.body);
   }
 
   static Future<Map<String, dynamic>> createSensor({
@@ -16,16 +32,35 @@ class SensorApi {
     required String name,
     required String status,
     required String unit,
+    String? sensorId,
+    String? serialNumber,
+    String? macAddress,
+    int? channelNumber,
+    double? lat,
+    double? log,
   }) async {
     final response = await ApiClient.post(
       '/api/v1/sensors/devices/$deviceId/sensors',
       data: {
+        if (sensorId != null) 'sensorId': sensorId,
+        if (sensorId != null) 'id': sensorId,
         'deviceId': deviceId,
+        'device_id': deviceId,
         'sensorTypeId': sensorTypeId,
+        'sensor_type_id': sensorTypeId,
         'name': name,
+        if (serialNumber != null) 'serialNumber': serialNumber,
+        if (serialNumber != null) 'serial_number': serialNumber,
+        if (macAddress != null) 'macAddress': macAddress,
+        if (macAddress != null) 'mac_address': macAddress,
+        if (channelNumber != null) 'channelNumber': channelNumber,
+        if (channelNumber != null) 'channel_number': channelNumber,
+        if (lat != null) 'lat': lat,
+        if (log != null) 'log': log,
         'status': status,
         'unit': unit,
       },
+      headers: sensorId != null ? {'sensor-id': sensorId} : null,
     );
     return _asMap(response.body);
   }
@@ -37,14 +72,28 @@ class SensorApi {
     required String name,
     required String status,
     required String unit,
+    String? serialNumber,
+    String? macAddress,
+    int? channelNumber,
+    double? lat,
+    double? log,
   }) async {
     final response = await ApiClient.put(
-      '/api/v1/sensors/sensors/$sensorId',
+      '$_sensorsBase/$sensorId',
       data: {
-        'sensorId': sensorId,
         'deviceId': deviceId,
+        'device_id': deviceId,
         'sensorTypeId': sensorTypeId,
+        'sensor_type_id': sensorTypeId,
         'name': name,
+        if (serialNumber != null) 'serialNumber': serialNumber,
+        if (serialNumber != null) 'serial_number': serialNumber,
+        if (macAddress != null) 'macAddress': macAddress,
+        if (macAddress != null) 'mac_address': macAddress,
+        if (channelNumber != null) 'channelNumber': channelNumber,
+        if (channelNumber != null) 'channel_number': channelNumber,
+        if (lat != null) 'lat': lat,
+        if (log != null) 'log': log,
         'status': status,
         'unit': unit,
       },
@@ -53,7 +102,7 @@ class SensorApi {
   }
 
   static Future<void> deleteSensor(String sensorId) async {
-    await ApiClient.delete('/api/v1/sensors/sensors/$sensorId');
+    await ApiClient.delete('$_sensorsBase/$sensorId');
   }
 
   static Map<String, dynamic> _asMap(dynamic body) {

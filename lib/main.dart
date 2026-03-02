@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'
     show ConsumerWidget, ProviderScope, WidgetRef;
 import 'package:google_fonts/google_fonts.dart';
@@ -54,6 +55,26 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => const {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.invertedStylus,
+      };
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const ClampingScrollPhysics(
+      parent: AlwaysScrollableScrollPhysics(),
+    );
+  }
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -84,6 +105,7 @@ class _AppRoot extends ConsumerWidget {
       child: MaterialApp(
         title: 'Industrial Tilt Super Admin',
         debugShowCheckedModeBanner: false,
+        scrollBehavior: const AppScrollBehavior(),
         theme: _withTypography(themeProvider.buildTheme(Brightness.light)),
         darkTheme: _withTypography(themeProvider.buildTheme(Brightness.dark)),
         themeMode: themeProvider.themeMode,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -63,32 +64,31 @@ class LoginBody {
 
 class AuthApi {
   static const String baseUrl = 'http://103.211.202.145:8091';
+  static const Duration _requestDeadline = Duration(seconds: 10);
 
   static Future<LoginResponse> login(LoginRequest request) async {
     try {
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/api/v1/auth/login'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(request.toJson()),
-          )
-          .timeout(const Duration(seconds: 20));
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/v1/auth/login'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(request.toJson()),
+      ).timeout(_requestDeadline);
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final parsed = jsonDecode(response.body) as Map<String, dynamic>;
         return LoginResponse.fromJson(parsed);
       }
-      throw AuthApiException('Login failed: ${response.body}');
+      throw AuthApiException('Login failed (${response.statusCode}): ${response.body}');
+    } on TimeoutException {
+      throw AuthApiException(
+        'CORS timeout. Run: flutter run -d chrome --web-browser-flag "--disable-web-security"',
+      );
+    } on http.ClientException catch (e) {
+      throw AuthApiException('Network error: ${e.message}');
     } catch (e) {
-      final text = e.toString();
-      if (text.contains('XMLHttpRequest error')) {
-        throw AuthApiException(
-          'CORS blocked login request. Backend must allow OPTIONS/POST for /api/v1/auth/login from this origin.',
-        );
-      }
-      if (text.contains('TimeoutException')) {
-        throw AuthApiException('Login request timed out. Please try again.');
-      }
       if (e is AuthApiException) rethrow;
       throw AuthApiException('Login failed: $e');
     }

@@ -1,13 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-class AnalyticsSseService {
-  static const String baseUrl = 'http://103.211.202.145:8091';
+class GenericSseService {
+  GenericSseService(this.endpointPath);
+
+  static const String _baseUrl = 'http://103.211.202.145:8091';
   static const String _tokenStorageKey = 'super_admin_auth_token';
 
+  final String endpointPath;
   final StreamController<dynamic> _controller =
       StreamController<dynamic>.broadcast();
   http.Client? _client;
@@ -24,19 +28,19 @@ class AnalyticsSseService {
       _controller.add(jsonDecode(raw));
       buffer.clear();
     } catch (_) {
-      // Keep buffering until a complete JSON payload is available.
+      // Keep buffering until complete JSON arrives.
     }
   }
 
   Future<void> connect() async {
     if (_isConnected) return;
 
-    debugPrint('🔌 Connecting to SSE endpoint...');
     _client = http.Client();
-
     try {
       final request = http.Request(
-          'GET', Uri.parse('$baseUrl/api/v1/analytics/events/live'));
+        'GET',
+        Uri.parse('$_baseUrl$endpointPath'),
+      );
       request.headers['Accept'] = 'text/event-stream';
       request.headers['Cache-Control'] = 'no-cache';
       final prefs = await SharedPreferences.getInstance();
@@ -46,47 +50,43 @@ class AnalyticsSseService {
       }
 
       final response = await _client!.send(request);
-
-      if (response.statusCode == 200) {
-        _isConnected = true;
-        debugPrint('✅ SSE Connected');
-
-        final dataBuffer = StringBuffer();
-        _streamSubscription = response.stream
-            .transform(utf8.decoder)
-            .transform(const LineSplitter())
-            .listen(
-          (line) {
-            final trimmed = line.trim();
-            if (trimmed.isEmpty) {
-              _tryEmitBufferedJson(dataBuffer);
-              return;
-            }
-            if (trimmed.startsWith(':')) return;
-            if (trimmed.startsWith('data:')) {
-              final payload = trimmed.substring(5).trimLeft();
-              if (payload.isNotEmpty) {
-                if (dataBuffer.isNotEmpty) dataBuffer.write('\n');
-                dataBuffer.write(payload);
-                _tryEmitBufferedJson(dataBuffer);
-              }
-              return;
-            }
-          },
-          onError: (error) {
-            debugPrint('❌ SSE Error: $error');
-            _isConnected = false;
-          },
-          onDone: () {
-            debugPrint('🔌 SSE Disconnected');
-            _isConnected = false;
-          },
-        );
-      } else {
-        debugPrint('❌ SSE Connection failed: ${response.statusCode}');
+      if (response.statusCode != 200) {
+        debugPrint('❌ SSE $endpointPath failed: ${response.statusCode}');
+        return;
       }
+
+      _isConnected = true;
+      final dataBuffer = StringBuffer();
+      _streamSubscription = response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen(
+        (line) {
+          final trimmed = line.trim();
+          if (trimmed.isEmpty) {
+            _tryEmitBufferedJson(dataBuffer);
+            return;
+          }
+          if (trimmed.startsWith(':')) return;
+          if (trimmed.startsWith('data:')) {
+            final payload = trimmed.substring(5).trimLeft();
+            if (payload.isNotEmpty) {
+              if (dataBuffer.isNotEmpty) dataBuffer.write('\n');
+              dataBuffer.write(payload);
+              _tryEmitBufferedJson(dataBuffer);
+            }
+          }
+        },
+        onError: (error) {
+          debugPrint('❌ SSE $endpointPath error: $error');
+          _isConnected = false;
+        },
+        onDone: () {
+          _isConnected = false;
+        },
+      );
     } catch (e) {
-      debugPrint('❌ SSE Connection error: $e');
+      debugPrint('❌ SSE $endpointPath connect error: $e');
       _isConnected = false;
     }
   }

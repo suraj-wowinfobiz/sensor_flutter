@@ -32,7 +32,6 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
   String _currentView = 'dashboard';
   bool _showTopNav = true;
   bool _showBottomNav = true;
-  final List<String> _openedViews = ['dashboard'];
   late AnimationController _menuController;
 
   @override
@@ -160,6 +159,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
                 onNotification: _onScroll,
                 child: isDesktop
                     ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           SideMenu(
                             animation:
@@ -171,10 +171,18 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
                             onLogout: _logout,
                             showCloseButton: false,
                           ),
-                          Expanded(child: _buildContent(_currentView)),
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.topLeft,
+                              child: _buildContent(_currentView),
+                            ),
+                          ),
                         ],
                       )
-                    : _buildContent(_currentView),
+                    : Align(
+                        alignment: Alignment.topLeft,
+                        child: _buildContent(_currentView),
+                      ),
               ),
             ),
           ],
@@ -349,19 +357,9 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
 
   Widget _buildContent(String view) {
     final normalized = _normalizeView(view);
-    if (!_openedViews.contains(normalized)) {
-      _openedViews.add(normalized);
-    }
-    return IndexedStack(
-      index: _openedViews.indexOf(normalized),
-      children: _openedViews
-          .map(
-            (openedView) => KeyedSubtree(
-              key: PageStorageKey<String>('admin_$openedView'),
-              child: _buildView(openedView),
-            ),
-          )
-          .toList(),
+    return KeyedSubtree(
+      key: PageStorageKey<String>('admin_$normalized'),
+      child: _buildView(normalized),
     );
   }
 

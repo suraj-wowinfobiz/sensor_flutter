@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../super_admin/api/api_client.dart';
+import '../api/engineer_login_api.dart';
 import '../engineer_page.dart';
 import '../providers/engineer_riverpod_provider.dart';
 
@@ -16,8 +18,9 @@ class _EngineerLoginScreenState extends ConsumerState<EngineerLoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  void _login() {
-    if (_emailController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
+  Future<void> _login() async {
+    if (_emailController.text.trim().isEmpty ||
+        _passwordController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter email and password')),
       );
@@ -26,13 +29,34 @@ class _EngineerLoginScreenState extends ConsumerState<EngineerLoginScreen> {
 
     ref.read(engineerLoginLoadingStateProvider.notifier).state = true;
 
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (!mounted) return;
-      ref.read(engineerLoginLoadingStateProvider.notifier).state = false;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const EngineerPage()),
+    try {
+      final response = await EngineerLoginApi.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
       );
-    });
+
+      if (!mounted) return;
+      if (response.status.toUpperCase() == 'SUCCESS') {
+        await ApiClient.setAuthToken(response.body.token);
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const EngineerPage()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.message)),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        ref.read(engineerLoginLoadingStateProvider.notifier).state = false;
+      }
+    }
   }
 
   @override
@@ -41,10 +65,14 @@ class _EngineerLoginScreenState extends ConsumerState<EngineerLoginScreen> {
     final obscurePassword =
         ref.watch(engineerLoginObscurePasswordStateProvider);
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final titleColor = isLight ? const Color(0xFF1A2B3C) : const Color(0xFFD7E8F6);
-    final subColor = isLight ? const Color(0xFF5F7285) : const Color(0xFF9DB7D2);
-    final labelColor = isLight ? const Color(0xFF2D3E50) : const Color(0xFFD7E8F6);
-    final inputFill = isLight ? const Color(0xFFF8FAFB) : const Color(0xFF1E3A52);
+    final titleColor =
+        isLight ? const Color(0xFF1A2B3C) : const Color(0xFFD7E8F6);
+    final subColor =
+        isLight ? const Color(0xFF5F7285) : const Color(0xFF9DB7D2);
+    final labelColor =
+        isLight ? const Color(0xFF2D3E50) : const Color(0xFFD7E8F6);
+    final inputFill =
+        isLight ? const Color(0xFFF8FAFB) : const Color(0xFF1E3A52);
     final borderColor = Theme.of(context).dividerColor;
     final primary = Theme.of(context).colorScheme.primary;
 
@@ -118,7 +146,8 @@ class _EngineerLoginScreenState extends ConsumerState<EngineerLoginScreen> {
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide(color: primary, width: 2),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 18),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -136,16 +165,20 @@ class _EngineerLoginScreenState extends ConsumerState<EngineerLoginScreen> {
                   obscureText: obscurePassword,
                   decoration: InputDecoration(
                     hintText: '••••••••',
-                    hintStyle: TextStyle(color: subColor, fontSize: 20, letterSpacing: 2),
+                    hintStyle: TextStyle(
+                        color: subColor, fontSize: 20, letterSpacing: 2),
                     filled: true,
                     fillColor: inputFill,
                     suffixIcon: IconButton(
                       icon: Icon(
-                        obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
                         color: subColor,
                       ),
                       onPressed: () => ref
-                          .read(engineerLoginObscurePasswordStateProvider.notifier)
+                          .read(engineerLoginObscurePasswordStateProvider
+                              .notifier)
                           .state = !obscurePassword,
                     ),
                     border: OutlineInputBorder(
@@ -160,7 +193,8 @@ class _EngineerLoginScreenState extends ConsumerState<EngineerLoginScreen> {
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide(color: primary, width: 2),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 18),
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -183,7 +217,8 @@ class _EngineerLoginScreenState extends ConsumerState<EngineerLoginScreen> {
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : const Text(

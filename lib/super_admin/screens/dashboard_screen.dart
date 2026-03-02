@@ -9,6 +9,7 @@ import '../shared/models/threshold_rule.dart';
 import '../providers/super_admin_api_riverpod_provider.dart';
 import '../providers/super_admin_riverpod_provider.dart';
 import '../services/analytics_sse_service.dart';
+import '../services/generic_sse_service.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   final bool embeddedScroll;
@@ -20,61 +21,332 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  final AnalyticsSseService _sseService = AnalyticsSseService();
+  final AnalyticsSseService _analyticsSseService = AnalyticsSseService();
+  final GenericSseService _rawSseService =
+      GenericSseService('/api/v1/ingestion/readings/live');
+  final GenericSseService _processedSseService =
+      GenericSseService('/api/v1/processing/readings/live');
   final List<FlSpot> _liveData = [];
+  final List<FlSpot> _rawXData = [];
+  final List<FlSpot> _rawYData = [];
+  final List<FlSpot> _rawZData = [];
+  final List<FlSpot> _processedXData = [];
+  final List<FlSpot> _processedYData = [];
+  final List<FlSpot> _processedZData = [];
+  final List<FlSpot> _analyzedXData = [];
+  final List<FlSpot> _analyzedYData = [];
+  final List<FlSpot> _analyzedZData = [];
   int _dataPointIndex = 0;
-  StreamSubscription? _subscription;
+  int _rawIndex = 0;
+  int _processedIndex = 0;
+  int _analyzedIndex = 0;
+  StreamSubscription? _analyticsSubscription;
+  StreamSubscription? _rawSubscription;
+  StreamSubscription? _processedSubscription;
 
   @override
   void initState() {
     super.initState();
-    _connectToSSE();
+    _connectToStreams();
   }
 
-  void _connectToSSE() async {
-    await _sseService.connect();
-    _subscription = _sseService.stream.listen((data) {
-      if (mounted && data['eventType'] == 'analytics-live') {
-        setState(() {
-          final value = (data['x'] ?? 0).toDouble() / 1000000000000;
-          debugPrint('➕ Adding SSE point: x=$_dataPointIndex, y=$value');
-          _liveData.add(FlSpot(_dataPointIndex.toDouble(), value));
-          _dataPointIndex++;
-          if (_liveData.length > 65) {
-            _liveData.removeAt(0);
-            for (int i = 0; i < _liveData.length; i++) {
-              _liveData[i] = FlSpot(i.toDouble(), _liveData[i].y);
-            }
-            _dataPointIndex = _liveData.length;
-          }
-          debugPrint('📊 Total points: ${_liveData.length}');
-        });
-      }
+  void _connectToStreams() async {
+    await _analyticsSseService.connect();
+    _analyticsSubscription = _analyticsSseService.stream.listen((data) {
+      if (!mounted) return;
+      final metrics = _extractAnalyzedMetricsFromPayload(data);
+      if (metrics == null) return;
+      setState(() {
+        _appendAnalyzedPoint(_analyzedXData, metrics.$1);
+        _appendAnalyzedPoint(_analyzedYData, metrics.$2);
+        _appendAnalyzedPoint(_analyzedZData, metrics.$3);
+        _analyzedIndex++;
+        _trimAndReindexAnalyzedSeries();
+
+        _liveData.add(FlSpot(_dataPointIndex.toDouble(), metrics.$4));
+        _dataPointIndex++;
+        _trimAndReindexRealtime();
+      });
+    });
+
+    await _rawSseService.connect();
+    _rawSubscription = _rawSseService.stream.listen((data) {
+      if (!mounted) return;
+      final rawValues = _extractXyzValues(data);
+      if (rawValues == null) return;
+      setState(() {
+        _appendRawPoint(_rawXData, rawValues.$1);
+        _appendRawPoint(_rawYData, rawValues.$2);
+        _appendRawPoint(_rawZData, rawValues.$3);
+        _rawIndex++;
+        _trimAndReindexRawSeries();
+      });
+    });
+
+    await _processedSseService.connect();
+    _processedSubscription = _processedSseService.stream.listen((data) {
+      if (!mounted) return;
+      final processedValues = _extractProcessedValues(data);
+      if (processedValues == null) return;
+      setState(() {
+        _appendProcessedPoint(_processedXData, processedValues.$1);
+        _appendProcessedPoint(_processedYData, processedValues.$2);
+        _appendProcessedPoint(_processedZData, processedValues.$3);
+        _processedIndex++;
+        _trimAndReindexProcessedSeries();
+      });
     });
   }
 
   @override
   void dispose() {
-    _subscription?.cancel();
-    _sseService.dispose();
+    _analyticsSubscription?.cancel();
+    _rawSubscription?.cancel();
+    _processedSubscription?.cancel();
+    _analyticsSseService.dispose();
+    _rawSseService.dispose();
+    _processedSseService.dispose();
     super.dispose();
+  }
+
+  void _appendRawPoint(List<FlSpot> points, double value) {
+    points.add(FlSpot(_rawIndex.toDouble(), value));
+  }
+
+  void _appendProcessedPoint(List<FlSpot> points, double value) {
+    points.add(FlSpot(_processedIndex.toDouble(), value));
+  }
+
+  void _appendAnalyzedPoint(List<FlSpot> points, double value) {
+    points.add(FlSpot(_analyzedIndex.toDouble(), value));
+  }
+
+  void _trimAndReindexAnalyzedSeries() {
+    while (_analyzedXData.length > 65) {
+      _analyzedXData.removeAt(0);
+    }
+    while (_analyzedYData.length > 65) {
+      _analyzedYData.removeAt(0);
+    }
+    while (_analyzedZData.length > 65) {
+      _analyzedZData.removeAt(0);
+    }
+
+    for (int i = 0; i < _analyzedXData.length; i++) {
+      _analyzedXData[i] = FlSpot(i.toDouble(), _analyzedXData[i].y);
+    }
+    for (int i = 0; i < _analyzedYData.length; i++) {
+      _analyzedYData[i] = FlSpot(i.toDouble(), _analyzedYData[i].y);
+    }
+    for (int i = 0; i < _analyzedZData.length; i++) {
+      _analyzedZData[i] = FlSpot(i.toDouble(), _analyzedZData[i].y);
+    }
+    _analyzedIndex = _analyzedXData.length;
+  }
+
+  void _trimAndReindexRealtime() {
+    while (_liveData.length > 65) {
+      _liveData.removeAt(0);
+    }
+    for (int i = 0; i < _liveData.length; i++) {
+      _liveData[i] = FlSpot(i.toDouble(), _liveData[i].y);
+    }
+    _dataPointIndex = _liveData.length;
+  }
+
+  void _trimAndReindexRawSeries() {
+    while (_rawXData.length > 65) {
+      _rawXData.removeAt(0);
+    }
+    while (_rawYData.length > 65) {
+      _rawYData.removeAt(0);
+    }
+    while (_rawZData.length > 65) {
+      _rawZData.removeAt(0);
+    }
+
+    for (int i = 0; i < _rawXData.length; i++) {
+      _rawXData[i] = FlSpot(i.toDouble(), _rawXData[i].y);
+    }
+    for (int i = 0; i < _rawYData.length; i++) {
+      _rawYData[i] = FlSpot(i.toDouble(), _rawYData[i].y);
+    }
+    for (int i = 0; i < _rawZData.length; i++) {
+      _rawZData[i] = FlSpot(i.toDouble(), _rawZData[i].y);
+    }
+    _rawIndex = _rawXData.length;
+  }
+
+  void _trimAndReindexProcessedSeries() {
+    while (_processedXData.length > 65) {
+      _processedXData.removeAt(0);
+    }
+    while (_processedYData.length > 65) {
+      _processedYData.removeAt(0);
+    }
+    while (_processedZData.length > 65) {
+      _processedZData.removeAt(0);
+    }
+
+    for (int i = 0; i < _processedXData.length; i++) {
+      _processedXData[i] = FlSpot(i.toDouble(), _processedXData[i].y);
+    }
+    for (int i = 0; i < _processedYData.length; i++) {
+      _processedYData[i] = FlSpot(i.toDouble(), _processedYData[i].y);
+    }
+    for (int i = 0; i < _processedZData.length; i++) {
+      _processedZData[i] = FlSpot(i.toDouble(), _processedZData[i].y);
+    }
+    _processedIndex = _processedXData.length;
+  }
+
+  (double, double, double)? _extractXyzValues(dynamic payload) {
+    for (final map in _candidateMaps(payload)) {
+      final fromRawPayload = map['rawPayload'];
+      if (fromRawPayload is Map) {
+        final rawParams = fromRawPayload['parameters'];
+        if (rawParams is Map) {
+          final x = _toDouble(rawParams['x']);
+          final y = _toDouble(rawParams['y']);
+          final z = _toDouble(rawParams['z']);
+          if (x != null && y != null && z != null) return (x, y, z);
+        }
+      }
+
+      final params = map['parameters'];
+      if (params is Map) {
+        final x = _toDouble(params['x']);
+        final y = _toDouble(params['y']);
+        final z = _toDouble(params['z']);
+        if (x != null && y != null && z != null) return (x, y, z);
+      }
+
+      final x = _toDouble(map['x']);
+      final y = _toDouble(map['y']);
+      final z = _toDouble(map['z']);
+      if (x != null && y != null && z != null) return (x, y, z);
+    }
+    return null;
+  }
+
+  (double, double, double)? _extractProcessedValues(dynamic payload) {
+    for (final map in _candidateMaps(payload)) {
+      final processedPayload = map['processedPayload'];
+      if (processedPayload is Map) {
+        final roll = _toDouble(processedPayload['rollDegrees']);
+        final pitch = _toDouble(processedPayload['pitchDegrees']);
+        final tilt = _toDouble(processedPayload['tiltFromVerticalDegrees']);
+        if (roll != null && pitch != null && tilt != null) {
+          return (roll, pitch, tilt);
+        }
+
+        final x = _toDouble(processedPayload['x']);
+        final y = _toDouble(processedPayload['y']);
+        final z = _toDouble(processedPayload['z']);
+        if (x != null && y != null && z != null) return (x, y, z);
+      }
+    }
+
+    return _extractXyzValues(payload);
+  }
+
+  Iterable<Map<dynamic, dynamic>> _candidateMaps(
+    dynamic payload, {
+    int depth = 0,
+  }) sync* {
+    if (payload == null || depth > 5) return;
+
+    if (payload is Map) {
+      yield payload;
+      for (final key in const ['body', 'data', 'payload', 'event']) {
+        final next = payload[key];
+        if (next != null) {
+          yield* _candidateMaps(next, depth: depth + 1);
+        }
+      }
+      return;
+    }
+
+    if (payload is List) {
+      for (final item in payload) {
+        yield* _candidateMaps(item, depth: depth + 1);
+      }
+    }
+  }
+
+  (double, double, double, double)? _extractAnalyzedMetricsFromPayload(
+    dynamic payload,
+  ) {
+    for (final map in _candidateMaps(payload)) {
+      final metrics = _extractAnalyzedMetricsFromEvent(map);
+      if (metrics != null) return metrics;
+    }
+    return null;
+  }
+
+  (double, double, double, double)? _extractAnalyzedMetricsFromEvent(
+    Map<dynamic, dynamic> event,
+  ) {
+    final series = event['series'];
+    final values = <String, double>{};
+
+    if (series is List) {
+      for (final item in series) {
+        if (item is! Map) continue;
+        final name = item['name']?.toString();
+        final value = _toDouble(item['value']);
+        if (name == null || value == null) continue;
+        values[name] = value;
+      }
+    }
+
+    final x = values['x'] ??
+        values['tilt.x'] ??
+        values['vibration.x'] ??
+        _toDouble(event['x']);
+    final y = values['y'] ??
+        values['tilt.y'] ??
+        values['vibration.y'] ??
+        _toDouble(event['y']);
+    final z = values['z'] ??
+        values['tilt.z'] ??
+        values['vibration.z'] ??
+        _toDouble(event['z']);
+    if (x == null || y == null || z == null) return null;
+
+    final realtimeMagnitude = values['accelerationMagnitude'] ??
+        values['vibration.vibrationRms'] ??
+        values['inclinometer.inclinationDegrees'] ??
+        sqrt((x * x) + (y * y) + (z * z));
+
+    return (x, y, z, realtimeMagnitude);
+  }
+
+  double? _toDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
   }
 
   @override
   Widget build(BuildContext context) {
     final db = ref.watch(superAdminBackendChangeNotifierProvider);
     final statsApi = ref.watch(superAdminDashboardStatsApiProvider).valueOrNull;
-    final activeAlerts =
-        (statsApi?['activeAlerts'] as num?)?.toInt() ?? db.getActiveAlerts().length;
+    final activeAlerts = (statsApi?['activeAlerts'] as num?)?.toInt() ??
+        db.getActiveAlerts().length;
     final avgTilt = (statsApi?['averageTilt'] as num?)?.toDouble() ??
         (db.sensors.isEmpty
-        ? 0.0
-        : db.sensors.map((s) => s.lastReading.abs()).reduce((a, b) => a + b) /
-            db.sensors.length);
+            ? 0.0
+            : db.sensors
+                    .map((s) => s.lastReading.abs())
+                    .reduce((a, b) => a + b) /
+                db.sensors.length);
     final maxTilt = (statsApi?['maxTilt'] as num?)?.toDouble() ??
         (db.sensors.isEmpty
-        ? 0.0
-        : db.sensors.map((s) => s.lastReading.abs()).reduce((a, b) => max(a, b)));
+            ? 0.0
+            : db.sensors
+                .map((s) => s.lastReading.abs())
+                .reduce((a, b) => max(a, b)));
 
     final content = Padding(
       padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
@@ -85,6 +357,36 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           const SizedBox(height: 18),
           _buildRealtimeCard(context),
           const SizedBox(height: 18),
+          _buildLiveSeriesCard(
+            context,
+            title: 'Sensor Live Records',
+            icon: Icons.sensors,
+            xData: _rawXData,
+            yData: _rawYData,
+            zData: _rawZData,
+          ),
+          const SizedBox(height: 18),
+          _buildLiveSeriesCard(
+            context,
+            title: 'Processed Live Data',
+            icon: Icons.settings_input_component_outlined,
+            xData: _processedXData,
+            yData: _processedYData,
+            zData: _processedZData,
+            xLabel: 'Roll',
+            yLabel: 'Pitch',
+            zLabel: 'Tilt',
+          ),
+          const SizedBox(height: 18),
+          _buildLiveSeriesCard(
+            context,
+            title: 'Analyzed Live Data',
+            icon: Icons.psychology_alt_outlined,
+            xData: _analyzedXData,
+            yData: _analyzedYData,
+            zData: _analyzedZData,
+          ),
+          const SizedBox(height: 18),
           _buildAnalyticsGrid(context),
           const SizedBox(height: 18),
           _buildScatterCard(context),
@@ -93,11 +395,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           const SizedBox(height: 18),
           _buildBottomLiveStats(context),
           const SizedBox(height: 18),
-          _buildMultiSensorComparison(context),
+          _buildTiltRangeDistribution(context, db),
           const SizedBox(height: 18),
-          _buildStatisticalAnalysis(context),
-          const SizedBox(height: 18),
-          _buildHourlyHeatmap(context),
+          _buildTopTiltSensorsCard(context, db),
         ],
       ),
     );
@@ -107,6 +407,132 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: content,
+    );
+  }
+
+  Widget _buildLiveSeriesCard(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required List<FlSpot> xData,
+    required List<FlSpot> yData,
+    required List<FlSpot> zData,
+    String xLabel = 'X',
+    String yLabel = 'Y',
+    String zLabel = 'Z',
+  }) {
+    final allSpots = [...xData, ...yData, ...zData];
+    final hasData = allSpots.isNotEmpty;
+    final minY = hasData ? allSpots.map((e) => e.y).reduce(min) - 1 : 0.0;
+    final maxY = hasData ? allSpots.map((e) => e.y).reduce(max) + 1 : 10.0;
+    final minX = hasData ? allSpots.map((e) => e.x).reduce(min) : 0.0;
+    final maxX = hasData ? allSpots.map((e) => e.x).reduce(max) : 65.0;
+
+    return _DashboardPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _panelTitle(context, title, icon),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 18,
+            runSpacing: 8,
+            children: [
+              _LegendItem(color: const Color(0xFF2E8BFF), label: xLabel),
+              _LegendItem(color: const Color(0xFF11A95D), label: yLabel),
+              _LegendItem(color: const Color(0xFFE58500), label: zLabel),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 320,
+            child: LineChart(
+              LineChartData(
+                minX: minX,
+                maxX: maxX,
+                minY: minY,
+                maxY: maxY,
+                gridData: FlGridData(
+                  drawVerticalLine: false,
+                  horizontalInterval:
+                      hasData ? ((maxY - minY) / 5).clamp(1, 9999) : 2,
+                  getDrawingHorizontalLine: (_) => const FlLine(
+                    color: Color(0xFFd2dbe0),
+                    strokeWidth: 1,
+                  ),
+                ),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border(
+                    left: BorderSide(color: Colors.blueGrey.shade200),
+                    bottom: BorderSide(color: Colors.blueGrey.shade200),
+                    top: BorderSide.none,
+                    right: BorderSide.none,
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 40,
+                      getTitlesWidget: (value, _) => Text(
+                        value.toStringAsFixed(1),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: _mutedTextColor(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 24,
+                      interval: 10,
+                      getTitlesWidget: (value, _) => Text(
+                        value.toInt().toString(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: _mutedTextColor(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: xData,
+                    isCurved: true,
+                    color: const Color(0xFF2E8BFF),
+                    barWidth: 2.5,
+                    dotData: const FlDotData(show: false),
+                  ),
+                  LineChartBarData(
+                    spots: yData,
+                    isCurved: true,
+                    color: const Color(0xFF11A95D),
+                    barWidth: 2.5,
+                    dotData: const FlDotData(show: false),
+                  ),
+                  LineChartBarData(
+                    spots: zData,
+                    isCurved: true,
+                    color: const Color(0xFFE58500),
+                    barWidth: 2.5,
+                    dotData: const FlDotData(show: false),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -141,8 +567,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ),
       const _MetricData(
         title: 'LAST UPDATE',
-        value: '2s',
-        subtitle: 'Real-time',
+        value: 'SSE',
+        subtitle: 'Live stream',
         icon: Icons.notifications_none,
         tint: Color(0xFF5973d8),
       ),
@@ -182,6 +608,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildRealtimeCard(BuildContext context) {
+    final hasLiveData = _liveData.isNotEmpty;
+    final minLiveY =
+        hasLiveData ? _liveData.map((e) => e.y).reduce(min) - 2 : 42.0;
+    final maxLiveY =
+        hasLiveData ? _liveData.map((e) => e.y).reduce(max) + 2 : 72.0;
+
     return _DashboardPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,14 +641,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                   const SizedBox(width: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: _liveData.isEmpty ? Colors.orange : Colors.green,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      _liveData.isEmpty ? 'Waiting...' : 'Live ${_liveData.length} pts',
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      _liveData.isEmpty
+                          ? 'Waiting...'
+                          : 'Live ${_liveData.length} pts',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -238,8 +676,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             height: 350,
             child: LineChart(
               LineChartData(
-                minY: 42,
-                maxY: 72,
+                minY: minLiveY,
+                maxY: maxLiveY,
                 gridData: FlGridData(
                   drawVerticalLine: false,
                   horizontalInterval: 5,
@@ -927,6 +1365,247 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
+  Widget _buildTiltRangeDistribution(BuildContext context, dynamic db) {
+    final readings = (db.sensors as List)
+        .map((sensor) => (sensor.lastReading as num).abs().toDouble())
+        .toList();
+    final bins = [0, 0, 0, 0];
+    for (final value in readings) {
+      if (value < 0.5) {
+        bins[0]++;
+      } else if (value < 1.0) {
+        bins[1]++;
+      } else if (value < 1.5) {
+        bins[2]++;
+      } else {
+        bins[3]++;
+      }
+    }
+    final labels = ['0-0.5°', '0.5-1.0°', '1.0-1.5°', '>1.5°'];
+    final maxCount = bins.reduce(max).clamp(1, 999);
+
+    return _DashboardPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _panelTitle(
+            context,
+            'Tilt Range Distribution',
+            Icons.bar_chart_rounded,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Shows how many sensors are in each tilt severity band.',
+            style: TextStyle(fontSize: 12, color: _mutedTextColor(context)),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 270,
+            child: BarChart(
+              BarChartData(
+                minY: 0,
+                maxY: (maxCount + 1).toDouble(),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 1,
+                  getDrawingHorizontalLine: (_) =>
+                      const FlLine(color: Color(0xFFd2dbe0)),
+                ),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border(
+                    left: BorderSide(color: Colors.blueGrey.shade200),
+                    bottom: BorderSide(color: Colors.blueGrey.shade200),
+                    top: BorderSide.none,
+                    right: BorderSide.none,
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: true, reservedSize: 28),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, _) {
+                        final index = value.toInt();
+                        if (index < 0 || index >= labels.length) {
+                          return const SizedBox.shrink();
+                        }
+                        return Text(
+                          labels[index],
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: _mutedTextColor(context),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                barGroups: List.generate(labels.length, (index) {
+                  final count = bins[index];
+                  final color = index <= 1
+                      ? const Color(0xFF0ca15f)
+                      : index == 2
+                          ? const Color(0xFFd39a00)
+                          : const Color(0xFFea3e43);
+                  return BarChartGroupData(
+                    x: index,
+                    barRods: [
+                      BarChartRodData(
+                        toY: count.toDouble(),
+                        width: 34,
+                        color: color,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  );
+                }),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopTiltSensorsCard(BuildContext context, dynamic db) {
+    final sensors = List.of(db.sensors as List);
+    sensors.sort(
+      (a, b) =>
+          (b.lastReading as num).abs().compareTo((a.lastReading as num).abs()),
+    );
+    final topSensors = sensors.take(5).toList();
+    final maxTilt = topSensors.isEmpty
+        ? 1.0
+        : topSensors
+            .map((sensor) => (sensor.lastReading as num).abs().toDouble())
+            .reduce(max);
+
+    return _DashboardPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _panelTitle(
+            context,
+            'Top Sensors By Tilt',
+            Icons.leaderboard_outlined,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Highest current tilt sensors to review first.',
+            style: TextStyle(fontSize: 12, color: _mutedTextColor(context)),
+          ),
+          const SizedBox(height: 12),
+          if (topSensors.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  'No sensor data available.',
+                  style: TextStyle(color: _mutedTextColor(context)),
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 300,
+              child: BarChart(
+                BarChartData(
+                  minY: 0,
+                  maxY: max(2.0, maxTilt + 0.5),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: 0.5,
+                    getDrawingHorizontalLine: (_) =>
+                        const FlLine(color: Color(0xFFd2dbe0)),
+                  ),
+                  borderData: FlBorderData(
+                    show: true,
+                    border: Border(
+                      left: BorderSide(color: Colors.blueGrey.shade200),
+                      bottom: BorderSide(color: Colors.blueGrey.shade200),
+                      top: BorderSide.none,
+                      right: BorderSide.none,
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    leftTitles: const AxisTitles(
+                      sideTitles:
+                          SideTitles(showTitles: true, reservedSize: 30),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, _) {
+                          final index = value.toInt();
+                          if (index < 0 || index >= topSensors.length) {
+                            return const SizedBox.shrink();
+                          }
+                          final sensor = topSensors[index];
+                          final label =
+                              (sensor.serialNumber ?? sensor.id).toString();
+                          final shortLabel = label.length > 8
+                              ? '${label.substring(0, 8)}…'
+                              : label;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              shortLabel,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: _mutedTextColor(context),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  barGroups: List.generate(topSensors.length, (index) {
+                    final value =
+                        (topSensors[index].lastReading as num).abs().toDouble();
+                    final color = value >= 1.5
+                        ? const Color(0xFFea3e43)
+                        : value >= 1.0
+                            ? const Color(0xFFd39a00)
+                            : const Color(0xFF0ca15f);
+                    return BarChartGroupData(
+                      x: index,
+                      barRods: [
+                        BarChartRodData(
+                          toY: value,
+                          width: 30,
+                          color: color,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ],
+                    );
+                  }),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ignore: unused_element
   Widget _buildMultiSensorComparison(BuildContext context) {
     final timeLabels = List.generate(11, (i) => '15:0${(i / 2).floor()}');
     final lineColors = [
@@ -1127,6 +1806,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildStatisticalAnalysis(BuildContext context) {
     const sensors = [
       'SEN-H002B',
@@ -1240,6 +1920,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildHourlyHeatmap(BuildContext context) {
     final values = List.generate(24, (i) => Random(i + 91).nextDouble() * 57.7);
     final maxValue = values.reduce(max);

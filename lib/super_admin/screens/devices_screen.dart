@@ -1,29 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart' as provider;
 
+import '../api/device_api.dart';
 import '../models/device.dart';
 import '../providers/super_admin_backend_provider.dart';
+import '../providers/super_admin_riverpod_provider.dart';
 
-class DevicesScreen extends StatefulWidget {
+class DevicesScreen extends ConsumerStatefulWidget {
   const DevicesScreen({super.key});
 
   @override
-  State<DevicesScreen> createState() => _DevicesScreenState();
+  ConsumerState<DevicesScreen> createState() => _DevicesScreenState();
 }
 
-class _DevicesScreenState extends State<DevicesScreen> {
-  String? _editingId;
-  String _deviceCode = '';
-  String _siteId = '';
-  String _zoneId = '';
-  String _serialNumber = '';
-  String _macAddress = '';
-  String _ipUrl = '';
-  String _channelsCount = '4';
-  String _webhookUrl = 'https://api.example.com/webhook';
-  String _latitude = '37.7749';
-  String _longitude = '-122.4194';
-  bool _dataTransmissionEnabled = true;
+class _DevicesScreenState extends ConsumerState<DevicesScreen> {
   bool _showFilters = false;
   bool _isListView = false;
   String _searchQuery = '';
@@ -33,60 +24,104 @@ class _DevicesScreenState extends State<DevicesScreen> {
   String _siteFilter = 'all';
   String _zoneFilter = 'all';
   String _locationFilter = 'all';
+  int _refreshKey = 0;
+
+  String _isoUtcNow() => DateTime.now().toUtc().toIso8601String();
+
+  bool _isValidIsoUtc(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return false;
+    // Expected shape: 2026-02-28T06:15:10.092Z
+    final isoUtcPattern =
+        RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$');
+    if (!isoUtcPattern.hasMatch(trimmed)) return false;
+    return DateTime.tryParse(trimmed) != null;
+  }
+
+  String _asString(dynamic value, [String fallback = '']) {
+    final parsed = value?.toString().trim() ?? '';
+    return parsed.isEmpty ? fallback : parsed;
+  }
+
+  Map<String, dynamic> _normalizeDeviceResponse(Map<String, dynamic> source) {
+    // API returns flat structure directly
+    return source;
+  }
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
-      await db.loadSites();
-      for (final site in db.sites) {
-        await db.loadZones(site.id);
-      }
-      await db.loadDevices();
-      await db.loadSensors();
-    });
+    // Don't invalidate in initState - let provider load naturally
   }
 
-  void _showDeviceModal({Device? device}) {
-    final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
+  Future<void> _showDeviceModal({Device? device}) async {
+    final db =
+        provider.Provider.of<SuperAdminBackendProvider>(context, listen: false);
+    await db.loadOrganizations();
+    await db.loadSites();
+    if (!mounted) return;
+
     final isLight = Theme.of(context).brightness == Brightness.light;
     final subColor =
         isLight ? const Color(0xFF5A6F7D) : const Color(0xFFAEC4D7);
-    final defaultSiteId = db.sites.isNotEmpty ? db.sites.first.id : '';
-    final defaultZoneId = db.zones.isNotEmpty ? db.zones.first.id : '';
+    final defaultOrganizationId =
+        db.organizations.isNotEmpty ? db.organizations.first.id : '';
+
+    // Create controllers
+    final serialNumberCtrl = TextEditingController();
+    final firmwareVersionCtrl = TextEditingController();
+    final macAddressCtrl = TextEditingController();
+    final ipUrlCtrl = TextEditingController();
+    final channelsCountCtrl = TextEditingController();
+    final webhookUrlCtrl = TextEditingController();
+    final latitudeCtrl = TextEditingController();
+    final longitudeCtrl = TextEditingController();
+    final lastHeartBeatCtrl = TextEditingController();
+
+    // Local variables for dialog state
+    String editingId = '';
+    String organizationId = '';
+    String siteId = '';
+    String zoneId = '';
 
     if (device != null) {
-      final index = db.devices.indexOf(device);
-      _editingId = device.id;
-      _deviceCode = device.deviceCode;
-      _siteId = device.siteId;
-      _zoneId = device.zoneId;
-      _serialNumber = _serialFor(index < 0 ? 0 : index);
-      _macAddress = _macFor(index < 0 ? 0 : index);
-      _ipUrl = _ipFor(index < 0 ? 0 : index);
-      _channelsCount =
-          '${db.sensors.where((s) => s.deviceId == device.id).length}';
-      if (_channelsCount == '0') _channelsCount = '4';
-      _latitude = '37.7749';
-      _longitude = '-122.4194';
-      _dataTransmissionEnabled = device.status == 'active';
+      editingId = device.id;
+      final fetched = await DeviceApi.getDeviceById(device.id);
+      if (!mounted) return;
+      final details = _normalizeDeviceResponse(fetched);
+
+      // Update controllers with API data
+      organizationId = _asString(details['organizationId']);
+      siteId = _asString(details['siteId'], device.siteId);
+      zoneId = _asString(details['zoneId'], device.zoneId);
+      serialNumberCtrl.text = _asString(details['serialNumber']);
+      firmwareVersionCtrl.text = _asString(details['firmwareVersion']);
+      macAddressCtrl.text = _asString(details['macAddress']);
+      ipUrlCtrl.text = _asString(details['ipAddress']);
+      channelsCountCtrl.text = _asString(details['numberOfChannels'], '0');
+      webhookUrlCtrl.text = _asString(details['webHookUrl']);
+      latitudeCtrl.text = _asString(details['lat']);
+      longitudeCtrl.text = _asString(details['log']);
+      lastHeartBeatCtrl.text = _asString(details['lastHeartBeat']);
+
+      if (organizationId.isEmpty) {
+        organizationId = db.sites
+                .where((s) => s.id == siteId)
+                .map((s) => s.organizationId)
+                .firstOrNull ??
+            defaultOrganizationId;
+      }
+      if (siteId.isNotEmpty &&
+          db.zones.where((z) => z.siteId == siteId).isEmpty) {
+        await db.loadZones(siteId);
+      }
+      if (lastHeartBeatCtrl.text.isEmpty) {
+        lastHeartBeatCtrl.text = _isoUtcNow();
+      }
     } else {
-      _editingId = null;
-      _deviceCode =
-          'DEV-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-      _serialNumber =
-          'SNMLQ${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
-      _macAddress = _macFor(db.devices.length);
-      _ipUrl = _ipFor(db.devices.length);
-      _channelsCount = '4';
-      _siteId = defaultSiteId;
-      _zoneId = defaultZoneId;
-      _latitude = '37.7749';
-      _longitude = '-122.4194';
-      _dataTransmissionEnabled = true;
+      lastHeartBeatCtrl.text = _isoUtcNow();
     }
+    if (!mounted) return;
 
     showGeneralDialog(
       context: context,
@@ -94,10 +129,14 @@ class _DevicesScreenState extends State<DevicesScreen> {
       barrierLabel: 'Device Form',
       transitionDuration: const Duration(milliseconds: 120),
       pageBuilder: (context, animation, secondaryAnimation) => StatefulBuilder(
-        builder: (context, setState) {
+        builder: (context, setDialogState) {
           final theme = Theme.of(context);
           final isDialogLight = theme.brightness == Brightness.light;
           final cornerRadius = BorderRadius.circular(22);
+          final organizationSites = db.sites
+              .where((s) => s.organizationId == organizationId)
+              .toList();
+          final siteZones = db.zones.where((z) => z.siteId == siteId).toList();
           return Dialog(
             backgroundColor: Colors.transparent,
             insetPadding:
@@ -131,7 +170,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _editingId == null
+                                  editingId.isEmpty
                                       ? 'Add New Device'
                                       : 'Edit Device',
                                   style: const TextStyle(
@@ -157,78 +196,120 @@ class _DevicesScreenState extends State<DevicesScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      _dialogTextFieldWithController(
+                        label: 'Last Heartbeat (ISO-8601)',
+                        controller: lastHeartBeatCtrl,
+                      ),
                       const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _dialogTextField(
-                              label: 'Device ID',
-                              value: _deviceCode,
-                              onChanged: (v) => setState(() => _deviceCode = v),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: _dialogTextField(
-                              label: 'Serial Number',
-                              value: _serialNumber,
-                              onChanged: (v) =>
-                                  setState(() => _serialNumber = v),
-                            ),
-                          ),
-                        ],
+                      _dialogTextFieldWithController(
+                        label: 'Serial Number',
+                        controller: serialNumberCtrl,
+                      ),
+                      const SizedBox(height: 12),
+                      _dialogTextFieldWithController(
+                        label: 'Firmware Version',
+                        controller: firmwareVersionCtrl,
                       ),
                       const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
-                            child: _dialogTextField(
+                            child: _dialogTextFieldWithController(
                               label: 'MAC Address',
-                              value: _macAddress,
-                              onChanged: (v) => setState(() => _macAddress = v),
+                              controller: macAddressCtrl,
                             ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
-                            child: _dialogTextField(
+                            child: _dialogTextFieldWithController(
                               label: 'IP Address / URL',
-                              value: _ipUrl,
-                              onChanged: (v) => setState(() => _ipUrl = v),
+                              controller: ipUrlCtrl,
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      _dialogTextField(
+                      _dialogTextFieldWithController(
                         label: 'Number of Channels',
-                        value: _channelsCount,
-                        onChanged: (v) => setState(() => _channelsCount = v),
+                        controller: channelsCountCtrl,
                       ),
                       const SizedBox(height: 12),
-                      _dialogTextField(
+                      _dialogTextFieldWithController(
                         label: 'Webhook URL',
-                        value: _webhookUrl,
-                        onChanged: (v) => setState(() => _webhookUrl = v),
+                        controller: webhookUrlCtrl,
                       ),
                       const SizedBox(height: 12),
-                      _dialogDropdown(
-                        label: 'Organization *',
-                        value: _siteId.isEmpty ? null : _siteId,
-                        hint: 'Select organization',
-                        items: db.sites
-                            .map((site) => DropdownMenuItem<String>(
-                                  value: site.id,
-                                  child: Text(site.name),
-                                ))
-                            .toList(),
-                        onChanged: (value) => setState(() {
-                          _siteId = value ?? '';
-                          final firstZone = db.zones
-                              .where((z) => z.siteId == _siteId)
-                              .map((z) => z.id)
-                              .firstOrNull;
-                          _zoneId = firstZone ?? defaultZoneId;
-                        }),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _dialogDropdown(
+                              label: 'Organization *',
+                              value: organizationId.isEmpty
+                                  ? null
+                                  : organizationId,
+                              hint: 'Select organization',
+                              items: db.organizations
+                                  .map((org) => DropdownMenuItem<String>(
+                                        value: org.id,
+                                        child: Text(org.name),
+                                      ))
+                                  .toList(),
+                              onChanged: (value) {
+                                setDialogState(() {
+                                  organizationId = value ?? '';
+                                  siteId = '';
+                                  zoneId = '';
+                                });
+                              },
+                            ),
+                          ),
+                          if (organizationId.isNotEmpty) ...[
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _dialogDropdown(
+                                label: 'Site *',
+                                value: siteId.isEmpty ? null : siteId,
+                                hint: 'Select site',
+                                items: organizationSites
+                                    .map((site) => DropdownMenuItem<String>(
+                                          value: site.id,
+                                          child: Text(site.name),
+                                        ))
+                                    .toList(),
+                                onChanged: (value) {
+                                  setDialogState(() {
+                                    siteId = value ?? '';
+                                    zoneId = '';
+                                  });
+                                  if (siteId.isEmpty) return;
+                                  db.loadZones(siteId).then((_) {
+                                    if (!mounted) return;
+                                    setDialogState(() {});
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                          if (siteId.isNotEmpty) ...[
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _dialogDropdown(
+                                label: 'Zone *',
+                                value: zoneId.isEmpty ? null : zoneId,
+                                hint: 'Select zone',
+                                items: siteZones
+                                    .map((zone) => DropdownMenuItem<String>(
+                                          value: zone.id,
+                                          child: Text(zone.name),
+                                        ))
+                                    .toList(),
+                                onChanged: (value) =>
+                                    setDialogState(() => zoneId = value ?? ''),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 18),
                       LayoutBuilder(
@@ -245,9 +326,9 @@ class _DevicesScreenState extends State<DevicesScreen> {
                           );
                           final action = OutlinedButton.icon(
                             onPressed: () {
-                              setState(() {
-                                _latitude = '37.7749';
-                                _longitude = '-122.4194';
+                              setDialogState(() {
+                                latitudeCtrl.text = '37.7749';
+                                longitudeCtrl.text = '-122.4194';
                               });
                             },
                             icon: const Icon(Icons.my_location, size: 16),
@@ -280,57 +361,19 @@ class _DevicesScreenState extends State<DevicesScreen> {
                       Row(
                         children: [
                           Expanded(
-                            child: _dialogTextField(
+                            child: _dialogTextFieldWithController(
                               label: 'Latitude',
-                              value: _latitude,
-                              onChanged: (v) => setState(() => _latitude = v),
+                              controller: latitudeCtrl,
                             ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
-                            child: _dialogTextField(
+                            child: _dialogTextFieldWithController(
                               label: 'Longitude',
-                              value: _longitude,
-                              onChanged: (v) => setState(() => _longitude = v),
+                              controller: longitudeCtrl,
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          border:
-                              Border.all(color: Theme.of(context).dividerColor),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Data Transmission',
-                                    style: TextStyle(
-                                        fontSize: 30 > 22 ? 22 : 20,
-                                        fontWeight: FontWeight.w700),
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Enable device to send data',
-                                    style: TextStyle(color: subColor),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Switch(
-                              value: _dataTransmissionEnabled,
-                              onChanged: (v) =>
-                                  setState(() => _dataTransmissionEnabled = v),
-                            ),
-                          ],
-                        ),
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -338,39 +381,125 @@ class _DevicesScreenState extends State<DevicesScreen> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () async {
-                                final provider = Provider.of<SuperAdminBackendProvider>(
+                                final backend =
+                                    provider.Provider.of<SuperAdminBackendProvider>(
                                   context,
                                   listen: false,
                                 );
-                                final status = _dataTransmissionEnabled
-                                    ? 'active'
-                                    : 'inactive';
+                                const status = 'active';
+                                if (organizationId.isEmpty ||
+                                    siteId.isEmpty ||
+                                    zoneId.isEmpty) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Select organization, site, and zone',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+                                if (serialNumberCtrl.text.trim().isEmpty ||
+                                    firmwareVersionCtrl.text.trim().isEmpty ||
+                                    macAddressCtrl.text.trim().isEmpty ||
+                                    ipUrlCtrl.text.trim().isEmpty ||
+                                    channelsCountCtrl.text.trim().isEmpty ||
+                                    webhookUrlCtrl.text.trim().isEmpty ||
+                                    latitudeCtrl.text.trim().isEmpty ||
+                                    longitudeCtrl.text.trim().isEmpty ||
+                                    lastHeartBeatCtrl.text.trim().isEmpty) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Fill all device fields before saving',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+                                if (int.tryParse(channelsCountCtrl.text.trim()) ==
+                                        null ||
+                                    double.tryParse(latitudeCtrl.text.trim()) == null ||
+                                    double.tryParse(longitudeCtrl.text.trim()) == null) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Channels must be integer, latitude/longitude must be valid numbers',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+                                if (!_isValidIsoUtc(lastHeartBeatCtrl.text)) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Last Heartbeat must be ISO UTC format like 2026-02-28T06:15:10.092Z',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
                                 try {
-                                  if (_editingId == null) {
-                                    await provider.create('devices', {
-                                      'device_code': _deviceCode.trim(),
-                                      'serial_number': _serialNumber.trim(),
-                                      'firmware_version': '1.0.0',
-                                      'site_id': _siteId,
-                                      'zone_id': _zoneId,
+                                  if (editingId.isEmpty) {
+                                    await backend.create('devices', {
+                                      'serial_number': serialNumberCtrl.text.trim(),
+                                      'firmware_version':
+                                          firmwareVersionCtrl.text.trim(),
+                                      'organization_id': organizationId,
+                                      'site_id': siteId,
+                                      'zone_id': zoneId,
+                                      'mac_address': macAddressCtrl.text.trim(),
+                                      'ip_address': ipUrlCtrl.text.trim(),
+                                      'number_of_channels':
+                                          channelsCountCtrl.text.trim(),
+                                      'web_hook_url': webhookUrlCtrl.text.trim(),
+                                      'lat': latitudeCtrl.text.trim(),
+                                      'log': longitudeCtrl.text.trim(),
+                                      'last_heart_beat':
+                                          lastHeartBeatCtrl.text.trim(),
                                       'status': status,
                                     });
                                   } else {
-                                    await provider.update('devices', _editingId!, {
-                                      'device_code': _deviceCode.trim(),
-                                      'serial_number': _serialNumber.trim(),
-                                      'firmware_version': '1.0.0',
-                                      'site_id': _siteId,
-                                      'zone_id': _zoneId,
-                                      'status': status,
-                                    });
+                                    await backend.update(
+                                      'devices',
+                                      editingId,
+                                      {
+                                        'serial_number': serialNumberCtrl.text.trim(),
+                                        'firmware_version':
+                                            firmwareVersionCtrl.text.trim(),
+                                        'organization_id': organizationId,
+                                        'site_id': siteId,
+                                        'zone_id': zoneId,
+                                        'mac_address': macAddressCtrl.text.trim(),
+                                        'ip_address': ipUrlCtrl.text.trim(),
+                                        'number_of_channels':
+                                            channelsCountCtrl.text.trim(),
+                                        'web_hook_url': webhookUrlCtrl.text.trim(),
+                                        'lat': latitudeCtrl.text.trim(),
+                                        'log': longitudeCtrl.text.trim(),
+                                        'last_heart_beat':
+                                            lastHeartBeatCtrl.text.trim(),
+                                        'status': status,
+                                      },
+                                    );
                                   }
+                                  setState(() => _refreshKey++);
                                   if (context.mounted) Navigator.pop(context);
                                 } catch (e) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text('Failed to save device: $e'),
+                                        content:
+                                            Text('Failed to save device: $e'),
                                       ),
                                     );
                                   }
@@ -387,7 +516,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                                 ),
                               ),
                               child: Text(
-                                _editingId == null
+                                editingId.isEmpty
                                     ? 'Add Device'
                                     : 'Save Device',
                               ),
@@ -429,10 +558,9 @@ class _DevicesScreenState extends State<DevicesScreen> {
     );
   }
 
-  Widget _dialogTextField({
+  Widget _dialogTextFieldWithController({
     required String label,
-    required String value,
-    required ValueChanged<String> onChanged,
+    required TextEditingController controller,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -445,7 +573,53 @@ class _DevicesScreenState extends State<DevicesScreen> {
         ),
         const SizedBox(height: 6),
         TextFormField(
-          initialValue: value,
+          controller: controller,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Theme.of(context).brightness == Brightness.light
+                ? const Color(0xFFF7FAFC)
+                : const Color(0xFF1A3347),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.primary,
+                width: 2,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _dialogTextField({
+    required String label,
+    required String value,
+    required ValueChanged<String> onChanged,
+  }) {
+    final controller = TextEditingController(text: value);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
@@ -571,12 +745,25 @@ class _DevicesScreenState extends State<DevicesScreen> {
 
   Future<void> _togglePower(SuperAdminBackendProvider db, Device device) async {
     final next = device.status == 'active' ? 'inactive' : 'active';
+    final organizationId = db.sites
+            .where((s) => s.id == device.siteId)
+            .map((s) => s.organizationId)
+            .firstOrNull ??
+        '';
     await db.update('devices', device.id, {
       'device_code': device.deviceCode,
       'serial_number': device.deviceCode,
       'firmware_version': '1.0.0',
+      'organization_id': organizationId,
       'site_id': device.siteId,
       'zone_id': device.zoneId,
+      'mac_address': '',
+      'ip_address': '',
+      'number_of_channels': '0',
+      'web_hook_url': '',
+      'lat': '0',
+      'log': '0',
+      'last_heart_beat': DateTime.now().toUtc().toIso8601String(),
       'status': next,
     });
   }
@@ -614,20 +801,45 @@ class _DevicesScreenState extends State<DevicesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SuperAdminBackendProvider>(
+    final devicesAsync = ref.watch(devicesProvider(_refreshKey));
+
+    return devicesAsync.when(
+      data: (_) => _buildContent(context),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('Error loading devices: $error'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => ref.invalidate(devicesProvider),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    return provider.Consumer<SuperAdminBackendProvider>(
       builder: (context, db, child) {
+        final allDevices = db.devices;
         final devices =
-            db.devices.where((d) => _matchesFilters(db, d)).toList();
+            allDevices.where((d) => _matchesFilters(db, d)).toList();
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(context),
               if (_showFilters) ...[
                 const SizedBox(height: 18),
-                _buildFiltersPanel(context, devices.length, db.devices.length),
+                _buildFiltersPanel(context, devices.length, allDevices.length),
               ],
               const SizedBox(height: 18),
               _isListView
@@ -956,8 +1168,8 @@ class _DevicesScreenState extends State<DevicesScreen> {
     );
   }
 
-  Widget _buildGrid(
-      BuildContext context, SuperAdminBackendProvider db, List<Device> devices) {
+  Widget _buildGrid(BuildContext context, SuperAdminBackendProvider db,
+      List<Device> devices) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
@@ -1029,8 +1241,8 @@ class _DevicesScreenState extends State<DevicesScreen> {
     );
   }
 
-  Widget _buildList(
-      BuildContext context, SuperAdminBackendProvider db, List<Device> devices) {
+  Widget _buildList(BuildContext context, SuperAdminBackendProvider db,
+      List<Device> devices) {
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),

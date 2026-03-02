@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -5,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class OrgServiceApi {
   static const String baseUrl = 'http://103.211.202.145:8091/api/v1/org';
   static const String _tokenStorageKey = 'super_admin_auth_token';
+  static const Duration _requestDeadline = Duration(seconds: 30);
 
   static Future<Map<String, String>> _headers({bool json = false}) async {
     final headers = <String, String>{};
@@ -19,123 +21,130 @@ class OrgServiceApi {
 
   // Organizations
   static Future<ApiResponse> getAllOrganizations() async {
-    final res = await http.get(
+    final res = await _send(http.get(
       Uri.parse('$baseUrl/organization'),
       headers: await _headers(),
-    );
+    ));
     return _handleResponse(res);
   }
 
   static Future<ApiResponse> getOrganization(String orgId) async {
-    final res = await http.get(
+    final res = await _send(http.get(
       Uri.parse('$baseUrl/organization/$orgId'),
       headers: await _headers(),
-    );
+    ));
     return _handleResponse(res);
   }
 
-  static Future<ApiResponse> createOrganization(String name, String email) async {
-    final res = await http.post(
+  static Future<ApiResponse> createOrganization(
+      String name, String email) async {
+    final res = await _send(http.post(
       Uri.parse('$baseUrl/organization'),
       headers: await _headers(json: true),
       body: jsonEncode({'name': name, 'email': email}),
-    );
+    ));
     return _handleResponse(res);
   }
 
-  static Future<ApiResponse> updateOrganization(String orgId, String name, String email) async {
-    final res = await http.put(
+  static Future<ApiResponse> updateOrganization(
+      String orgId, String name, String email) async {
+    final res = await _send(http.put(
       Uri.parse('$baseUrl/organization/$orgId'),
       headers: await _headers(json: true),
       body: jsonEncode({'name': name, 'email': email}),
-    );
+    ));
     return _handleResponse(res);
   }
 
   static Future<ApiResponse> deleteOrganization(String orgId) async {
-    final res = await http.delete(
+    final res = await _send(http.delete(
       Uri.parse('$baseUrl/organization/$orgId'),
       headers: await _headers(),
-    );
+    ));
     return _handleResponse(res);
   }
 
   static Future<ApiResponse> getOrganizationSites(String orgId) async {
-    final res = await http.get(
+    final res = await _send(http.get(
       Uri.parse('$baseUrl/organization/$orgId/sites'),
       headers: await _headers(),
-    );
+    ));
     return _handleResponse(res);
   }
 
-  static Future<ApiResponse> createSiteForOrganization(String orgId, String name, String location) async {
-    final res = await http.post(
+  static Future<ApiResponse> createSiteForOrganization(
+      String orgId, String name, String location) async {
+    final res = await _send(http.post(
       Uri.parse('$baseUrl/organization/$orgId/sites'),
       headers: await _headers(json: true),
       body: jsonEncode({'name': name, 'location': location}),
-    );
+    ));
     return _handleResponse(res);
   }
 
   // Sites
   static Future<ApiResponse> getAllSites() async {
-    final res = await http.get(
+    final res = await _send(http.get(
       Uri.parse('$baseUrl/site/'),
       headers: await _headers(),
-    );
+    ));
     return _handleResponse(res);
   }
 
   static Future<ApiResponse> getSite(String siteId) async {
-    final res = await http.get(
+    final res = await _send(http.get(
       Uri.parse('$baseUrl/site/$siteId'),
       headers: await _headers(),
-    );
+    ));
     return _handleResponse(res);
   }
 
-  static Future<ApiResponse> createSite(String orgId, String name, String location) async {
-    final res = await http.post(
+  static Future<ApiResponse> createSite(
+      String orgId, String name, String location) async {
+    final res = await _send(http.post(
       Uri.parse('$baseUrl/site/'),
       headers: await _headers(json: true),
       body: jsonEncode({'orgId': orgId, 'name': name, 'location': location}),
-    );
+    ));
     return _handleResponse(res);
   }
 
-  static Future<ApiResponse> updateSite(String siteId, String name, String location, {String? orgId}) async {
+  static Future<ApiResponse> updateSite(
+      String siteId, String name, String location,
+      {String? orgId}) async {
     final body = <String, dynamic>{'name': name, 'location': location};
     if (orgId != null) body['orgId'] = orgId;
-    final res = await http.put(
+    final res = await _send(http.put(
       Uri.parse('$baseUrl/site/$siteId'),
       headers: await _headers(json: true),
       body: jsonEncode(body),
-    );
+    ));
     return _handleResponse(res);
   }
 
   static Future<ApiResponse> deleteSite(String siteId) async {
-    final res = await http.delete(
+    final res = await _send(http.delete(
       Uri.parse('$baseUrl/site/$siteId'),
       headers: await _headers(),
-    );
+    ));
     return _handleResponse(res);
   }
 
   static Future<ApiResponse> getSiteZones(String siteId) async {
-    final res = await http.get(
+    final res = await _send(http.get(
       Uri.parse('$baseUrl/site/$siteId/zones'),
       headers: await _headers(),
-    );
+    ));
     return _handleResponse(res);
   }
 
-  static Future<ApiResponse> createZoneForSite(String siteId, String name) async {
-    final res = await http.post(
+  static Future<ApiResponse> createZoneForSite(
+      String siteId, String name) async {
+    final res = await _send(http.post(
       Uri.parse('$baseUrl/site/$siteId/zones'),
       headers: await _headers(json: true),
       body: jsonEncode({'name': name}),
-    );
+    ));
     return _handleResponse(res);
   }
 
@@ -144,43 +153,44 @@ class OrgServiceApi {
     final uri = Uri.parse('$baseUrl/zone/').replace(
       queryParameters: {'siteId': siteId},
     );
-    final res = await http.get(uri, headers: await _headers());
+    final res = await _send(http.get(uri, headers: await _headers()));
     return _handleResponse(res);
   }
 
   static Future<ApiResponse> getZone(String zoneId) async {
-    final res = await http.get(
+    final res = await _send(http.get(
       Uri.parse('$baseUrl/zone/$zoneId'),
       headers: await _headers(),
-    );
+    ));
     return _handleResponse(res);
   }
 
   static Future<ApiResponse> createZone(String siteId, String name) async {
-    final res = await http.post(
+    final res = await _send(http.post(
       Uri.parse('$baseUrl/zone/'),
       headers: await _headers(json: true),
       body: jsonEncode({'siteId': siteId, 'name': name}),
-    );
+    ));
     return _handleResponse(res);
   }
 
-  static Future<ApiResponse> updateZone(String zoneId, String name, {String? siteId}) async {
+  static Future<ApiResponse> updateZone(String zoneId, String name,
+      {String? siteId}) async {
     final body = <String, dynamic>{'name': name};
     if (siteId != null) body['siteId'] = siteId;
-    final res = await http.put(
+    final res = await _send(http.put(
       Uri.parse('$baseUrl/zone/$zoneId'),
       headers: await _headers(json: true),
       body: jsonEncode(body),
-    );
+    ));
     return _handleResponse(res);
   }
 
   static Future<ApiResponse> deleteZone(String zoneId) async {
-    final res = await http.delete(
+    final res = await _send(http.delete(
       Uri.parse('$baseUrl/zone/$zoneId'),
       headers: await _headers(),
-    );
+    ));
     return _handleResponse(res);
   }
 
@@ -198,6 +208,20 @@ class OrgServiceApi {
       );
     }
     throw ApiException(message);
+  }
+
+  static Future<http.Response> _send(Future<http.Response> request) async {
+    try {
+      return await request.timeout(_requestDeadline, onTimeout: () {
+        throw TimeoutException('Request timeout');
+      });
+    } on TimeoutException {
+      throw ApiException(
+        'Connection timeout. Check if backend is running.',
+      );
+    } on http.ClientException catch (e) {
+      throw ApiException('Network error: ${e.message}');
+    }
   }
 
   static Map<String, dynamic>? _tryParseMap(String body) {

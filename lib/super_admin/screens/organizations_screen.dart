@@ -24,11 +24,13 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
       ref.read(superAdminSelectedOrganizationIdStateProvider.notifier).state =
           value;
 
-  String? get _selectedSiteId => ref.read(superAdminSelectedSiteIdStateProvider);
+  String? get _selectedSiteId =>
+      ref.read(superAdminSelectedSiteIdStateProvider);
   set _selectedSiteId(String? value) =>
       ref.read(superAdminSelectedSiteIdStateProvider.notifier).state = value;
 
-  String? get _selectedZoneId => ref.read(superAdminSelectedZoneIdStateProvider);
+  String? get _selectedZoneId =>
+      ref.read(superAdminSelectedZoneIdStateProvider);
   set _selectedZoneId(String? value) =>
       ref.read(superAdminSelectedZoneIdStateProvider.notifier).state = value;
 
@@ -42,7 +44,8 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
     final db = ref.read(superAdminBackendChangeNotifierProvider);
     await db.loadOrganizations();
     await db.loadSites();
-    final firstOrgId = db.organizations.isNotEmpty ? db.organizations.first.id : null;
+    final firstOrgId =
+        db.organizations.isNotEmpty ? db.organizations.first.id : null;
     final firstSiteId = db.sites
         .where((s) => s.organizationId == firstOrgId)
         .map((s) => s.id)
@@ -167,7 +170,8 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
                     'owner_user_id': '',
                   });
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Organization created')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Organization created')));
                     Navigator.pop(context);
                   }
                 } else {
@@ -193,7 +197,6 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
     if (_selectedOrganizationId == null && site == null) return;
 
     var name = site?.name ?? '';
-    var location = site?.location ?? '';
     var organizationId = site?.organizationId ?? _selectedOrganizationId!;
 
     showDialog(
@@ -207,12 +210,6 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
                 'label': 'Name',
                 'value': name,
                 'onChanged': (String value) => setState(() => name = value),
-                'keyboardType': TextInputType.text,
-              },
-              {
-                'label': 'Location',
-                'value': location,
-                'onChanged': (String value) => setState(() => location = value),
                 'keyboardType': TextInputType.text,
               },
               {
@@ -234,28 +231,31 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
                 if (name.trim().isEmpty) {
                   throw Exception("site name can't be empty");
                 }
-                if (location.trim().isEmpty) {
-                  throw Exception("site location can't be empty");
-                }
+                final fallbackLocation =
+                    (site?.location.trim().isNotEmpty ?? false)
+                        ? site!.location.trim()
+                        : 'N/A';
                 if (site == null) {
                   await db.create('sites', {
                     'name': name.trim(),
-                    'location': location.trim(),
+                    'location': fallbackLocation,
                     'organization_id': organizationId,
                   });
                   if (context.mounted) {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Site created successfully')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Site created successfully')));
                   }
                 } else {
                   await db.update('sites', site.id, {
                     'name': name.trim(),
-                    'location': location.trim(),
+                    'location': fallbackLocation,
                     'organization_id': organizationId,
                   });
                   if (context.mounted) {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Site updated successfully')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Site updated successfully')));
                   }
                 }
               } catch (e) {
@@ -316,7 +316,8 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
                   });
                   if (context.mounted) {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Zone created successfully')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Zone created successfully')));
                   }
                 } else {
                   await db.update('zones', zone.id, {
@@ -325,7 +326,8 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
                   });
                   if (context.mounted) {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Zone updated successfully')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Zone updated successfully')));
                   }
                 }
               } catch (e) {
@@ -348,7 +350,6 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
     final selectedOrganizationId =
         ref.watch(superAdminSelectedOrganizationIdStateProvider);
     final selectedSiteId = ref.watch(superAdminSelectedSiteIdStateProvider);
-    final selectedZoneId = ref.watch(superAdminSelectedZoneIdStateProvider);
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -364,156 +365,133 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
         .where((s) => s.organizationId == selectedOrganizationId)
         .toList();
     final zones = db.zones.where((z) => z.siteId == selectedSiteId).toList();
-    final locations = db.devices
-        .where((d) => d.zoneId == selectedZoneId)
-        .map((d) => d.deviceCode)
-        .toList();
-
     return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 12,
+            runSpacing: 12,
             children: [
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                spacing: 12,
-                runSpacing: 12,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Organization Hierarchy',
-                        style: TextStyle(
-                          fontSize: 34,
-                          fontWeight: FontWeight.w800,
-                          color:
-                              Theme.of(context).brightness == Brightness.light
-                                  ? const Color(0xFF0f202d)
-                                  : const Color(0xFFd4e4ef),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Manage organizations, sites, zones, and sensor locations',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: isLight
-                              ? const Color(0xFF4e6473)
-                              : const Color(0xFF9db7d2),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'Organization Hierarchy',
+                    style: TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? const Color(0xFF0f202d)
+                          : const Color(0xFFd4e4ef),
+                    ),
                   ),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _infoChip('${organizations.length} Orgs'),
-                      _infoChip('${db.sites.length} Sites'),
-                      _infoChip('${db.zones.length} Zones'),
-                      _infoChip('${db.devices.length} Locations'),
-                    ],
+                  const SizedBox(height: 2),
+                  Text(
+                    'Manage organizations, sites, and zones',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: isLight
+                          ? const Color(0xFF4e6473)
+                          : const Color(0xFF9db7d2),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final width = constraints.maxWidth;
-                  if (width < 900) {
-                    return Column(
-                      children: [
-                        _columnCard(
-                          title: 'Organizations',
-                          icon: Icons.business,
-                          height: mobileCardHeight,
-                          onAdd: () => _showOrganizationModal(db: db),
-                          child: _buildOrganizationsList(organizations, db),
-                        ),
-                        const SizedBox(height: 12),
-                        _columnCard(
-                          title: 'Sites',
-                          icon: Icons.map_outlined,
-                          height: mobileCardHeight,
-                          onAdd: _selectedOrganizationId == null
-                              ? null
-                              : () => _showSiteModal(db: db),
-                          child: _buildSitesList(sites, db),
-                        ),
-                        const SizedBox(height: 12),
-                        _columnCard(
-                          title: 'Zones',
-                          icon: Icons.layers_outlined,
-                          height: mobileCardHeight,
-                          onAdd: _selectedSiteId == null
-                              ? null
-                              : () => _showZoneModal(db: db),
-                          child: _buildZonesList(zones, db),
-                        ),
-                        const SizedBox(height: 12),
-                        _columnCard(
-                          title: 'Locations',
-                          icon: Icons.location_on_outlined,
-                          height: mobileCardHeight,
-                          child: _buildLocationsList(locations),
-                        ),
-                      ],
-                    );
-                  }
-
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: _columnCard(
-                          title: 'Organizations',
-                          icon: Icons.business,
-                          height: desktopCardHeight,
-                          onAdd: () => _showOrganizationModal(db: db),
-                          child: _buildOrganizationsList(organizations, db),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _columnCard(
-                          title: 'Sites',
-                          icon: Icons.map_outlined,
-                          height: desktopCardHeight,
-                          onAdd: _selectedOrganizationId == null
-                              ? null
-                              : () => _showSiteModal(db: db),
-                          child: _buildSitesList(sites, db),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _columnCard(
-                          title: 'Zones',
-                          icon: Icons.layers_outlined,
-                          height: desktopCardHeight,
-                          onAdd: _selectedSiteId == null
-                              ? null
-                              : () => _showZoneModal(db: db),
-                          child: _buildZonesList(zones, db),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _columnCard(
-                          title: 'Locations',
-                          icon: Icons.location_on_outlined,
-                          height: desktopCardHeight,
-                          child: _buildLocationsList(locations),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _infoChip('${organizations.length} Orgs'),
+                  _infoChip('${db.sites.length} Sites'),
+                  _infoChip('${db.zones.length} Zones'),
+                ],
               ),
             ],
           ),
-        );
+          const SizedBox(height: 18),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              if (width < 900) {
+                return Column(
+                  children: [
+                    _columnCard(
+                      title: 'Organizations',
+                      icon: Icons.business,
+                      height: mobileCardHeight,
+                      onAdd: () => _showOrganizationModal(db: db),
+                      child: _buildOrganizationsList(organizations, db),
+                    ),
+                    const SizedBox(height: 12),
+                    _columnCard(
+                      title: 'Sites',
+                      icon: Icons.map_outlined,
+                      height: mobileCardHeight,
+                      onAdd: _selectedOrganizationId == null
+                          ? null
+                          : () => _showSiteModal(db: db),
+                      child: _buildSitesList(sites, db),
+                    ),
+                    const SizedBox(height: 12),
+                    _columnCard(
+                      title: 'Zones',
+                      icon: Icons.layers_outlined,
+                      height: mobileCardHeight,
+                      onAdd: _selectedSiteId == null
+                          ? null
+                          : () => _showZoneModal(db: db),
+                      child: _buildZonesList(zones, db),
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _columnCard(
+                      title: 'Organizations',
+                      icon: Icons.business,
+                      height: desktopCardHeight,
+                      onAdd: () => _showOrganizationModal(db: db),
+                      child: _buildOrganizationsList(organizations, db),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _columnCard(
+                      title: 'Sites',
+                      icon: Icons.map_outlined,
+                      height: desktopCardHeight,
+                      onAdd: _selectedOrganizationId == null
+                          ? null
+                          : () => _showSiteModal(db: db),
+                      child: _buildSitesList(sites, db),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _columnCard(
+                      title: 'Zones',
+                      icon: Icons.layers_outlined,
+                      height: desktopCardHeight,
+                      onAdd: _selectedSiteId == null
+                          ? null
+                          : () => _showZoneModal(db: db),
+                      child: _buildZonesList(zones, db),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _columnCard({
@@ -679,7 +657,7 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
         return _ListTileCard(
           selected: selected,
           title: site.name,
-          subtitle: site.location,
+          subtitle: 'Site',
           badge: '$zonesCount zones',
           onTap: () {
             setState(() {
@@ -735,57 +713,6 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
           },
         );
       }).toList(),
-    );
-  }
-
-  Widget _buildLocationsList(List<String> locations) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    if (_selectedZoneId == null) {
-      return const _EmptyHint(text: 'Select a zone');
-    }
-    if (locations.isEmpty) {
-      return const _EmptyHint(text: 'No locations in this zone');
-    }
-    return Column(
-      children: locations
-          .map((loc) => Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                decoration: BoxDecoration(
-                  color: isLight
-                      ? const Color(0xFFF4F8FB)
-                      : const Color(0xFF253F52),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Theme.of(context).dividerColor),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.place_outlined,
-                      size: 15,
-                      color: isLight
-                          ? const Color(0xFF4C7084)
-                          : const Color(0xFFBBD0E0),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        loc,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isLight
-                              ? const Color(0xFF1f3642)
-                              : const Color(0xFFE2EDF8),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ))
-          .toList(),
     );
   }
 

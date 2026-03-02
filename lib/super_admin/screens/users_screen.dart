@@ -25,7 +25,7 @@ class _UsersScreenState extends State<UsersScreen> {
   String? _editingId;
   String _name = '';
   String _email = '';
-  String _role = 'operator';
+  String _role = 'admin';
 
   @override
   void initState() {
@@ -54,7 +54,7 @@ class _UsersScreenState extends State<UsersScreen> {
       _editingId = null;
       _name = '';
       _email = '';
-      _role = 'operator';
+      _role = 'admin';
     }
 
     final nameController = TextEditingController(text: _name);
@@ -71,18 +71,11 @@ class _UsersScreenState extends State<UsersScreen> {
         'organization': 'Default Organization',
       },
       {
-        'title': 'Site Installation Engineer',
-        'name': 'New Site Engineer',
-        'email': 'engineer@example.com',
-        'role': 'engineer',
-        'organization': 'Field Operations',
-      },
-      {
-        'title': 'Monitoring Operator',
-        'name': 'New Monitoring User',
-        'email': 'operator@example.com',
-        'role': 'operator',
-        'organization': 'Monitoring Center',
+        'title': 'Vendor Account',
+        'name': 'New Vendor',
+        'email': 'vendor@example.com',
+        'role': 'vendor',
+        'organization': 'Vendor Organization',
       },
     ];
     var useTemplateTab = user == null;
@@ -92,9 +85,8 @@ class _UsersScreenState extends State<UsersScreen> {
 
     String normalizeRole(String value) {
       final lower = value.trim().toLowerCase();
-      if (lower == 'admin') return 'admin';
-      if (lower == 'engineer') return 'engineer';
-      return 'operator';
+      if (lower == 'vendor') return 'vendor';
+      return 'admin';
     }
 
     await showDialog(
@@ -438,16 +430,23 @@ class _UsersScreenState extends State<UsersScreen> {
                         ),
                         const SizedBox(height: 6),
                         _inputBox(
-                          child: TextField(
-                            controller: roleController,
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding:
-                                  EdgeInsets.symmetric(vertical: 12),
-                              hintText: 'operator / engineer / admin',
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: normalizeRole(roleController.text),
+                              isExpanded: true,
+                              items: const [
+                                DropdownMenuItem(
+                                    value: 'admin',
+                                    child: Text('User Admin')),
+                                DropdownMenuItem(
+                                    value: 'vendor', child: Text('Vendor')),
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  roleController.text = value;
+                                }
+                              },
                             ),
-                            textAlignVertical: TextAlignVertical.center,
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -463,16 +462,37 @@ class _UsersScreenState extends State<UsersScreen> {
                         ),
                         const SizedBox(height: 6),
                         _inputBox(
-                          child: TextField(
-                            controller: organizationController,
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding:
-                                  EdgeInsets.symmetric(vertical: 12),
-                              hintText: 'Organization name',
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: db.organizations.isEmpty
+                                  ? null
+                                  : (db.organizations.any((o) =>
+                                          o.name.toLowerCase() ==
+                                          organizationController.text
+                                              .toLowerCase())
+                                      ? db.organizations
+                                          .firstWhere((o) =>
+                                              o.name.toLowerCase() ==
+                                              organizationController.text
+                                                  .toLowerCase())
+                                          .id
+                                      : db.organizations.first.id),
+                              isExpanded: true,
+                              hint: const Text('Select organization'),
+                              items: db.organizations
+                                  .map((org) => DropdownMenuItem<String>(
+                                        value: org.id,
+                                        child: Text(org.name),
+                                      ))
+                                  .toList(),
+                              onChanged: (value) {
+                                if (value != null) {
+                                  final org = db.organizations
+                                      .firstWhere((o) => o.id == value);
+                                  organizationController.text = org.name;
+                                }
+                              },
                             ),
-                            textAlignVertical: TextAlignVertical.center,
                           ),
                         ),
                         const SizedBox(height: 14),
@@ -1444,11 +1464,9 @@ class _UsersScreenState extends State<UsersScreen> {
                             DropdownMenuItem(
                                 value: 'all', child: Text('All Roles')),
                             DropdownMenuItem(
-                                value: 'admin', child: Text('Admin')),
+                                value: 'admin', child: Text('User Admin')),
                             DropdownMenuItem(
-                                value: 'engineer', child: Text('Engineer')),
-                            DropdownMenuItem(
-                                value: 'operator', child: Text('Operator')),
+                                value: 'vendor', child: Text('Vendor')),
                           ],
                           onChanged: (value) =>
                               setState(() => _roleFilter = value!),
@@ -1506,11 +1524,9 @@ class _UsersScreenState extends State<UsersScreen> {
                                 DropdownMenuItem(
                                     value: 'all', child: Text('All Roles')),
                                 DropdownMenuItem(
-                                    value: 'admin', child: Text('Admin')),
+                                    value: 'admin', child: Text('User Admin')),
                                 DropdownMenuItem(
-                                    value: 'engineer', child: Text('Engineer')),
-                                DropdownMenuItem(
-                                    value: 'operator', child: Text('Operator')),
+                                    value: 'vendor', child: Text('Vendor')),
                               ],
                               onChanged: (value) =>
                                   setState(() => _roleFilter = value!),

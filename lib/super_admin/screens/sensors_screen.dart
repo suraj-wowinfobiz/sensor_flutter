@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart' as provider;
 
 import '../models/sensor.dart';
 import '../providers/super_admin_backend_provider.dart';
+import '../providers/super_admin_riverpod_provider.dart';
 
-class SensorsScreen extends StatefulWidget {
+class SensorsScreen extends ConsumerStatefulWidget {
   const SensorsScreen({super.key});
 
   @override
-  State<SensorsScreen> createState() => _SensorsScreenState();
+  ConsumerState<SensorsScreen> createState() => _SensorsScreenState();
 }
 
-class _SensorsScreenState extends State<SensorsScreen> {
+class _SensorsScreenState extends ConsumerState<SensorsScreen> {
   String? _editingId;
   String _serialNumber = '';
   String _deviceId = '';
@@ -33,21 +35,16 @@ class _SensorsScreenState extends State<SensorsScreen> {
   String _zoneFilter = 'all';
   String _locationFilter = 'all';
   final Set<String> _inactiveSensors = {};
+  int _refreshKey = 0;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
-      await db.loadSites();
-      await db.loadDevices();
-      await db.loadSensors();
-    });
+    // Don't invalidate in initState - let provider load naturally
   }
 
   void _showSensorModal({Sensor? sensor}) {
-    final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
+    final db = provider.Provider.of<SuperAdminBackendProvider>(context, listen: false);
     final isLight = Theme.of(context).brightness == Brightness.light;
     final subColor =
         isLight ? const Color(0xFF5A6F7D) : const Color(0xFFAEC4D7);
@@ -306,34 +303,46 @@ class _SensorsScreenState extends State<SensorsScreen> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () async {
-                                final provider = Provider.of<SuperAdminBackendProvider>(
+                                final backend =
+                                    provider.Provider.of<SuperAdminBackendProvider>(
                                   context,
                                   listen: false,
                                 );
                                 try {
                                   if (_editingId == null) {
-                                    await provider.create('sensors', {
+                                    await backend.create('sensors', {
                                       'serial_number': _serialNumber.trim(),
                                       'device_id': _deviceId,
                                       'sensor_type_id': _sensorTypeId,
+                                      'mac_address': _macAddress.trim(),
+                                      'channel_number': _channelNumber.trim(),
+                                      'lat': _latitude.trim(),
+                                      'log': _longitude.trim(),
                                       'status': 'ACTIVE',
                                       'unit': '',
                                     });
                                   } else {
-                                    await provider.update('sensors', _editingId!, {
+                                    await backend
+                                        .update('sensors', _editingId!, {
                                       'serial_number': _serialNumber.trim(),
                                       'device_id': _deviceId,
                                       'sensor_type_id': _sensorTypeId,
+                                      'mac_address': _macAddress.trim(),
+                                      'channel_number': _channelNumber.trim(),
+                                      'lat': _latitude.trim(),
+                                      'log': _longitude.trim(),
                                       'status': 'ACTIVE',
                                       'unit': '',
                                     });
                                   }
+                                  setState(() => _refreshKey++);
                                   if (context.mounted) Navigator.pop(context);
                                 } catch (e) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text('Failed to save sensor: $e'),
+                                        content:
+                                            Text('Failed to save sensor: $e'),
                                       ),
                                     );
                                   }
@@ -604,10 +613,34 @@ class _SensorsScreenState extends State<SensorsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SuperAdminBackendProvider>(
+    final sensorsAsync = ref.watch(sensorsProvider(_refreshKey));
+    
+    return sensorsAsync.when(
+      data: (sensors) => _buildContent(context, sensors),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('Error loading sensors: $error'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => ref.invalidate(sensorsProvider),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, List<Sensor> allSensors) {
+    return provider.Consumer<SuperAdminBackendProvider>(
       builder: (context, db, child) {
         final sensors =
-            db.sensors.where((s) => _matchesFilters(db, s)).toList();
+            allSensors.where((s) => _matchesFilters(db, s)).toList();
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
@@ -618,7 +651,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
               if (_showFilters) ...[
                 const SizedBox(height: 18),
                 _buildFiltersPanel(
-                    context, db, sensors.length, db.sensors.length),
+                    context, db, sensors.length, allSensors.length),
               ],
               const SizedBox(height: 18),
               _isListView

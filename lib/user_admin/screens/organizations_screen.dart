@@ -20,6 +20,52 @@ class _UserAdminOrganizationsScreenState
   String? _selectedOrganizationId;
   String? _selectedSiteId;
   String? _selectedZoneId;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
+
+  Future<void> _loadData() async {
+    final db = context.read<UserAdminDatabaseProvider>();
+    setState(() => _isLoading = true);
+    try {
+      await db.loadOrganizations();
+      await db.loadSites();
+      final firstOrgId =
+          db.organizations.isNotEmpty ? db.organizations.first.id : null;
+      final firstSiteId = db.sites
+          .where((s) => s.organizationId == firstOrgId)
+          .map((s) => s.id)
+          .firstOrNull;
+      if (firstSiteId != null) {
+        await db.loadZones(firstSiteId);
+      }
+      if (mounted) {
+        setState(() {
+          _ensureSelections(db);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showApiError(e);
+    }
+  }
+
+  void _showApiError(Object e) {
+    final text = e.toString().replaceFirst('ApiException: ', '');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
 
   void _ensureSelections(UserAdminDatabaseProvider db) {
     if (db.organizations.isNotEmpty &&
@@ -27,6 +73,7 @@ class _UserAdminOrganizationsScreenState
             db.organizations.every((o) => o.id != _selectedOrganizationId))) {
       _selectedOrganizationId = db.organizations.first.id;
     }
+    if (db.organizations.isEmpty) _selectedOrganizationId = null;
 
     final sites = db.sites
         .where((s) => s.organizationId == _selectedOrganizationId)
@@ -88,22 +135,27 @@ class _UserAdminOrganizationsScreenState
                 ],
               },
             ],
-            onSave: () {
-              if (organization == null) {
-                db.create('organizations', {
-                  'name': name,
-                  'email': email,
-                  'status': status,
-                  'owner_user_id': db.users.first.id,
-                });
-              } else {
-                db.update('organizations', organization.id, {
-                  'name': name,
-                  'email': email,
-                  'status': status,
-                });
+            onSave: () async {
+              try {
+                if (name.trim().isEmpty || email.trim().isEmpty) {
+                  throw Exception('Name and email are required');
+                }
+                if (organization == null) {
+                  await db.createOrganization(
+                    name: name.trim(),
+                    email: email.trim(),
+                  );
+                } else {
+                  await db.updateOrganization(
+                    organizationId: organization.id,
+                    name: name.trim(),
+                    email: email.trim(),
+                  );
+                }
+                if (context.mounted) Navigator.pop(context);
+              } catch (e) {
+                if (context.mounted) _showApiError(e);
               }
-              Navigator.pop(context);
             },
             onCancel: () => Navigator.pop(context),
           );
@@ -116,7 +168,6 @@ class _UserAdminOrganizationsScreenState
     if (_selectedOrganizationId == null && site == null) return;
 
     var name = site?.name ?? '';
-    var location = site?.location ?? '';
     var organizationId = site?.organizationId ?? _selectedOrganizationId!;
 
     showDialog(
@@ -133,12 +184,6 @@ class _UserAdminOrganizationsScreenState
                 'keyboardType': TextInputType.text,
               },
               {
-                'label': 'Location',
-                'value': location,
-                'onChanged': (String value) => setState(() => location = value),
-                'keyboardType': TextInputType.text,
-              },
-              {
                 'label': 'Organization',
                 'type': 'select',
                 'value': organizationId,
@@ -149,21 +194,33 @@ class _UserAdminOrganizationsScreenState
                     .toList(),
               },
             ],
-            onSave: () {
-              if (site == null) {
-                db.create('sites', {
-                  'name': name,
-                  'location': location,
-                  'organization_id': organizationId,
-                });
-              } else {
-                db.update('sites', site.id, {
-                  'name': name,
-                  'location': location,
-                  'organization_id': organizationId,
-                });
+            onSave: () async {
+              try {
+                if (organizationId.trim().isEmpty || name.trim().isEmpty) {
+                  throw Exception('Organization and name are required');
+                }
+                final fallbackLocation =
+                    (site?.location.trim().isNotEmpty ?? false)
+                        ? site!.location.trim()
+                        : 'N/A';
+                if (site == null) {
+                  await db.createSite(
+                    organizationId: organizationId,
+                    name: name.trim(),
+                    location: fallbackLocation,
+                  );
+                } else {
+                  await db.updateSite(
+                    siteId: site.id,
+                    organizationId: organizationId,
+                    name: name.trim(),
+                    location: fallbackLocation,
+                  );
+                }
+                if (context.mounted) Navigator.pop(context);
+              } catch (e) {
+                if (context.mounted) _showApiError(e);
               }
-              Navigator.pop(context);
             },
             onCancel: () => Navigator.pop(context),
           );
@@ -202,19 +259,27 @@ class _UserAdminOrganizationsScreenState
                     .toList(),
               },
             ],
-            onSave: () {
-              if (zone == null) {
-                db.create('zones', {
-                  'name': name,
-                  'site_id': siteId,
-                });
-              } else {
-                db.update('zones', zone.id, {
-                  'name': name,
-                  'site_id': siteId,
-                });
+            onSave: () async {
+              try {
+                if (siteId.trim().isEmpty || name.trim().isEmpty) {
+                  throw Exception('Site and zone name are required');
+                }
+                if (zone == null) {
+                  await db.createZone(
+                    siteId: siteId,
+                    name: name.trim(),
+                  );
+                } else {
+                  await db.updateZone(
+                    zoneId: zone.id,
+                    siteId: siteId,
+                    name: name.trim(),
+                  );
+                }
+                if (context.mounted) Navigator.pop(context);
+              } catch (e) {
+                if (context.mounted) _showApiError(e);
               }
-              Navigator.pop(context);
             },
             onCancel: () => Navigator.pop(context),
           );
@@ -227,6 +292,9 @@ class _UserAdminOrganizationsScreenState
   Widget build(BuildContext context) {
     return Consumer<UserAdminDatabaseProvider>(
       builder: (context, db, child) {
+        if (_isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
         final isLight = Theme.of(context).brightness == Brightness.light;
         _ensureSelections(db);
 
@@ -236,11 +304,6 @@ class _UserAdminOrganizationsScreenState
             .toList();
         final zones =
             db.zones.where((z) => z.siteId == _selectedSiteId).toList();
-        final locations = db.devices
-            .where((d) => d.zoneId == _selectedZoneId)
-            .map((d) => d.deviceCode)
-            .toList();
-
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
           child: Column(
@@ -267,7 +330,7 @@ class _UserAdminOrganizationsScreenState
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Manage organizations, sites, zones, and sensor locations',
+                        'Manage organizations, sites, and zones',
                         style: TextStyle(
                           fontSize: 15,
                           color: isLight
@@ -284,7 +347,6 @@ class _UserAdminOrganizationsScreenState
                       _infoChip('${organizations.length} Orgs'),
                       _infoChip('${db.sites.length} Sites'),
                       _infoChip('${db.zones.length} Zones'),
-                      _infoChip('${db.devices.length} Locations'),
                     ],
                   ),
                 ],
@@ -319,12 +381,6 @@ class _UserAdminOrganizationsScreenState
                               ? null
                               : () => _showZoneModal(db: db),
                           child: _buildZonesList(zones, db),
-                        ),
-                        const SizedBox(height: 12),
-                        _columnCard(
-                          title: 'Locations',
-                          icon: Icons.location_on_outlined,
-                          child: _buildLocationsList(locations),
                         ),
                       ],
                     );
@@ -361,14 +417,6 @@ class _UserAdminOrganizationsScreenState
                               ? null
                               : () => _showZoneModal(db: db),
                           child: _buildZonesList(zones, db),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _columnCard(
-                          title: 'Locations',
-                          icon: Icons.location_on_outlined,
-                          child: _buildLocationsList(locations),
                         ),
                       ),
                     ],
@@ -507,15 +555,20 @@ class _UserAdminOrganizationsScreenState
             _selectedZoneId = null;
           }),
           onEdit: () => _showOrganizationModal(organization: org, db: db),
-          onDelete: () {
-            db.delete('organizations', org.id);
-            setState(() {
-              if (_selectedOrganizationId == org.id) {
-                _selectedOrganizationId = null;
-                _selectedSiteId = null;
-                _selectedZoneId = null;
-              }
-            });
+          onDelete: () async {
+            try {
+              await db.deleteOrganization(org.id);
+              if (!mounted) return;
+              setState(() {
+                if (_selectedOrganizationId == org.id) {
+                  _selectedOrganizationId = null;
+                  _selectedSiteId = null;
+                  _selectedZoneId = null;
+                }
+              });
+            } catch (e) {
+              if (mounted) _showApiError(e);
+            }
           },
         );
       }).toList(),
@@ -535,20 +588,32 @@ class _UserAdminOrganizationsScreenState
         return _ListTileCard(
           selected: selected,
           title: site.name,
-          subtitle: site.location,
-          onTap: () => setState(() {
-            _selectedSiteId = site.id;
-            _selectedZoneId = null;
-          }),
-          onEdit: () => _showSiteModal(site: site, db: db),
-          onDelete: () {
-            db.delete('sites', site.id);
+          subtitle: 'Site',
+          onTap: () async {
             setState(() {
-              if (_selectedSiteId == site.id) {
-                _selectedSiteId = null;
-                _selectedZoneId = null;
-              }
+              _selectedSiteId = site.id;
+              _selectedZoneId = null;
             });
+            try {
+              await db.loadZones(site.id);
+            } catch (e) {
+              if (mounted) _showApiError(e);
+            }
+          },
+          onEdit: () => _showSiteModal(site: site, db: db),
+          onDelete: () async {
+            try {
+              await db.deleteSite(site.id);
+              if (!mounted) return;
+              setState(() {
+                if (_selectedSiteId == site.id) {
+                  _selectedSiteId = null;
+                  _selectedZoneId = null;
+                }
+              });
+            } catch (e) {
+              if (mounted) _showApiError(e);
+            }
           },
         );
       }).toList(),
@@ -571,65 +636,19 @@ class _UserAdminOrganizationsScreenState
           subtitle: 'Zone',
           onTap: () => setState(() => _selectedZoneId = zone.id),
           onEdit: () => _showZoneModal(zone: zone, db: db),
-          onDelete: () {
-            db.delete('zones', zone.id);
-            setState(() {
-              if (_selectedZoneId == zone.id) _selectedZoneId = null;
-            });
+          onDelete: () async {
+            try {
+              await db.deleteZone(zone.id);
+              if (!mounted) return;
+              setState(() {
+                if (_selectedZoneId == zone.id) _selectedZoneId = null;
+              });
+            } catch (e) {
+              if (mounted) _showApiError(e);
+            }
           },
         );
       }).toList(),
-    );
-  }
-
-  Widget _buildLocationsList(List<String> locations) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    if (_selectedZoneId == null) {
-      return const _EmptyHint(text: 'Select a zone');
-    }
-    if (locations.isEmpty) {
-      return const _EmptyHint(text: 'No locations in this zone');
-    }
-    return Column(
-      children: locations
-          .map((loc) => Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                decoration: BoxDecoration(
-                  color: isLight
-                      ? const Color(0xFFF4F8FB)
-                      : const Color(0xFF253F52),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Theme.of(context).dividerColor),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.place_outlined,
-                      size: 15,
-                      color: isLight
-                          ? const Color(0xFF4C7084)
-                          : const Color(0xFFBBD0E0),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        loc,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isLight
-                              ? const Color(0xFF1f3642)
-                              : const Color(0xFFE2EDF8),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ))
-          .toList(),
     );
   }
 

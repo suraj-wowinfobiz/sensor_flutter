@@ -38,6 +38,10 @@ class SuperAdminBackendProvider extends ChangeNotifier {
   late Config config;
 
   String currentView = 'dashboard';
+  Future<void>? _loadOrganizationsTask;
+  Future<void>? _loadSitesTask;
+  Future<void>? _loadDevicesTask;
+  Future<void>? _loadSensorsTask;
   int _thresholdRuleSeed = 4;
   final List<ThresholdRule> _thresholdRules = [
     const ThresholdRule(
@@ -164,93 +168,108 @@ class SuperAdminBackendProvider extends ChangeNotifier {
   }
 
   Future<void> loadOrganizations() async {
-    try {
-      final res = await org_api.OrgServiceApi.getAllOrganizations();
-      if (res.body == null) {
+    if (_loadOrganizationsTask != null) return _loadOrganizationsTask!;
+    final task = () async {
+      try {
+        final res = await org_api.OrgServiceApi.getAllOrganizations();
+        if (res.body == null) {
+          organizations = [];
+          return;
+        }
+        organizations = (res.body as List)
+            .map((json) => Organization(
+                  id: json['organizationId'],
+                  name: json['name'],
+                  email: json['email'],
+                  status: json['status']?.toLowerCase() ?? 'active',
+                  ownerUserId: '',
+                  createdAt: DateTime.parse(json['createdAt']),
+                ))
+            .toList();
+      } catch (e) {
+        print('Error loading organizations: $e');
         organizations = [];
-        notifyListeners();
-        return;
       }
-      organizations = (res.body as List).map((json) => Organization(
-        id: json['organizationId'],
-        name: json['name'],
-        email: json['email'],
-        status: json['status']?.toLowerCase() ?? 'active',
-        ownerUserId: '',
-        createdAt: DateTime.parse(json['createdAt']),
-      )).toList();
-      notifyListeners();
-    } catch (e) {
-      print('Error loading organizations: $e');
-      organizations = [];
-      notifyListeners();
+    }();
+    _loadOrganizationsTask = task;
+    try {
+      await task;
+    } finally {
+      _loadOrganizationsTask = null;
     }
   }
 
   Future<void> loadSites() async {
-    try {
-      final res = await org_api.OrgServiceApi.getAllSites();
-      if (res.body == null) {
-        sites = [];
-        notifyListeners();
-        return;
-      }
-      final mappedSites = <String, Site>{};
-      for (final json in (res.body as List)) {
-        final org = json['organization'];
-        final site = Site(
-          id: json['sitesID'],
-          organizationId: org != null && org is Map ? org['organizationId'] : '',
-          name: json['name'],
-          location: json['location'],
-          createdAt: DateTime.parse(json['createdAt']),
-        );
-        mappedSites[site.id] = site;
-      }
+    if (_loadSitesTask != null) return _loadSitesTask!;
+    final task = () async {
+      try {
+        final res = await org_api.OrgServiceApi.getAllSites();
+        if (res.body == null) {
+          sites = [];
+          return;
+        }
+        final mappedSites = <String, Site>{};
+        for (final json in (res.body as List)) {
+          final org = json['organization'];
+          final site = Site(
+            id: json['sitesID'],
+            organizationId:
+                org != null && org is Map ? org['organizationId'] : '',
+            name: json['name'],
+            location: json['location'],
+            createdAt: DateTime.parse(json['createdAt']),
+          );
+          mappedSites[site.id] = site;
+        }
 
-      // Some backend responses from /site/ do not include organization relation.
-      // Enrich missing organizationId by querying sites scoped per organization.
-      final hasMissingOrganization = mappedSites.values.any(
-        (s) => s.organizationId.trim().isEmpty,
-      );
-      if (hasMissingOrganization && organizations.isNotEmpty) {
-        for (final org in organizations) {
-          try {
-            final orgSitesRes =
-                await org_api.OrgServiceApi.getOrganizationSites(org.id);
-            final body = orgSitesRes.body;
-            if (body is! Map) continue;
-            final rawSites = body['sites'];
-            if (rawSites is! List) continue;
-            for (final raw in rawSites) {
-              if (raw is! Map) continue;
-              final id = _asString(raw['sitesID']);
-              if (id.isEmpty) continue;
-              final existing = mappedSites[id];
-              final createdAtRaw = raw['createdAt'];
-              final createdAt = createdAtRaw is String
-                  ? (DateTime.tryParse(createdAtRaw) ?? DateTime.now())
-                  : (existing?.createdAt ?? DateTime.now());
-              mappedSites[id] = Site(
-                id: id,
-                organizationId: org.id,
-                name: _asString(raw['name'], existing?.name ?? ''),
-                location: _asString(raw['location'], existing?.location ?? ''),
-                createdAt: createdAt,
-              );
+        // Some backend responses from /site/ do not include organization relation.
+        // Enrich missing organizationId by querying sites scoped per organization.
+        final hasMissingOrganization = mappedSites.values.any(
+          (s) => s.organizationId.trim().isEmpty,
+        );
+        if (hasMissingOrganization && organizations.isNotEmpty) {
+          for (final org in organizations) {
+            try {
+              final orgSitesRes =
+                  await org_api.OrgServiceApi.getOrganizationSites(org.id);
+              final body = orgSitesRes.body;
+              if (body is! Map) continue;
+              final rawSites = body['sites'];
+              if (rawSites is! List) continue;
+              for (final raw in rawSites) {
+                if (raw is! Map) continue;
+                final id = _asString(raw['sitesID']);
+                if (id.isEmpty) continue;
+                final existing = mappedSites[id];
+                final createdAtRaw = raw['createdAt'];
+                final createdAt = createdAtRaw is String
+                    ? (DateTime.tryParse(createdAtRaw) ?? DateTime.now())
+                    : (existing?.createdAt ?? DateTime.now());
+                mappedSites[id] = Site(
+                  id: id,
+                  organizationId: org.id,
+                  name: _asString(raw['name'], existing?.name ?? ''),
+                  location: _asString(raw['location'], existing?.location ?? ''),
+                  createdAt: createdAt,
+                );
+              }
+            } catch (_) {
+              // Ignore per-org enrichment failures and keep base list.
             }
-          } catch (_) {
-            // Ignore per-org enrichment failures and keep base list.
           }
         }
-      }
 
-      sites = mappedSites.values.toList();
-      notifyListeners();
-    } catch (e) {
-      print('Error loading sites: $e');
-      sites = [];
-      notifyListeners();
+        sites = mappedSites.values.toList();
+      } catch (e) {
+        print('Error loading sites: $e');
+        sites = [];
+      }
+    }();
+    _loadSitesTask = task;
+    try {
+      await task;
+    } finally {
+      _loadSitesTask = null;
     }
   }
 
@@ -259,7 +278,6 @@ class SuperAdminBackendProvider extends ChangeNotifier {
       final res = await org_api.OrgServiceApi.getZonesBySite(siteId);
       if (res.body == null) {
         zones.removeWhere((z) => z.siteId == siteId);
-        notifyListeners();
         return;
       }
       final newZones = (res.body as List).map((json) {
@@ -272,7 +290,6 @@ class SuperAdminBackendProvider extends ChangeNotifier {
       }).toList();
       zones.removeWhere((z) => z.siteId == siteId);
       zones.addAll(newZones);
-      notifyListeners();
     } catch (e) {
       print('Error loading zones: $e');
     }
@@ -291,59 +308,77 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           updatedAt: _asDate(json['updatedAt'] ?? json['updated_at']),
         );
       }).toList();
-      notifyListeners();
     } catch (e) {
       print('Error loading users: $e');
       users = [];
-      notifyListeners();
     }
   }
 
   Future<void> loadDevices() async {
-    try {
-      final loadedDevices = <Device>[];
-      for (final site in sites) {
-        final body = await DeviceApi.getDevicesBySite(site.id);
-        loadedDevices.addAll(body.map((json) {
+    if (_loadDevicesTask != null) return _loadDevicesTask!;
+    final task = () async {
+      try {
+        final body = await DeviceApi.getAllDevices();
+        final loadedDevices = body.map((json) {
+          final rawSite = json['site'];
+          final rawZone = json['zone'];
+          final resolvedSiteId = _asString(
+            json['siteId'] ?? json['site_id'] ?? json['sitesID'],
+            rawSite is Map ? _asString(rawSite['sitesID']) : '',
+          );
+          final resolvedZoneId = _asString(
+            json['zoneId'] ?? json['zone_id'],
+            rawZone is Map ? _asString(rawZone['zoneId']) : '',
+          );
           return Device(
-            id: _asString(json['id'], _uuid()),
-            siteId: _asString(json['siteId'] ?? json['site_id'], site.id),
-            zoneId: _asString(json['zoneId'] ?? json['zone_id']),
+            id: _asString(json['id'] ?? json['deviceId'], _uuid()),
+            siteId: resolvedSiteId,
+            zoneId: resolvedZoneId,
             deviceCode: _asString(
-              json['serialNumber'] ?? json['device_code'],
+              json['serialNumber'] ?? json['device_code'] ?? json['name'],
               'DEV-${_uuid().substring(0, 8)}',
             ),
             status: _asString(json['status'], 'active').toLowerCase(),
             installedAt: _asDate(
-              json['lastHeartBeat'] ?? json['installed_at'] ?? json['createdAt'],
+              json['lastHeartBeat'] ??
+                  json['installed_at'] ??
+                  json['createdAt'],
             ),
           );
-        }));
+        }).toList();
+        final deduped = <String, Device>{};
+        for (final device in loadedDevices) {
+          deduped[device.id] = device;
+        }
+        devices = deduped.values.toList();
+      } catch (e) {
+        print('Error loading devices: $e');
+        devices = [];
       }
-      final deduped = <String, Device>{};
-      for (final device in loadedDevices) {
-        deduped[device.id] = device;
-      }
-      devices = deduped.values.toList();
-      notifyListeners();
-    } catch (e) {
-      print('Error loading devices: $e');
-      devices = [];
-      notifyListeners();
+    }();
+    _loadDevicesTask = task;
+    try {
+      await task;
+    } finally {
+      _loadDevicesTask = null;
     }
   }
 
   Future<void> loadSensors() async {
-    try {
-      final loadedSensors = <Sensor>[];
-      for (final device in devices) {
-        final body = await SensorApi.getSensorsByDevice(device.id);
-        loadedSensors.addAll(body.map((json) {
+    if (_loadSensorsTask != null) return _loadSensorsTask!;
+    final task = () async {
+      try {
+        final body = await SensorApi.getAllSensors();
+        final loadedSensors = body.map((json) {
+          final rawType = json['sensorType'];
           return Sensor(
             id: _asString(json['sensorId'] ?? json['id'], _uuid()),
-            deviceId: _asString(json['deviceId'] ?? json['device_id'], device.id),
-            sensorTypeId:
-                _asString(json['sensorTypeId'] ?? json['sensor_type_id']),
+            deviceId: _asString(json['deviceId'] ?? json['device_id']),
+            sensorTypeId: _asString(
+              json['sensorTypeId'] ??
+                  json['sensor_type_id'] ??
+                  (rawType is Map ? rawType['sensorTypeId'] : null),
+            ),
             serialNumber: _asString(
               json['name'] ?? json['serial_number'],
               'SEN-${_uuid().substring(0, 8)}',
@@ -351,18 +386,22 @@ class SuperAdminBackendProvider extends ChangeNotifier {
             installedAt: _asDate(json['createdAt'] ?? json['installed_at']),
             lastReading: (json['last_reading'] as num?)?.toDouble() ?? 0,
           );
-        }));
+        }).toList();
+        final deduped = <String, Sensor>{};
+        for (final sensor in loadedSensors) {
+          deduped[sensor.id] = sensor;
+        }
+        sensors = deduped.values.toList();
+      } catch (e) {
+        print('Error loading sensors: $e');
+        sensors = [];
       }
-      final deduped = <String, Sensor>{};
-      for (final sensor in loadedSensors) {
-        deduped[sensor.id] = sensor;
-      }
-      sensors = deduped.values.toList();
-      notifyListeners();
-    } catch (e) {
-      print('Error loading sensors: $e');
-      sensors = [];
-      notifyListeners();
+    }();
+    _loadSensorsTask = task;
+    try {
+      await task;
+    } finally {
+      _loadSensorsTask = null;
     }
   }
 
@@ -379,11 +418,9 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           description: _asString(json['description']),
         );
       }).toList();
-      notifyListeners();
     } catch (e) {
       print('Error loading threshold profiles: $e');
       thresholdProfiles = [];
-      notifyListeners();
     }
   }
 
@@ -414,19 +451,40 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         await loadZones(siteId);
         break;
       case 'devices':
+        final siteId = data['site_id'] as String;
+        final site = sites.where((s) => s.id == siteId).firstOrNull;
         await DeviceApi.createDevice(
-          siteId: data['site_id'] as String,
-          serialNumber: _asString(data['serial_number'] ?? data['device_code']),
-          firmwareVersion: _asString(data['firmware_version'], '1.0.0'),
-          status: _asString(data['status'], 'active').toUpperCase(),
+          deviceId: '',
+          organizationId:
+              _asString(data['organization_id'], site?.organizationId ?? ''),
+          siteId: siteId,
+          zoneId: _asString(data['zone_id']),
+          serialNumber: _asString(data['serial_number']),
+          firmwareVersion: _asString(data['firmware_version']),
+          macAddress: _asString(data['mac_address']),
+          ipAddress: _asString(data['ip_address']),
+          numberOfChannels:
+              int.tryParse(_asString(data['number_of_channels'])) ?? 0,
+          webHookUrl: _asString(data['web_hook_url']),
+          lat: double.tryParse(_asString(data['lat'])) ?? 0,
+          log: double.tryParse(_asString(data['log'])) ?? 0,
+          lastHeartBeat: _asString(data['last_heart_beat']),
+          status: _asString(data['status'], 'active'),
         );
         await loadDevices();
         break;
       case 'sensors':
+        final sensorId = _asString(data['sensor_id'] ?? data['sensorId']);
         await SensorApi.createSensor(
+          sensorId: sensorId.isEmpty ? null : sensorId,
           deviceId: data['device_id'] as String,
           sensorTypeId: data['sensor_type_id'] as String,
           name: _asString(data['serial_number'], 'Sensor'),
+          serialNumber: _asString(data['serial_number']),
+          macAddress: _asString(data['mac_address']),
+          channelNumber: int.tryParse(_asString(data['channel_number'])),
+          lat: double.tryParse(_asString(data['lat'])),
+          log: double.tryParse(_asString(data['log'])),
           status: _asString(data['status'], 'ACTIVE'),
           unit: _asString(data['unit'], ''),
         );
@@ -440,16 +498,30 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         await loadThresholdProfiles();
         break;
       case 'users':
-        await UsersApi.createUser(
-          name: data['name'] as String,
-          email: data['email'] as String,
-          role: _asString(data['role'], 'operator'),
-          organizationId: _asString(
-            data['organization_id'] ?? data['organizationId'],
-            organizations.isNotEmpty ? organizations.first.id : '',
-          ),
-          password: _asString(data['password'], 'Temp@12345'),
-        );
+        final role = _asString(data['role'], 'admin').toLowerCase();
+        // TEMP: Force organizationId to 1 until org selection flow is finalized.
+        const organizationId = '1';
+        final name = data['name'] as String;
+        final email = data['email'] as String;
+        final password = _asString(data['password'], 'Temp@12345');
+
+        if (role == 'admin') {
+          await UsersApi.createAdminUser(
+            name: name,
+            email: email,
+            organizationId: organizationId,
+            password: password,
+          );
+        } else if (role == 'vendor') {
+          await UsersApi.createVendor(
+            name: name,
+            email: email,
+            organizationId: organizationId,
+            password: password,
+          );
+        } else {
+          throw ArgumentError('Unsupported user role: $role');
+        }
         await loadUsers();
         break;
       case 'audit':
@@ -509,12 +581,26 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         await loadZones(data['site_id'] as String);
         break;
       case 'devices':
+        final siteId = data['site_id'] as String;
+        final site = sites.where((s) => s.id == siteId).firstOrNull;
         await DeviceApi.updateDevice(
           deviceId: id,
-          siteId: data['site_id'] as String,
+          organizationId:
+              _asString(data['organization_id'], site?.organizationId ?? ''),
+          siteId: siteId,
+          zoneId: _asString(data['zone_id']),
           serialNumber: _asString(data['serial_number'] ?? data['device_code']),
           firmwareVersion: _asString(data['firmware_version'], '1.0.0'),
-          status: _asString(data['status'], 'active').toUpperCase(),
+          macAddress: _asString(data['mac_address']),
+          ipAddress: _asString(data['ip_address']),
+          numberOfChannels:
+              int.tryParse(_asString(data['number_of_channels'], '0')) ?? 0,
+          webHookUrl: _asString(data['web_hook_url']),
+          lat: double.tryParse(_asString(data['lat'], '0')) ?? 0,
+          log: double.tryParse(_asString(data['log'], '0')) ?? 0,
+          lastHeartBeat: _asString(
+              data['last_heart_beat'], DateTime.now().toIso8601String()),
+          status: _asString(data['status'], 'active'),
         );
         await loadDevices();
         break;
@@ -524,6 +610,11 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           deviceId: data['device_id'] as String,
           sensorTypeId: data['sensor_type_id'] as String,
           name: _asString(data['serial_number'], 'Sensor'),
+          serialNumber: _asString(data['serial_number']),
+          macAddress: _asString(data['mac_address']),
+          channelNumber: int.tryParse(_asString(data['channel_number'])),
+          lat: double.tryParse(_asString(data['lat'])),
+          log: double.tryParse(_asString(data['log'])),
           status: _asString(data['status'], 'ACTIVE'),
           unit: _asString(data['unit'], ''),
         );

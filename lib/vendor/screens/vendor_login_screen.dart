@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../super_admin/api/api_client.dart';
+import '../api/vendor_login_api.dart';
 import '../providers/vendor_riverpod_provider.dart';
 import '../vendor_page.dart';
 
@@ -15,7 +17,7 @@ class _VendorLoginScreenState extends ConsumerState<VendorLoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  void _login() {
+  Future<void> _login() async {
     if (_emailController.text.trim().isEmpty ||
         _passwordController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -26,13 +28,34 @@ class _VendorLoginScreenState extends ConsumerState<VendorLoginScreen> {
 
     ref.read(vendorLoginLoadingStateProvider.notifier).state = true;
 
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (!mounted) return;
-      ref.read(vendorLoginLoadingStateProvider.notifier).state = false;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const VendorPage()),
+    try {
+      final response = await VendorLoginApi.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
       );
-    });
+
+      if (!mounted) return;
+      if (response.status.toUpperCase() == 'SUCCESS') {
+        await ApiClient.setAuthToken(response.body.token);
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const VendorPage()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.message)),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        ref.read(vendorLoginLoadingStateProvider.notifier).state = false;
+      }
+    }
   }
 
   @override
@@ -157,12 +180,10 @@ class _VendorLoginScreenState extends ConsumerState<VendorLoginScreen> {
                         color: subColor,
                       ),
                       onPressed: () => ref
-                              .read(
-                                vendorLoginObscurePasswordStateProvider
-                                    .notifier,
-                              )
-                              .state =
-                          !obscurePassword,
+                          .read(
+                            vendorLoginObscurePasswordStateProvider.notifier,
+                          )
+                          .state = !obscurePassword,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
