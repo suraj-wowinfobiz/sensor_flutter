@@ -5,9 +5,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../shared/models/threshold_rule.dart';
 import '../providers/super_admin_backend_provider.dart';
-import '../api/analytics_live_api.dart';
+import '../services/generic_sse_service.dart';
+import '../shared/models/threshold_rule.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -30,39 +30,147 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   String _siteFilter = 'all';
   String _zoneFilter = 'all';
   String _locationFilter = 'all';
-  
-  final List<FlSpot> _liveData = [];
+
+  final GenericSseService _processedSseService =
+      GenericSseService('/api/v1/processing/readings/live');
+  final List<FlSpot> _gravityMagnitudeData = [];
+  final List<FlSpot> _motionData = [];
   int _dataPointIndex = 0;
-  StreamSubscription? _subscription;
+  StreamSubscription? _processedSubscription;
 
   @override
   void initState() {
     super.initState();
-    _startLiveDataFetch();
+    _startProcessedLiveFetch();
   }
 
-  void _startLiveDataFetch() {
-    _subscription = AnalyticsLiveApi.connectToLiveStream().listen((event) {
-      if (mounted && !_paused) {
-        setState(() {
-          final value = event.x / 1000000000000;
-          _liveData.add(FlSpot(_dataPointIndex.toDouble(), value));
-          _dataPointIndex++;
-          if (_liveData.length > 40) {
-            _liveData.removeAt(0);
-            for (int i = 0; i < _liveData.length; i++) {
-              _liveData[i] = FlSpot(i.toDouble(), _liveData[i].y);
-            }
-            _dataPointIndex = _liveData.length;
-          }
-        });
-      }
+  Future<void> _startProcessedLiveFetch() async {
+    await _processedSseService.connect();
+    _processedSubscription = _processedSseService.stream.listen((payload) {
+      if (!mounted || _paused) return;
+      final metrics = _extractProcessedMetrics(payload);
+      if (metrics == null) return;
+      setState(() {
+        final xIndex = _dataPointIndex.toDouble();
+        _gravityMagnitudeData.add(FlSpot(xIndex, metrics.gravityMagnitude));
+        _motionData.add(FlSpot(xIndex, metrics.motionDetected ? 1 : 0));
+        _dataPointIndex++;
+        _trimAndReindexSeries();
+      });
     });
+  }
+
+  void _trimAndReindexSeries() {
+    while (_gravityMagnitudeData.length > 220) {
+      _gravityMagnitudeData.removeAt(0);
+    }
+    while (_motionData.length > 220) {
+      _motionData.removeAt(0);
+    }
+    for (int i = 0; i < _gravityMagnitudeData.length; i++) {
+      _gravityMagnitudeData[i] =
+          FlSpot(i.toDouble(), _gravityMagnitudeData[i].y);
+    }
+    for (int i = 0; i < _motionData.length; i++) {
+      _motionData[i] = FlSpot(i.toDouble(), _motionData[i].y);
+    }
+    _dataPointIndex = _gravityMagnitudeData.length;
+  }
+
+  Iterable<Map<dynamic, dynamic>> _candidateMaps(
+    dynamic payload, {
+    int depth = 0,
+  }) sync* {
+    if (payload == null || depth > 5) return;
+
+    if (payload is Map) {
+      yield payload;
+      for (final key in const ['body', 'data', 'payload', 'event']) {
+        final next = payload[key];
+        if (next != null) {
+          yield* _candidateMaps(next, depth: depth + 1);
+        }
+      }
+      return;
+    }
+
+    if (payload is List) {
+      for (final item in payload) {
+        yield* _candidateMaps(item, depth: depth + 1);
+      }
+    }
+  }
+
+  _ProcessedMetrics? _extractProcessedMetrics(
+    dynamic payload,
+  ) {
+    for (final map in _candidateMaps(payload)) {
+      final rawPayload = map['rawPayload'];
+      final rawParams = rawPayload is Map ? rawPayload['parameters'] : null;
+
+      final processedPayload = map['processedPayload'];
+      if (processedPayload is Map) {
+        final horizontalMagnitude =
+            _toDouble(processedPayload['horizontalMagnitude']);
+
+        final x = _toDouble(processedPayload['x']) ??
+            (rawParams is Map ? _toDouble(rawParams['x']) : null);
+        final y = _toDouble(processedPayload['y']) ??
+            (rawParams is Map ? _toDouble(rawParams['y']) : null);
+        final z = _toDouble(processedPayload['z']) ??
+            (rawParams is Map ? _toDouble(rawParams['z']) : null);
+
+        final computedRms = (x != null && y != null && z != null)
+            ? sqrt((x * x) + (y * y) + (z * z))
+            : null;
+        final gravityMagnitude = horizontalMagnitude ?? computedRms;
+        if (gravityMagnitude == null) continue;
+        final motion = _toBoolOrNumberTrue(
+              rawParams is Map ? rawParams['motionDetected'] : null,
+            ) ??
+            _toBoolOrNumberTrue(processedPayload['motionDetected']) ??
+            false;
+
+        return _ProcessedMetrics(
+          gravityMagnitude: gravityMagnitude,
+          motionDetected: motion,
+        );
+      }
+
+      final x = _toDouble(map['x']);
+      final y = _toDouble(map['y']);
+      final z = _toDouble(map['z']);
+      if (x != null && y != null && z != null) {
+        final magnitude = sqrt((x * x) + (y * y) + (z * z));
+        return _ProcessedMetrics(
+          gravityMagnitude: magnitude,
+          motionDetected: false,
+        );
+      }
+    }
+    return null;
+  }
+
+  double? _toDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+
+  bool? _toBoolOrNumberTrue(dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final text = value.toString().trim().toLowerCase();
+    if (text == '1' || text == 'true' || text == 'yes') return true;
+    if (text == '0' || text == 'false' || text == 'no') return false;
+    return null;
   }
 
   @override
   void dispose() {
-    _subscription?.cancel();
+    _processedSubscription?.cancel();
+    _processedSseService.dispose();
     super.dispose();
   }
 
@@ -100,9 +208,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
           return matchesSearch && matchesStatus && matchesType && matchesDevice;
         }).toList();
-
-        final selected =
-            filteredSensors.where((s) => s.id == _selectedSensorId).firstOrNull;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
@@ -310,7 +415,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Real-Time Data Visualization',
+                                'Gravity Magnitude (Processed Live)',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
@@ -326,7 +431,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           children: [
                             const Expanded(
                               child: Text(
-                                'Real-Time Data Visualization',
+                                'Gravity Magnitude (Processed Live)',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
@@ -343,22 +448,30 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     Row(
                       children: [
                         Icon(
-                          _liveData.isNotEmpty ? Icons.circle : Icons.circle_outlined,
+                          _gravityMagnitudeData.isNotEmpty
+                              ? Icons.circle
+                              : Icons.circle_outlined,
                           size: 12,
-                          color: _liveData.isNotEmpty ? Colors.green : Colors.orange,
+                          color: _gravityMagnitudeData.isNotEmpty
+                              ? Colors.green
+                              : Colors.orange,
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          _liveData.isNotEmpty ? 'Receiving Data' : 'Waiting for data...',
+                          _gravityMagnitudeData.isNotEmpty
+                              ? 'Receiving magnitude data'
+                              : 'Waiting for data...',
                           style: TextStyle(
                             fontSize: 12,
-                            color: _liveData.isNotEmpty ? Colors.green : Colors.orange,
+                            color: _gravityMagnitudeData.isNotEmpty
+                                ? Colors.green
+                                : Colors.orange,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         const SizedBox(width: 16),
                         Text(
-                          'Data points: ${_liveData.length}',
+                          'Data points: ${_gravityMagnitudeData.length}',
                           style: const TextStyle(
                             fontSize: 12,
                             color: Color(0xFF4F6573),
@@ -368,11 +481,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    _buildThresholdLegend(graphThresholds),
-                    const SizedBox(height: 10),
                     SizedBox(
                       height: 400,
-                      child: _liveData.isEmpty
+                      child: _gravityMagnitudeData.isEmpty
                           ? const Center(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -385,44 +496,124 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                             )
                           : LineChart(
                               LineChartData(
-                                minY: _liveData.map((e) => e.y).reduce((a, b) => a < b ? a : b) - 0.5,
-                                maxY: _liveData.map((e) => e.y).reduce((a, b) => a > b ? a : b) + 0.5,
+                                minY: _gravityMagnitudeData
+                                        .map((e) => e.y)
+                                        .reduce(min) -
+                                    0.5,
+                                maxY: _gravityMagnitudeData
+                                        .map((e) => e.y)
+                                        .reduce(max) +
+                                    0.5,
                                 gridData: FlGridData(
                                   show: true,
-                                  drawVerticalLine: false,
-                                  getDrawingHorizontalLine: (_) =>
-                                      const FlLine(color: Color(0xFFD2DBE0)),
+                                  drawVerticalLine: true,
+                                  horizontalInterval: 0.2,
+                                  verticalInterval: 20,
+                                  getDrawingHorizontalLine: (value) {
+                                    final nearInteger =
+                                        (value - value.round()).abs() < 0.05;
+                                    return FlLine(
+                                      color: const Color(0xFF111111).withValues(
+                                          alpha: nearInteger ? 0.65 : 0.35),
+                                      strokeWidth: nearInteger ? 1.1 : 0.7,
+                                      dashArray:
+                                          nearInteger ? null : const [8, 6],
+                                    );
+                                  },
+                                  getDrawingVerticalLine: (_) => const FlLine(
+                                    color: Color(0xFF8A8A8A),
+                                    strokeWidth: 0.8,
+                                  ),
                                 ),
                                 borderData: FlBorderData(
                                   show: true,
-                                  border: Border(
+                                  border: const Border(
                                     left: BorderSide(
-                                        color: Colors.blueGrey.shade200),
+                                        color: Color(0xFF111111), width: 1),
                                     bottom: BorderSide(
-                                        color: Colors.blueGrey.shade200),
-                                    top: BorderSide.none,
-                                    right: BorderSide.none,
+                                        color: Color(0xFF111111), width: 1),
+                                    top: BorderSide(
+                                        color: Color(0xFF111111), width: 1),
+                                    right: BorderSide(
+                                        color: Color(0xFF111111), width: 1),
                                   ),
                                 ),
-                                titlesData: const FlTitlesData(
-                                  topTitles: AxisTitles(
+                                titlesData: FlTitlesData(
+                                  topTitles: const AxisTitles(
                                     sideTitles: SideTitles(showTitles: false),
                                   ),
-                                  rightTitles: AxisTitles(
+                                  rightTitles: const AxisTitles(
                                     sideTitles: SideTitles(showTitles: false),
+                                  ),
+                                  leftTitles: AxisTitles(
+                                    axisNameWidget: const Text(
+                                      'Gravity Magnitude',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF1E2930),
+                                      ),
+                                    ),
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      reservedSize: 40,
+                                      interval: 0.5,
+                                      getTitlesWidget: (value, _) => Text(
+                                        value.toStringAsFixed(1),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF1E2930),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  bottomTitles: AxisTitles(
+                                    axisNameWidget: const Text(
+                                      'Processed Samples',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF1E2930),
+                                      ),
+                                    ),
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      reservedSize: 24,
+                                      interval: 20,
+                                      getTitlesWidget: (value, _) => Text(
+                                        value.toInt().toString(),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF1E2930),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 lineBarsData: [
                                   LineChartBarData(
-                                    spots: _liveData,
+                                    spots: _gravityMagnitudeData,
                                     isCurved: true,
-                                    color: const Color(0xFF0f8f92),
-                                    barWidth: 2.5,
+                                    color: const Color(0xFF111D8A),
+                                    barWidth: 2.1,
                                     dotData: const FlDotData(show: false),
                                   ),
                                 ],
                               ),
                             ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      height: 280,
+                      child: _singleSeriesChart(
+                        title: 'Motion Detection (Processed)',
+                        yAxisLabel: 'Motion',
+                        data: _motionData,
+                        lineColor: const Color(0xFFB9382A),
+                        fixedMinY: -0.1,
+                        fixedMaxY: 1.1,
+                        fixedLeftInterval: 1.0,
+                      ),
                     ),
                   ],
                 ),
@@ -643,41 +834,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return items;
   }
 
-  Widget _buildThresholdLegend(List<ThresholdRule> thresholds) {
-    Widget item(String label, Color color, double value, String sound) {
-      return Container(
-        margin: const EdgeInsets.only(right: 8, bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.35)),
-        ),
-        child: Text(
-          '$label ${value.toStringAsFixed(1)}°  |  $sound',
-          style: TextStyle(
-            fontSize: 12,
-            color: color,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      );
-    }
-
-    return Wrap(
-      children: [
-        ...thresholds.map(
-          (threshold) => item(
-            threshold.label,
-            threshold.color,
-            threshold.value,
-            threshold.sound,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _countText({required int filteredCount, required int total}) {
     return Padding(
       padding: const EdgeInsets.only(top: 26),
@@ -858,4 +1014,119 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       ),
     );
   }
+
+  Widget _singleSeriesChart({
+    required String title,
+    required String yAxisLabel,
+    required List<FlSpot> data,
+    required Color lineColor,
+    double? fixedMinY,
+    double? fixedMaxY,
+    double? fixedLeftInterval,
+  }) {
+    final dataOrDefault = data.isEmpty ? [const FlSpot(0, 0)] : data;
+    final minY = fixedMinY ?? (dataOrDefault.map((e) => e.y).reduce(min) - 0.3);
+    final maxY = fixedMaxY ?? (dataOrDefault.map((e) => e.y).reduce(max) + 0.3);
+    final maxX = dataOrDefault.last.x;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FBFD),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFD5E1E8)),
+      ),
+      child: LineChart(
+        LineChartData(
+          minX: 0,
+          maxX: maxX <= 0 ? 1 : maxX,
+          minY: minY,
+          maxY: maxY <= minY ? minY + 1 : maxY,
+          gridData: FlGridData(
+            show: true,
+            horizontalInterval: ((maxY - minY).abs() / 5).clamp(0.1, 10.0),
+            verticalInterval: 20,
+            getDrawingHorizontalLine: (_) => FlLine(
+              color: const Color(0xFF9AAAB4).withValues(alpha: 0.45),
+              strokeWidth: 0.7,
+            ),
+            getDrawingVerticalLine: (_) => FlLine(
+              color: const Color(0xFF9AAAB4).withValues(alpha: 0.35),
+              strokeWidth: 0.6,
+            ),
+          ),
+          borderData: FlBorderData(
+            show: true,
+            border: Border.all(color: const Color(0xFF12303E), width: 1),
+          ),
+          titlesData: FlTitlesData(
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            leftTitles: AxisTitles(
+              axisNameWidget: Text(
+                yAxisLabel,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1E2930),
+                ),
+              ),
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 42,
+                interval: fixedLeftInterval ??
+                    ((maxY - minY).abs() / 4).clamp(0.1, 10.0),
+                getTitlesWidget: (value, _) => Text(
+                  value.toStringAsFixed(2),
+                  style: const TextStyle(fontSize: 10),
+                ),
+              ),
+            ),
+            bottomTitles: AxisTitles(
+              axisNameWidget: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1E2930),
+                ),
+              ),
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 22,
+                interval: 40,
+                getTitlesWidget: (value, _) => Text(
+                  value.toInt().toString(),
+                  style: const TextStyle(fontSize: 10),
+                ),
+              ),
+            ),
+          ),
+          lineBarsData: [
+            LineChartBarData(
+              spots: dataOrDefault,
+              color: lineColor,
+              barWidth: 1.8,
+              dotData: const FlDotData(show: false),
+              isCurved: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProcessedMetrics {
+  const _ProcessedMetrics({
+    required this.gravityMagnitude,
+    required this.motionDetected,
+  });
+
+  final double gravityMagnitude;
+  final bool motionDetected;
 }

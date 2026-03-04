@@ -56,11 +56,16 @@ class SensorApi {
         if (channelNumber != null) 'channelNumber': channelNumber,
         if (channelNumber != null) 'channel_number': channelNumber,
         if (lat != null) 'lat': lat,
+        if (log != null) 'long': log,
         if (log != null) 'log': log,
         'status': status,
         'unit': unit,
       },
-      headers: sensorId != null ? {'sensor-id': sensorId} : null,
+      headers: {
+        'deviceId': deviceId,
+        'device-id': deviceId,
+        if (sensorId != null) 'sensor-id': sensorId,
+      },
     );
     return _asMap(response.body);
   }
@@ -93,6 +98,7 @@ class SensorApi {
         if (channelNumber != null) 'channelNumber': channelNumber,
         if (channelNumber != null) 'channel_number': channelNumber,
         if (lat != null) 'lat': lat,
+        if (log != null) 'long': log,
         if (log != null) 'log': log,
         'status': status,
         'unit': unit,

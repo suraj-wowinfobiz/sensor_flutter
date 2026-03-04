@@ -33,6 +33,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   final List<FlSpot> _processedXData = [];
   final List<FlSpot> _processedYData = [];
   final List<FlSpot> _processedZData = [];
+  final List<FlSpot> _processedMagnitudeData = [];
   final List<FlSpot> _analyzedXData = [];
   final List<FlSpot> _analyzedYData = [];
   final List<FlSpot> _analyzedZData = [];
@@ -88,10 +89,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (!mounted) return;
       final processedValues = _extractProcessedValues(data);
       if (processedValues == null) return;
+      final magnitude = _extractProcessedMagnitude(data) ??
+          sqrt((processedValues.$1 * processedValues.$1) +
+              (processedValues.$2 * processedValues.$2) +
+              (processedValues.$3 * processedValues.$3));
       setState(() {
         _appendProcessedPoint(_processedXData, processedValues.$1);
         _appendProcessedPoint(_processedYData, processedValues.$2);
         _appendProcessedPoint(_processedZData, processedValues.$3);
+        _appendProcessedPoint(_processedMagnitudeData, magnitude);
         _processedIndex++;
         _trimAndReindexProcessedSeries();
       });
@@ -187,6 +193,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     while (_processedZData.length > 65) {
       _processedZData.removeAt(0);
     }
+    while (_processedMagnitudeData.length > 65) {
+      _processedMagnitudeData.removeAt(0);
+    }
 
     for (int i = 0; i < _processedXData.length; i++) {
       _processedXData[i] = FlSpot(i.toDouble(), _processedXData[i].y);
@@ -196,6 +205,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
     for (int i = 0; i < _processedZData.length; i++) {
       _processedZData[i] = FlSpot(i.toDouble(), _processedZData[i].y);
+    }
+    for (int i = 0; i < _processedMagnitudeData.length; i++) {
+      _processedMagnitudeData[i] =
+          FlSpot(i.toDouble(), _processedMagnitudeData[i].y);
     }
     _processedIndex = _processedXData.length;
   }
@@ -248,6 +261,37 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
 
     return _extractXyzValues(payload);
+  }
+
+  double? _extractProcessedMagnitude(dynamic payload) {
+    for (final map in _candidateMaps(payload)) {
+      final processedPayload = map['processedPayload'];
+      if (processedPayload is Map) {
+        final horizontal = _toDouble(processedPayload['horizontalMagnitude']);
+        if (horizontal != null) return horizontal;
+
+        final x = _toDouble(processedPayload['x']);
+        final y = _toDouble(processedPayload['y']);
+        final z = _toDouble(processedPayload['z']);
+        if (x != null && y != null && z != null) {
+          return sqrt((x * x) + (y * y) + (z * z));
+        }
+      }
+
+      final rawPayload = map['rawPayload'];
+      if (rawPayload is Map) {
+        final params = rawPayload['parameters'];
+        if (params is Map) {
+          final x = _toDouble(params['x']);
+          final y = _toDouble(params['y']);
+          final z = _toDouble(params['z']);
+          if (x != null && y != null && z != null) {
+            return sqrt((x * x) + (y * y) + (z * z));
+          }
+        }
+      }
+    }
+    return null;
   }
 
   Iterable<Map<dynamic, dynamic>> _candidateMaps(
@@ -798,79 +842,127 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _historicalTrendCard(BuildContext context) {
+    final hasData = _processedMagnitudeData.isNotEmpty;
+    final minY = hasData
+        ? (_processedMagnitudeData.map((e) => e.y).reduce(min) - 0.3)
+        : 0.0;
+    final maxY = hasData
+        ? (_processedMagnitudeData.map((e) => e.y).reduce(max) + 0.3)
+        : 1.0;
+    final maxX = hasData ? _processedMagnitudeData.last.x : 65.0;
+
     return _DashboardPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _panelTitle(context, 'Historical Trend', Icons.trending_up),
+          _panelTitle(
+              context, 'Magnitude Trend (Processed)', Icons.trending_up),
           const SizedBox(height: 8),
           SizedBox(
             height: 280,
-            child: LineChart(
-              LineChartData(
-                minY: 0,
-                maxY: 2.1,
-                gridData: FlGridData(
-                  drawVerticalLine: false,
-                  horizontalInterval: 0.5,
-                  getDrawingHorizontalLine: (_) =>
-                      const FlLine(color: Color(0xFFd2dbe0)),
-                ),
-                borderData: FlBorderData(
-                  show: true,
-                  border: Border(
-                    left: BorderSide(color: Colors.blueGrey.shade200),
-                    bottom: BorderSide(color: Colors.blueGrey.shade200),
-                    top: BorderSide.none,
-                    right: BorderSide.none,
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  leftTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: true, reservedSize: 28),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: 6,
-                      getTitlesWidget: (value, meta) {
-                        final d = value.toInt() + 1;
-                        if (d % 7 != 0) return const SizedBox.shrink();
-                        return Text(
-                          '${d.toString().padLeft(2, '0')}/01',
-                          style: TextStyle(
-                              fontSize: 10, color: _mutedTextColor(context)),
-                        );
-                      },
+            child: hasData
+                ? LineChart(
+                    LineChartData(
+                      minX: 0,
+                      maxX: maxX <= 0 ? 1 : maxX,
+                      minY: minY,
+                      maxY: maxY <= minY ? minY + 1 : maxY,
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: true,
+                        horizontalInterval:
+                            ((maxY - minY).abs() / 8).clamp(0.05, 10.0),
+                        verticalInterval: 5,
+                        getDrawingHorizontalLine: (value) {
+                          final major = (value - value.round()).abs() < 0.04;
+                          return FlLine(
+                            color: const Color(0xFF111111)
+                                .withValues(alpha: major ? 0.7 : 0.35),
+                            strokeWidth: major ? 1.0 : 0.7,
+                            dashArray: major ? null : const [10, 6],
+                          );
+                        },
+                        getDrawingVerticalLine: (_) => FlLine(
+                          color: const Color(0xFF111111).withValues(alpha: 0.3),
+                          strokeWidth: 0.7,
+                        ),
+                      ),
+                      borderData: FlBorderData(
+                        show: true,
+                        border: const Border(
+                          left: BorderSide(color: Color(0xFF111111), width: 1),
+                          bottom:
+                              BorderSide(color: Color(0xFF111111), width: 1),
+                          top: BorderSide(color: Color(0xFF111111), width: 1),
+                          right: BorderSide(color: Color(0xFF111111), width: 1),
+                        ),
+                      ),
+                      titlesData: FlTitlesData(
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        leftTitles: AxisTitles(
+                          axisNameWidget: const Text(
+                            'Magnitude',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1E2930),
+                            ),
+                          ),
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 42,
+                            interval:
+                                ((maxY - minY).abs() / 5).clamp(0.1, 20.0),
+                            getTitlesWidget: (value, _) => Text(
+                              value.toStringAsFixed(2),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF1E2930),
+                              ),
+                            ),
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          axisNameWidget: const Text(
+                            'Processed Samples',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1E2930),
+                            ),
+                          ),
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 22,
+                            interval: 10,
+                            getTitlesWidget: (value, _) => Text(
+                              value.toInt().toString(),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF1E2930),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: _processedMagnitudeData,
+                          isCurved: true,
+                          color: const Color(0xFF111D8A),
+                          barWidth: 2.0,
+                          dotData: const FlDotData(show: false),
+                        ),
+                      ],
                     ),
-                  ),
-                ),
-                extraLinesData: ExtraLinesData(
-                  horizontalLines: _thresholdLinesForGraph(
-                    context,
-                    ThresholdGraphTarget.dashboardRealtime,
-                  ),
-                ),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: List.generate(30, (i) {
-                      final y = 1.05 + (Random(i + 3).nextDouble() * 0.55);
-                      return FlSpot(i.toDouble(), y);
-                    }),
-                    isCurved: true,
-                    color: const Color(0xFF0d6e76),
-                    barWidth: 2.6,
-                    dotData: const FlDotData(show: false),
-                  ),
-                ],
-              ),
-            ),
+                  )
+                : const Center(
+                    child: Text('Waiting for processed magnitude...')),
           ),
         ],
       ),

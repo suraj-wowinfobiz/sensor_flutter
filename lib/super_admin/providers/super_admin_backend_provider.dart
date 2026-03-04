@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../api/device_api.dart';
 import '../api/organization_api.dart' as org_api;
 import '../api/sensor_api.dart';
+import '../api/sensor_type_api.dart';
 import '../api/thresholds_api.dart';
 import '../api/users_api.dart';
 import '../models/alert.dart';
@@ -123,20 +124,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
 
     devices = [];
 
-    sensorTypes = const [
-      SensorType(
-        id: 'type_tilt',
-        name: 'Tilt X/Y',
-        category: 'inclinometer',
-        description: 'Biaxial tilt sensor',
-      ),
-      SensorType(
-        id: 'type_temp',
-        name: 'Temperature',
-        category: 'thermal',
-        description: 'Temperature sensor',
-      ),
-    ];
+    sensorTypes = [];
 
     sensors = [];
     sensorParameters = [];
@@ -249,7 +237,8 @@ class SuperAdminBackendProvider extends ChangeNotifier {
                   id: id,
                   organizationId: org.id,
                   name: _asString(raw['name'], existing?.name ?? ''),
-                  location: _asString(raw['location'], existing?.location ?? ''),
+                  location:
+                      _asString(raw['location'], existing?.location ?? ''),
                   createdAt: createdAt,
                 );
               }
@@ -405,6 +394,31 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> loadSensorTypes() async {
+    try {
+      final body = await SensorTypeApi.getAllSensorTypes();
+      final loaded = body.map((json) {
+        return SensorType(
+          id: _asString(
+            json['sensorTypeId'] ?? json['id'],
+            _uuid(),
+          ),
+          name: _asString(json['name'], 'Sensor Type'),
+          category: _asString(json['category'], 'general'),
+          description: _asString(json['description']),
+        );
+      }).toList();
+      final deduped = <String, SensorType>{};
+      for (final item in loaded) {
+        deduped[item.id] = item;
+      }
+      sensorTypes = deduped.values.toList();
+    } catch (e) {
+      print('Error loading sensor types: $e');
+      sensorTypes = [];
+    }
+  }
+
   Future<void> loadThresholdProfiles() async {
     try {
       final body = await ThresholdsApi.getProfiles();
@@ -479,7 +493,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           sensorId: sensorId.isEmpty ? null : sensorId,
           deviceId: data['device_id'] as String,
           sensorTypeId: data['sensor_type_id'] as String,
-          name: _asString(data['serial_number'], 'Sensor'),
+          name: _asString(data['name'] ?? data['serial_number'], 'Sensor'),
           serialNumber: _asString(data['serial_number']),
           macAddress: _asString(data['mac_address']),
           channelNumber: int.tryParse(_asString(data['channel_number'])),
@@ -489,6 +503,14 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           unit: _asString(data['unit'], ''),
         );
         await loadSensors();
+        break;
+      case 'sensor_types':
+        await SensorTypeApi.createSensorType(
+          name: _asString(data['name'], 'Sensor Type'),
+          category: _asString(data['category'], 'general'),
+          description: _asString(data['description']),
+        );
+        await loadSensorTypes();
         break;
       case 'thresholds':
         await ThresholdsApi.createProfile(
@@ -609,7 +631,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           sensorId: id,
           deviceId: data['device_id'] as String,
           sensorTypeId: data['sensor_type_id'] as String,
-          name: _asString(data['serial_number'], 'Sensor'),
+          name: _asString(data['name'] ?? data['serial_number'], 'Sensor'),
           serialNumber: _asString(data['serial_number']),
           macAddress: _asString(data['mac_address']),
           channelNumber: int.tryParse(_asString(data['channel_number'])),

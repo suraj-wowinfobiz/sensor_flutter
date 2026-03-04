@@ -15,13 +15,10 @@ class SensorsScreen extends ConsumerStatefulWidget {
 
 class _SensorsScreenState extends ConsumerState<SensorsScreen> {
   String? _editingId;
+  String _sensorName = '';
   String _serialNumber = '';
   String _deviceId = '';
   String _sensorTypeId = '';
-  String _sensorCodeInput = '';
-  String _macAddress = '';
-  String _channelNumber = '1';
-  String _organizationId = '';
   String _latitude = '37.7749';
   String _longitude = '-122.4194';
   bool _showFilters = false;
@@ -43,38 +40,32 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
     // Don't invalidate in initState - let provider load naturally
   }
 
-  void _showSensorModal({Sensor? sensor}) {
-    final db = provider.Provider.of<SuperAdminBackendProvider>(context, listen: false);
+  Future<void> _showSensorModal({Sensor? sensor}) async {
+    final db =
+        provider.Provider.of<SuperAdminBackendProvider>(context, listen: false);
+    await db.loadDevices();
+    await db.loadSensorTypes();
+    if (!mounted) return;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final subColor =
         isLight ? const Color(0xFF5A6F7D) : const Color(0xFFAEC4D7);
     final defaultDeviceId = db.devices.isNotEmpty ? db.devices.first.id : '';
     final defaultTypeId =
         db.sensorTypes.isNotEmpty ? db.sensorTypes.first.id : '';
-    final defaultOrgId = db.sites.isNotEmpty ? db.sites.first.id : '';
 
     if (sensor != null) {
-      final index = db.sensors.indexOf(sensor);
       _editingId = sensor.id;
+      _sensorName = sensor.serialNumber;
       _serialNumber = sensor.serialNumber;
       _deviceId = sensor.deviceId;
       _sensorTypeId = sensor.sensorTypeId;
-      _sensorCodeInput = _sensorCodeFor(index < 0 ? 0 : index);
-      _macAddress =
-          '9E:55:DE:5E:${(56 + (index < 0 ? 0 : index)).toRadixString(16).padLeft(2, '0').toUpperCase()}:18';
-      _channelNumber = '${_channelFor(index < 0 ? 0 : index)}';
-      _organizationId = defaultOrgId;
     } else {
       _editingId = null;
-      _sensorCodeInput =
-          'SEN-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      _sensorName = 'Sensor ${DateTime.now().millisecondsSinceEpoch % 10000}';
       _serialNumber =
           'SNMLQ${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
-      _macAddress = '9E:55:DE:5E:56:18';
-      _channelNumber = '1';
       _deviceId = defaultDeviceId;
       _sensorTypeId = defaultTypeId;
-      _organizationId = defaultOrgId;
     }
 
     showGeneralDialog(
@@ -147,32 +138,10 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                         ],
                       ),
                       const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _dialogTextField(
-                              label: 'Sensor ID',
-                              value: _sensorCodeInput,
-                              onChanged: (v) =>
-                                  setState(() => _sensorCodeInput = v),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: _dialogTextField(
-                              label: 'Serial Number',
-                              value: _serialNumber,
-                              onChanged: (v) =>
-                                  setState(() => _serialNumber = v),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
                       _dialogTextField(
-                        label: 'MAC Address',
-                        value: _macAddress,
-                        onChanged: (v) => setState(() => _macAddress = v),
+                        label: 'Serial Number',
+                        value: _serialNumber,
+                        onChanged: (v) => setState(() => _serialNumber = v),
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -192,16 +161,13 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                                   setState(() => _deviceId = value ?? ''),
                             ),
                           ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: _dialogTextField(
-                              label: 'Channel Number',
-                              value: _channelNumber,
-                              onChanged: (v) =>
-                                  setState(() => _channelNumber = v),
-                            ),
-                          ),
                         ],
+                      ),
+                      const SizedBox(height: 12),
+                      _dialogTextField(
+                        label: 'Sensor Name',
+                        value: _sensorName,
+                        onChanged: (v) => setState(() => _sensorName = v),
                       ),
                       const SizedBox(height: 12),
                       _dialogDropdown(
@@ -217,19 +183,29 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                         onChanged: (value) =>
                             setState(() => _sensorTypeId = value ?? ''),
                       ),
-                      const SizedBox(height: 12),
-                      _dialogDropdown(
-                        label: 'Organization',
-                        value: _organizationId.isEmpty ? null : _organizationId,
-                        hint: 'Select organization',
-                        items: db.sites
-                            .map((site) => DropdownMenuItem<String>(
-                                  value: site.id,
-                                  child: Text(site.name),
-                                ))
-                            .toList(),
-                        onChanged: (value) =>
-                            setState(() => _organizationId = value ?? ''),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            await _showCreateSensorTypeDialog();
+                            if (!mounted) return;
+                            await db.loadSensorTypes();
+                            if (!context.mounted) return;
+                            setState(() {
+                              if (_sensorTypeId.isEmpty &&
+                                  db.sensorTypes.isNotEmpty) {
+                                _sensorTypeId = db.sensorTypes.first.id;
+                              }
+                            });
+                          },
+                          icon: const Icon(Icons.add, size: 16),
+                          label: Text(
+                            db.sensorTypes.isEmpty
+                                ? 'Create Sensor Type'
+                                : 'Create New Sensor Type',
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       LayoutBuilder(
@@ -303,19 +279,29 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () async {
-                                final backend =
-                                    provider.Provider.of<SuperAdminBackendProvider>(
+                                final backend = provider.Provider.of<
+                                    SuperAdminBackendProvider>(
                                   context,
                                   listen: false,
                                 );
                                 try {
+                                  if (_deviceId.trim().isEmpty) {
+                                    throw Exception(
+                                      'Please select a device before saving sensor.',
+                                    );
+                                  }
+                                  if (_sensorTypeId.trim().isEmpty) {
+                                    throw Exception(
+                                      'Please select sensor type or create one.',
+                                    );
+                                  }
+
                                   if (_editingId == null) {
                                     await backend.create('sensors', {
+                                      'name': _sensorName.trim(),
                                       'serial_number': _serialNumber.trim(),
                                       'device_id': _deviceId,
                                       'sensor_type_id': _sensorTypeId,
-                                      'mac_address': _macAddress.trim(),
-                                      'channel_number': _channelNumber.trim(),
                                       'lat': _latitude.trim(),
                                       'log': _longitude.trim(),
                                       'status': 'ACTIVE',
@@ -324,11 +310,10 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                                   } else {
                                     await backend
                                         .update('sensors', _editingId!, {
+                                      'name': _sensorName.trim(),
                                       'serial_number': _serialNumber.trim(),
                                       'device_id': _deviceId,
                                       'sensor_type_id': _sensorTypeId,
-                                      'mac_address': _macAddress.trim(),
-                                      'channel_number': _channelNumber.trim(),
                                       'lat': _latitude.trim(),
                                       'log': _longitude.trim(),
                                       'status': 'ACTIVE',
@@ -394,6 +379,85 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
             scale: Tween<double>(begin: 0.98, end: 1.0).animate(animation),
             child: child,
           ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showCreateSensorTypeDialog() async {
+    String name = '';
+    String category = 'general';
+    String description = '';
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Create Sensor Type'),
+          content: StatefulBuilder(
+            builder: (context, setDialogState) => SizedBox(
+              width: 420,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _dialogTextField(
+                    label: 'Name',
+                    value: name,
+                    onChanged: (v) => setDialogState(() => name = v),
+                  ),
+                  const SizedBox(height: 10),
+                  _dialogTextField(
+                    label: 'Category',
+                    value: category,
+                    onChanged: (v) => setDialogState(() => category = v),
+                  ),
+                  const SizedBox(height: 10),
+                  _dialogTextField(
+                    label: 'Description',
+                    value: description,
+                    onChanged: (v) => setDialogState(() => description = v),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (name.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Sensor type name is required')),
+                  );
+                  return;
+                }
+                try {
+                  final backend =
+                      provider.Provider.of<SuperAdminBackendProvider>(
+                    context,
+                    listen: false,
+                  );
+                  await backend.create('sensor_types', {
+                    'name': name.trim(),
+                    'category':
+                        category.trim().isEmpty ? 'general' : category.trim(),
+                    'description': description.trim(),
+                  });
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to create sensor type: $e')),
+                  );
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
         );
       },
     );
@@ -614,7 +678,7 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
   @override
   Widget build(BuildContext context) {
     final sensorsAsync = ref.watch(sensorsProvider(_refreshKey));
-    
+
     return sensorsAsync.when(
       data: (sensors) => _buildContent(context, sensors),
       loading: () => const Center(child: CircularProgressIndicator()),
