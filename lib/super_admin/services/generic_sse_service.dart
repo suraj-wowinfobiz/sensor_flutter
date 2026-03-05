@@ -4,11 +4,11 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/api/admin_api_config.dart';
 
 class GenericSseService {
   GenericSseService(this.endpointPath);
 
-  static const String _baseUrl = 'http://103.211.202.145:8091';
   static const String _tokenStorageKey = 'super_admin_auth_token';
 
   final String endpointPath;
@@ -39,7 +39,7 @@ class GenericSseService {
     try {
       final request = http.Request(
         'GET',
-        Uri.parse('$_baseUrl$endpointPath'),
+        Uri.parse('${AdminApiConfig.baseUrl}$endpointPath'),
       );
       request.headers['Accept'] = 'text/event-stream';
       request.headers['Cache-Control'] = 'no-cache';

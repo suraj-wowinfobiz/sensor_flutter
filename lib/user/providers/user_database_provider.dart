@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../super_admin/api/organization_api.dart' as org_api;
+import '../../super_admin/api/users_api.dart';
 import '../models/alert.dart';
 import '../models/audit_log.dart';
 import '../models/config.dart';
@@ -93,91 +95,25 @@ class UserDatabaseProvider extends ChangeNotifier {
     }).join();
   }
 
+  String _asString(dynamic value, [String fallback = '']) {
+    if (value == null) return fallback;
+    final parsed = value.toString().trim();
+    return parsed.isEmpty ? fallback : parsed;
+  }
+
+  DateTime _asDate(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String && value.trim().isNotEmpty) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+    return DateTime.now();
+  }
+
   void _initializeData() {
-    organizations = [
-      Organization(
-        id: _uuid(),
-        name: 'Smart Building Solutions',
-        email: 'contact@sbs.com',
-        status: 'active',
-        ownerUserId: _uuid(),
-        createdAt: DateTime.now(),
-      ),
-      Organization(
-        id: _uuid(),
-        name: 'Industrial Monitoring Inc',
-        email: 'info@imi.com',
-        status: 'active',
-        ownerUserId: _uuid(),
-        createdAt: DateTime.now(),
-      ),
-      Organization(
-        id: _uuid(),
-        name: 'Environmental Systems Ltd',
-        email: 'admin@ensys.com',
-        status: 'inactive',
-        ownerUserId: _uuid(),
-        createdAt: DateTime.now(),
-      ),
-    ];
-
-    sites = [
-      Site(
-        id: _uuid(),
-        organizationId: organizations[0].id,
-        name: 'HQ Building (NYC)',
-        location: 'New York',
-        createdAt: DateTime.now(),
-      ),
-      Site(
-        id: _uuid(),
-        organizationId: organizations[0].id,
-        name: 'R&D Center (Boston)',
-        location: 'Boston',
-        createdAt: DateTime.now(),
-      ),
-      Site(
-        id: _uuid(),
-        organizationId: organizations[1].id,
-        name: 'Factory A (Detroit)',
-        location: 'Detroit',
-        createdAt: DateTime.now(),
-      ),
-    ];
-
-    zones = [
-      Zone(id: _uuid(), siteId: sites[0].id, name: 'Zone A - Structural'),
-      Zone(id: _uuid(), siteId: sites[0].id, name: 'Zone B - HVAC'),
-      Zone(id: _uuid(), siteId: sites[1].id, name: 'Lab Zone 1'),
-      Zone(id: _uuid(), siteId: sites[2].id, name: 'Assembly Zone'),
-    ];
-
-    devices = [
-      Device(
-        id: _uuid(),
-        siteId: sites[0].id,
-        zoneId: zones[0].id,
-        deviceCode: 'GATEWAY-001',
-        status: 'active',
-        installedAt: DateTime.now(),
-      ),
-      Device(
-        id: _uuid(),
-        siteId: sites[0].id,
-        zoneId: zones[1].id,
-        deviceCode: 'GATEWAY-002',
-        status: 'active',
-        installedAt: DateTime.now(),
-      ),
-      Device(
-        id: _uuid(),
-        siteId: sites[1].id,
-        zoneId: zones[2].id,
-        deviceCode: 'GATEWAY-003',
-        status: 'maintenance',
-        installedAt: DateTime.now(),
-      ),
-    ];
+    organizations = [];
+    sites = [];
+    zones = [];
+    devices = [];
 
     sensorTypes = const [
       SensorType(
@@ -195,18 +131,6 @@ class UserDatabaseProvider extends ChangeNotifier {
     ];
 
     sensors = [];
-    for (int i = 1; i <= 12; i++) {
-      sensors.add(
-        Sensor(
-          id: _uuid(),
-          deviceId: devices[i % 3].id,
-          sensorTypeId: sensorTypes[0].id,
-          serialNumber: 'TILT-2024-${1000 + i}',
-          installedAt: DateTime.now(),
-          lastReading: Random().nextDouble() * 5,
-        ),
-      );
-    }
 
     sensorParameters = [
       SensorParameter(
@@ -252,74 +176,9 @@ class UserDatabaseProvider extends ChangeNotifier {
       ),
     ];
 
-    users = [
-      User(
-        id: _uuid(),
-        name: 'Sarah Connor',
-        role: 'operator',
-        email: 'sarah@example.com',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      User(
-        id: _uuid(),
-        name: 'Mike Ryan',
-        role: 'engineer',
-        email: 'mike@example.com',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      User(
-        id: _uuid(),
-        name: 'Admin User',
-        role: 'admin',
-        email: 'admin@example.com',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-    ];
-
-    alerts = [
-      Alert(
-        id: _uuid(),
-        sensorId: sensors[0].id,
-        sensorParameterId: sensorParameters[0].id,
-        alertLevel: 'warning',
-        message: 'Tilt above warning threshold',
-        triggeredAt: DateTime.now(),
-      ),
-      Alert(
-        id: _uuid(),
-        sensorId: sensors[2].id,
-        sensorParameterId: sensorParameters[0].id,
-        alertLevel: 'critical',
-        message: 'Critical tilt detected',
-        triggeredAt: DateTime.now(),
-      ),
-      Alert(
-        id: _uuid(),
-        sensorId: sensors[5].id,
-        sensorParameterId: sensorParameters[0].id,
-        alertLevel: 'warning',
-        message: 'Unstable readings',
-        triggeredAt: DateTime.now().subtract(const Duration(hours: 1)),
-        resolvedAt: DateTime.now(),
-      ),
-    ];
-
+    users = [];
+    alerts = [];
     auditLogs = [];
-    for (int i = 1; i <= 10; i++) {
-      auditLogs.add(
-        AuditLog(
-          id: _uuid(),
-          userId: users[i % 3].id,
-          action: ['CREATE', 'UPDATE', 'DELETE', 'LOGIN'][i % 4],
-          resource: ['Organization', 'Site', 'Sensor', 'User'][i % 4],
-          timestamp: DateTime.now().subtract(Duration(hours: i)),
-          ip: '192.168.1.${100 + i}',
-        ),
-      );
-    }
 
     config = Config(
       globalThreshold: 3.0,
@@ -333,33 +192,151 @@ class UserDatabaseProvider extends ChangeNotifier {
     );
   }
 
-  void create(String view, Map<String, dynamic> data) {
+  Future<void> loadOrganizations() async {
+    final res = await org_api.OrgServiceApi.getAllOrganizations();
+    final body = res.body;
+    if (body is! List) {
+      organizations = [];
+      notifyListeners();
+      return;
+    }
+
+    organizations = body.map((json) {
+      final item = json as Map;
+      return Organization(
+        id: _asString(item['organizationId']),
+        name: _asString(item['name'], 'Organization'),
+        email: _asString(item['email']),
+        status: _asString(item['status'], 'active').toLowerCase(),
+        ownerUserId: _asString(item['ownerUserId']),
+        createdAt: _asDate(item['createdAt']),
+      );
+    }).toList();
+    notifyListeners();
+  }
+
+  Future<void> loadSites() async {
+    final res = await org_api.OrgServiceApi.getAllSites();
+    final body = res.body;
+    if (body is! List) {
+      sites = [];
+      notifyListeners();
+      return;
+    }
+
+    final mappedSites = <String, Site>{};
+    for (final raw in body) {
+      if (raw is! Map) continue;
+      final org = raw['organization'];
+      final id = _asString(raw['sitesID']);
+      if (id.isEmpty) continue;
+      mappedSites[id] = Site(
+        id: id,
+        organizationId: org is Map ? _asString(org['organizationId']) : '',
+        name: _asString(raw['name']),
+        location: _asString(raw['location']),
+        createdAt: _asDate(raw['createdAt']),
+      );
+    }
+
+    final hasMissingOrganization = mappedSites.values.any(
+      (s) => s.organizationId.trim().isEmpty,
+    );
+    if (hasMissingOrganization && organizations.isNotEmpty) {
+      for (final org in organizations) {
+        try {
+          final orgSitesRes =
+              await org_api.OrgServiceApi.getOrganizationSites(org.id);
+          final orgBody = orgSitesRes.body;
+          if (orgBody is! Map) continue;
+          final rawSites = orgBody['sites'];
+          if (rawSites is! List) continue;
+          for (final raw in rawSites) {
+            if (raw is! Map) continue;
+            final id = _asString(raw['sitesID']);
+            if (id.isEmpty) continue;
+            final existing = mappedSites[id];
+            mappedSites[id] = Site(
+              id: id,
+              organizationId: org.id,
+              name: _asString(raw['name'], existing?.name ?? ''),
+              location: _asString(raw['location'], existing?.location ?? ''),
+              createdAt: _asDate(raw['createdAt'] ?? existing?.createdAt),
+            );
+          }
+        } catch (_) {
+          // Keep base site list when enrichment endpoint fails for one org.
+        }
+      }
+    }
+
+    sites = mappedSites.values.toList();
+    notifyListeners();
+  }
+
+  Future<void> loadZones(String siteId) async {
+    final res = await org_api.OrgServiceApi.getZonesBySite(siteId);
+    final body = res.body;
+    if (body is! List) {
+      zones.removeWhere((z) => z.siteId == siteId);
+      notifyListeners();
+      return;
+    }
+
+    final newZones = body.map((json) {
+      final item = json as Map;
+      final site = item['site'];
+      return Zone(
+        id: _asString(item['zoneId']),
+        siteId: site is Map ? _asString(site['sitesID'], siteId) : siteId,
+        name: _asString(item['name']),
+      );
+    }).toList();
+
+    zones.removeWhere((z) => z.siteId == siteId);
+    zones.addAll(newZones);
+    notifyListeners();
+  }
+
+  Future<void> loadUsers() async {
+    final body = await UsersApi.getUsers();
+    users = body.map((json) {
+      return User(
+        id: _asString(json['id'] ?? json['userId'], _uuid()),
+        name: _asString(json['name'], 'User'),
+        role: _asString(json['role'], 'operator').toLowerCase(),
+        email: _asString(json['email']),
+        createdAt: _asDate(json['createdAt'] ?? json['created_at']),
+        updatedAt: _asDate(json['updatedAt'] ?? json['updated_at']),
+      );
+    }).toList();
+    notifyListeners();
+  }
+
+  Future<void> create(String view, Map<String, dynamic> data) async {
     switch (view) {
       case 'organizations':
-        organizations.add(Organization(
-          id: _uuid(),
-          name: data['name'] as String,
-          email: data['email'] as String,
-          status: data['status'] as String,
-          ownerUserId: data['owner_user_id'] as String,
-          createdAt: DateTime.now(),
-        ));
+        await org_api.OrgServiceApi.createOrganization(
+          data['name'] as String,
+          data['email'] as String,
+        );
+        await loadOrganizations();
         break;
       case 'sites':
-        sites.add(Site(
-          id: _uuid(),
-          name: data['name'] as String,
-          location: data['location'] as String,
-          organizationId: data['organization_id'] as String,
-          createdAt: DateTime.now(),
-        ));
+        await org_api.OrgServiceApi.createSiteForOrganization(
+          data['organization_id'] as String,
+          data['name'] as String,
+          data['location'] as String,
+        );
+        await loadSites();
         break;
       case 'zones':
-        zones.add(Zone(
-          id: _uuid(),
-          name: data['name'] as String,
-          siteId: data['site_id'] as String,
-        ));
+        final siteId = data['site_id'] as String;
+        await org_api.OrgServiceApi.createZone(
+          siteId,
+          data['name'] as String,
+        );
+        await loadZones(siteId);
         break;
       case 'devices':
         devices.add(Device(
@@ -389,14 +366,14 @@ class UserDatabaseProvider extends ChangeNotifier {
         ));
         break;
       case 'users':
-        users.add(User(
-          id: _uuid(),
+        await UsersApi.createUser(
           name: data['name'] as String,
           email: data['email'] as String,
-          role: data['role'] as String,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ));
+          role: _asString(data['role'], 'operator'),
+          organizationId: data['organization_id'] as String,
+          password: _asString(data['password'], 'Temp@12345'),
+        );
+        await loadUsers();
         break;
       case 'audit':
         auditLogs.add(AuditLog(
@@ -412,7 +389,7 @@ class UserDatabaseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void update(String view, String id, Map<String, dynamic> data) {
+  Future<void> update(String view, String id, Map<String, dynamic> data) async {
     if (view == 'config') {
       config = config.copyWith(
         globalThreshold: (data['global_threshold'] as num).toDouble(),
@@ -430,33 +407,29 @@ class UserDatabaseProvider extends ChangeNotifier {
 
     switch (view) {
       case 'organizations':
-        final index = organizations.indexWhere((item) => item.id == id);
-        if (index != -1) {
-          organizations[index] = organizations[index].copyWith(
-            name: data['name'] as String,
-            email: data['email'] as String,
-            status: data['status'] as String,
-          );
-        }
+        await org_api.OrgServiceApi.updateOrganization(
+          id,
+          data['name'] as String,
+          data['email'] as String,
+        );
+        await loadOrganizations();
         break;
       case 'sites':
-        final index = sites.indexWhere((item) => item.id == id);
-        if (index != -1) {
-          sites[index] = sites[index].copyWith(
-            name: data['name'] as String,
-            location: data['location'] as String,
-            organizationId: data['organization_id'] as String,
-          );
-        }
+        await org_api.OrgServiceApi.updateSite(
+          id,
+          data['name'] as String,
+          data['location'] as String,
+          orgId: data['organization_id'] as String,
+        );
+        await loadSites();
         break;
       case 'zones':
-        final index = zones.indexWhere((item) => item.id == id);
-        if (index != -1) {
-          zones[index] = zones[index].copyWith(
-            name: data['name'] as String,
-            siteId: data['site_id'] as String,
-          );
-        }
+        await org_api.OrgServiceApi.updateZone(
+          id,
+          data['name'] as String,
+          siteId: data['site_id'] as String,
+        );
+        await loadZones(data['site_id'] as String);
         break;
       case 'devices':
         final index = devices.indexWhere((item) => item.id == id);
@@ -489,30 +462,32 @@ class UserDatabaseProvider extends ChangeNotifier {
         }
         break;
       case 'users':
-        final index = users.indexWhere((item) => item.id == id);
-        if (index != -1) {
-          users[index] = users[index].copyWith(
-            name: data['name'] as String,
-            email: data['email'] as String,
-            role: data['role'] as String,
-          );
-        }
+        await UsersApi.updateUser(
+          id: id,
+          name: data['name'] as String,
+          email: data['email'] as String,
+          role: _asString(data['role'], 'operator'),
+        );
+        await loadUsers();
         break;
     }
     notifyListeners();
   }
 
-  void delete(String view, String id) {
+  Future<void> delete(String view, String id) async {
     switch (view) {
       case 'organizations':
-        organizations.removeWhere((item) => item.id == id);
-        sites.removeWhere((s) => s.organizationId == id);
+        await org_api.OrgServiceApi.deleteOrganization(id);
+        await loadOrganizations();
+        await loadSites();
         break;
       case 'sites':
-        sites.removeWhere((item) => item.id == id);
+        await org_api.OrgServiceApi.deleteSite(id);
+        await loadSites();
         zones.removeWhere((z) => z.siteId == id);
         break;
       case 'zones':
+        await org_api.OrgServiceApi.deleteZone(id);
         zones.removeWhere((item) => item.id == id);
         devices.removeWhere((d) => d.zoneId == id);
         break;
@@ -529,7 +504,8 @@ class UserDatabaseProvider extends ChangeNotifier {
         thresholdProfiles.removeWhere((item) => item.id == id);
         break;
       case 'users':
-        users.removeWhere((item) => item.id == id);
+        await UsersApi.deleteUser(id);
+        await loadUsers();
         break;
       case 'audit':
         auditLogs.removeWhere((item) => item.id == id);

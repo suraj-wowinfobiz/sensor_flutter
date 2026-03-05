@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../core/api/admin_api_config.dart';
 
 class AnalyticsLiveEvent {
   final String eventType;
@@ -92,13 +93,15 @@ class AnalyticsLiveEvent {
 }
 
 class AnalyticsLiveApi {
-  static const String baseUrl = 'http://103.211.202.145:8091';
   static const String endpoint = '/api/v1/analytics/events/live';
 
   static Stream<AnalyticsLiveEvent> connectToLiveStream() async* {
     final client = http.Client();
     try {
-      final request = http.Request('GET', Uri.parse('$baseUrl$endpoint'));
+      final request = http.Request(
+        'GET',
+        Uri.parse('${AdminApiConfig.baseUrl}$endpoint'),
+      );
       request.headers['Accept'] = 'text/event-stream';
       request.headers['Cache-Control'] = 'no-cache';
 
@@ -108,7 +111,7 @@ class AnalyticsLiveApi {
         final lines = chunk.split('\n');
         for (final line in lines) {
           if (line.isEmpty) continue;
-          
+
           String jsonStr = line;
           if (line.startsWith('data: ')) {
             jsonStr = line.substring(6);

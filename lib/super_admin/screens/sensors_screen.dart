@@ -320,8 +320,8 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                                       'unit': '',
                                     });
                                   }
-                                  setState(() => _refreshKey++);
                                   if (context.mounted) Navigator.pop(context);
+                                  this.setState(() => _refreshKey++);
                                 } catch (e) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(

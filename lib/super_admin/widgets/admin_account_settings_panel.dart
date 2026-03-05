@@ -12,8 +12,6 @@ enum _SettingsTab {
   profile,
   preferences,
   notifications,
-  access,
-  security,
   thresholds
 }
 
@@ -106,8 +104,6 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
               _buildPreferencesTab(context),
             if (_activeTab == _SettingsTab.notifications)
               _buildNotificationsTab(context),
-            if (_activeTab == _SettingsTab.access) _buildAccessTab(context),
-            if (_activeTab == _SettingsTab.security) _buildSecurityTab(context),
             if (_activeTab == _SettingsTab.thresholds)
               _buildThresholdsTab(context),
           ],
@@ -121,8 +117,6 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
       (_SettingsTab.profile, Icons.person_outline, 'Profile'),
       (_SettingsTab.preferences, Icons.palette_outlined, 'Preferences'),
       (_SettingsTab.notifications, Icons.notifications_none, 'Notifications'),
-      (_SettingsTab.access, Icons.verified_user_outlined, 'Access'),
-      (_SettingsTab.security, Icons.lock_outline, 'Security'),
       (_SettingsTab.thresholds, Icons.tune, 'Thresholds'),
     ];
 
@@ -267,6 +261,152 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
           ),
           const SizedBox(height: 18),
           _buildInputGrid(context),
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 18),
+          const Text(
+            'Access Control',
+            style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'View your access permissions across the organization hierarchy',
+            style: TextStyle(color: subColor, fontSize: 15),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: const Color(0xFF27a36a).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: const Color(0xFF27a36a).withValues(alpha: 0.4)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.verified, color: Color(0xFF27a36a)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Full Organization Access',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 16),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'You currently have unrestricted access to sites, zones, and sensors.',
+                ),
+                const SizedBox(height: 14),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final statWidth = constraints.maxWidth < 460
+                        ? constraints.maxWidth
+                        : 220.0;
+                    return Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        SizedBox(
+                          width: statWidth,
+                          child: const _AccessStatCard(
+                              label: 'All Sites', value: '1'),
+                        ),
+                        SizedBox(
+                          width: statWidth,
+                          child: const _AccessStatCard(
+                              label: 'All Zones', value: '1'),
+                        ),
+                        SizedBox(
+                          width: statWidth,
+                          child: const _AccessStatCard(
+                              label: 'All Sensors', value: '214'),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 18),
+          const Text(
+            'Change Password',
+            style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 12),
+          const _LabeledPasswordField(label: 'Current Password'),
+          const SizedBox(height: 10),
+          const _LabeledPasswordField(label: 'New Password'),
+          const SizedBox(height: 10),
+          const _LabeledPasswordField(label: 'Confirm New Password'),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.key),
+              label: const Text('Update Password'),
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'Two-Factor Authentication',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 10),
+          _actionTile(context,
+              title: 'Authentication App',
+              subtitle:
+                  'Use an authenticator app to generate verification codes'),
+          _actionTile(context,
+              title: 'SMS Authentication',
+              subtitle: 'Receive verification codes via text message'),
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: const Color(0xFFE54C4C).withValues(alpha: 0.08),
+              border: Border.all(
+                  color: const Color(0xFFE54C4C).withValues(alpha: 0.35)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Danger Zone',
+                  style: TextStyle(
+                    color: Color(0xFFE54C4C),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 20 * 0.9,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Permanently delete your account and associated data.',
+                ),
+                const SizedBox(height: 10),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFE54C4C),
+                  ),
+                  onPressed: () {},
+                  child: const Text('Delete Account'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          _buildProfileLogoutFooter(context),
         ],
       ),
     );
@@ -1209,227 +1349,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
     );
   }
 
-  Widget _buildAccessTab(BuildContext context) {
-    return _sectionContainer(
-      context,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Access Control',
-            style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'View your access permissions across the organization hierarchy',
-            style: TextStyle(
-              color: Theme.of(context).brightness == Brightness.light
-                  ? const Color(0xFF4f6b82)
-                  : const Color(0xFF9db7d2),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: const Color(0xFF27a36a).withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                  color: const Color(0xFF27a36a).withValues(alpha: 0.4)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.verified, color: Color(0xFF27a36a)),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Full Organization Access',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 16),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'You currently have unrestricted access to sites, zones, and sensors.',
-                ),
-                const SizedBox(height: 14),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final statWidth = constraints.maxWidth < 460
-                        ? constraints.maxWidth
-                        : 220.0;
-                    return Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        SizedBox(
-                          width: statWidth,
-                          child: const _AccessStatCard(
-                              label: 'All Sites', value: '1'),
-                        ),
-                        SizedBox(
-                          width: statWidth,
-                          child: const _AccessStatCard(
-                              label: 'All Zones', value: '1'),
-                        ),
-                        SizedBox(
-                          width: statWidth,
-                          child: const _AccessStatCard(
-                              label: 'All Sensors', value: '214'),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildSecurityTab(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 1100;
-    return _sectionContainer(
-      context,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Change Password',
-            style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 12),
-          const _LabeledPasswordField(label: 'Current Password'),
-          const SizedBox(height: 10),
-          const _LabeledPasswordField(label: 'New Password'),
-          const SizedBox(height: 10),
-          const _LabeledPasswordField(label: 'Confirm New Password'),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.key),
-              label: const Text('Update Password'),
-            ),
-          ),
-          const SizedBox(height: 18),
-          const Text(
-            'Two-Factor Authentication',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 10),
-          _actionTile(context,
-              title: 'Authentication App',
-              subtitle:
-                  'Use an authenticator app to generate verification codes'),
-          _actionTile(context,
-              title: 'SMS Authentication',
-              subtitle: 'Receive verification codes via text message'),
-          const SizedBox(height: 18),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              color: const Color(0xFFE54C4C).withValues(alpha: 0.08),
-              border: Border.all(
-                  color: const Color(0xFFE54C4C).withValues(alpha: 0.35)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Danger Zone',
-                  style: TextStyle(
-                    color: Color(0xFFE54C4C),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 20 * 0.9,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Permanently delete your account and associated data.',
-                ),
-                const SizedBox(height: 10),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFE54C4C),
-                  ),
-                  onPressed: () {},
-                  child: const Text('Delete Account'),
-                ),
-              ],
-            ),
-          ),
-          if (isMobile) ...[
-            const SizedBox(height: 18),
-            _buildMobileLogoutSection(context),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMobileLogoutSection(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        color: isLight ? const Color(0xFFF8EDED) : const Color(0xFF3A2327),
-        border:
-            Border.all(color: const Color(0xFFE54C4C).withValues(alpha: 0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Session',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: Color(0xFFE54C4C),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Sign out from this device.',
-            style: TextStyle(
-              color:
-                  isLight ? const Color(0xFF37434C) : const Color(0xFFC5D5E3),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(
-                    builder: (_) => const MainPage(),
-                  ),
-                  (route) => false,
-                );
-              },
-              icon: const Icon(Icons.logout, color: Color(0xFFE54C4C)),
-              label: const Text(
-                'Logout',
-                style: TextStyle(color: Color(0xFFE54C4C)),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildThresholdsTab(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
@@ -1686,10 +1606,12 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
                   isLight ? const Color(0xFFF1F7FB) : const Color(0xFF243E52),
               title:
                   Text(existing == null ? 'Add Threshold' : 'Edit Threshold'),
-              content: SingleChildScrollView(
-                child: SizedBox(
-                  width: 380,
-                  child: Column(
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 600),
+                child: SingleChildScrollView(
+                  child: SizedBox(
+                    width: 380,
+                    child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1851,6 +1773,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
                   ),
                 ),
               ),
+            ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),

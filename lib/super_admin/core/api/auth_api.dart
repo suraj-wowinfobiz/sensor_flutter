@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'admin_api_config.dart';
 
 enum UserRole { USER, VENDOR, VENDOR_ENGINEER, ADMIN, SUPER_ADMIN }
 
@@ -34,16 +35,22 @@ class LoginResponse {
   });
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
+    final rawBody = json['body'];
+    final bodyMap = rawBody is Map<String, dynamic>
+        ? rawBody
+        : (rawBody is Map
+            ? rawBody.cast<String, dynamic>()
+            : <String, dynamic>{});
     return LoginResponse(
-      message: json['message'],
-      status: json['status'],
-      body: LoginBody.fromJson(json['body']),
+      message: (json['message'] ?? '').toString(),
+      status: (json['status'] ?? '').toString(),
+      body: LoginBody.fromJson(bodyMap),
     );
   }
 }
 
 class LoginBody {
-  final int principalId;
+  final String principalId;
   final String principalType;
   final String token;
 
@@ -55,33 +62,41 @@ class LoginBody {
 
   factory LoginBody.fromJson(Map<String, dynamic> json) {
     return LoginBody(
-      principalId: json['principalId'],
-      principalType: json['principalType'],
-      token: json['token'],
+      principalId: (json['principalId'] ?? '').toString(),
+      principalType: (json['principalType'] ?? '').toString(),
+      token: (json['token'] ?? '').toString(),
     );
   }
 }
 
 class AuthApi {
-  static const String baseUrl = 'http://103.211.202.145:8091';
   static const Duration _requestDeadline = Duration(seconds: 10);
 
-  static Future<LoginResponse> login(LoginRequest request) async {
+  static Future<LoginResponse> login(
+    LoginRequest request, {
+    String? baseUrl,
+  }) async {
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/v1/auth/login'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode(request.toJson()),
-      ).timeout(_requestDeadline);
+      final rootUrl = (baseUrl == null || baseUrl.trim().isEmpty)
+          ? AdminApiConfig.baseUrl
+          : baseUrl.trim();
+      final response = await http
+          .post(
+            Uri.parse('$rootUrl/api/v1/auth/login'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode(request.toJson()),
+          )
+          .timeout(_requestDeadline);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final parsed = jsonDecode(response.body) as Map<String, dynamic>;
         return LoginResponse.fromJson(parsed);
       }
-      throw AuthApiException('Login failed (${response.statusCode}): ${response.body}');
+      throw AuthApiException(
+          'Login failed (${response.statusCode}): ${response.body}');
     } on TimeoutException {
       throw AuthApiException(
         'CORS timeout. Run: flutter run -d chrome --web-browser-flag "--disable-web-security"',

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../core/api/admin_api_config.dart';
 
 class LiveReading {
   final String readingId;
@@ -34,7 +35,7 @@ class LiveReading {
 
 class LiveReadingsService {
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'http://103.211.202.145:8091',
+    baseUrl: AdminApiConfig.baseUrl,
     connectTimeout: const Duration(seconds: 5),
     receiveTimeout: const Duration(seconds: 5),
   ));

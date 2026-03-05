@@ -1,9 +1,35 @@
 import 'package:flutter/material.dart';
 
+import 'analytics/analytics_page.dart';
+import 'engineer/engineer_page.dart';
 import 'super_admin/widgets/login_preferences_button.dart';
+import 'super_admin/screens/admin_screen.dart';
+import 'user/user_page.dart';
+import 'user_admin/user_admin_page.dart';
+import 'vendor/vendor_page.dart';
 
-class MainPage extends StatelessWidget {
+class MainPage extends StatefulWidget {
   const MainPage({super.key});
+
+  @override
+  State<MainPage> createState() => _MainPageState();
+}
+
+class _MainPageState extends State<MainPage> {
+  bool _isApiEnabled = true;
+
+  void _openRole({
+    required String loginRoute,
+    required Widget bypassPage,
+  }) {
+    if (_isApiEnabled) {
+      Navigator.pushNamed(context, loginRoute);
+      return;
+    }
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => bypassPage));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +66,28 @@ class MainPage extends StatelessWidget {
                   alignment: Alignment.topRight,
                   child: LoginPreferencesButton(),
                 ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _isApiEnabled
+                            ? 'API calls enabled'
+                            : 'API calls disabled (bypass)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: subColor,
+                        ),
+                      ),
+                    ),
+                    Switch(
+                      value: _isApiEnabled,
+                      onChanged: (value) =>
+                          setState(() => _isApiEnabled = value),
+                    ),
+                  ],
+                ),
                 Text(
                   'Welcome',
                   style: TextStyle(
@@ -63,44 +111,60 @@ class MainPage extends StatelessWidget {
                   title: 'User',
                   subtitle: 'View sensor data and alerts',
                   icon: Icons.person_outline,
-                  onTap: () => Navigator.pushNamed(context, '/login/user'),
+                  onTap: () => _openRole(
+                    loginRoute: '/login/user',
+                    bypassPage: const UserPage(),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 _RoleButton(
                   title: 'User Admin',
                   subtitle: 'Manage users and organizations',
                   icon: Icons.admin_panel_settings_outlined,
-                  onTap: () =>
-                      Navigator.pushNamed(context, '/login/user-admin'),
+                  onTap: () => _openRole(
+                    loginRoute: '/login/user-admin',
+                    bypassPage: const UserAdminPage(),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 _RoleButton(
                   title: 'Engineer',
                   subtitle: 'Configure devices and sensors',
                   icon: Icons.engineering_outlined,
-                  onTap: () => Navigator.pushNamed(context, '/login/engineer'),
+                  onTap: () => _openRole(
+                    loginRoute: '/login/engineer',
+                    bypassPage: const EngineerPage(),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 _RoleButton(
                   title: 'Vendor',
                   subtitle: 'Access vendor dashboard and settings',
                   icon: Icons.storefront_outlined,
-                  onTap: () => Navigator.pushNamed(context, '/login/vendor'),
+                  onTap: () => _openRole(
+                    loginRoute: '/login/vendor',
+                    bypassPage: const VendorPage(),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 _RoleButton(
                   title: 'Analytics',
                   subtitle: 'Access analytics dashboard and settings',
                   icon: Icons.insights_outlined,
-                  onTap: () => Navigator.pushNamed(context, '/login/analytics'),
+                  onTap: () => _openRole(
+                    loginRoute: '/login/analytics',
+                    bypassPage: const AnalyticsPage(),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 _RoleButton(
                   title: 'Super Admin',
                   subtitle: 'Full system access',
                   icon: Icons.security_outlined,
-                  onTap: () =>
-                      Navigator.pushNamed(context, '/login/super-admin'),
+                  onTap: () => _openRole(
+                    loginRoute: '/login/super-admin',
+                    bypassPage: const AdminScreen(),
+                  ),
                 ),
               ],
             ),

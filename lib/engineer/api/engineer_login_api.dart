@@ -1,4 +1,5 @@
 import '../../super_admin/core/api/auth_api.dart';
+import 'engineer_api_config.dart';
 
 class EngineerLoginApi {
   static Future<LoginResponse> login({
@@ -10,6 +11,9 @@ class EngineerLoginApi {
       password: password,
       role: 'vendor_engineer',
     );
-    return AuthApi.login(request);
+    return AuthApi.login(
+      request,
+      baseUrl: EngineerApiConfig.baseUrl,
+    );
   }
 }

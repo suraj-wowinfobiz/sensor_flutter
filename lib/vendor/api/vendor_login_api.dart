@@ -1,4 +1,5 @@
 import '../../super_admin/core/api/auth_api.dart';
+import 'vendor_api_config.dart';
 
 class VendorLoginApi {
   static Future<LoginResponse> login({
@@ -10,6 +11,9 @@ class VendorLoginApi {
       password: password,
       role: 'vendor',
     );
-    return AuthApi.login(request);
+    return AuthApi.login(
+      request,
+      baseUrl: VendorApiConfig.baseUrl,
+    );
   }
 }

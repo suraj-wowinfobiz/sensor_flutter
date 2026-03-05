@@ -2,9 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/api/admin_api_config.dart';
 
 class OrgServiceApi {
-  static const String baseUrl = 'http://195.250.21.120/api/v1/org';
+  static const String baseUrl = '${AdminApiConfig.apiV1Base}/org';
   static const String _tokenStorageKey = 'super_admin_auth_token';
   static const Duration _requestDeadline = Duration(seconds: 30);
 

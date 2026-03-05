@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/api/admin_api_config.dart';
 
 class AnalyticsSseService {
-  static const String baseUrl = 'http://103.211.202.145:8091';
   static const String _tokenStorageKey = 'super_admin_auth_token';
 
   final StreamController<dynamic> _controller =
@@ -36,7 +36,9 @@ class AnalyticsSseService {
 
     try {
       final request = http.Request(
-          'GET', Uri.parse('$baseUrl/api/v1/analytics/events/live'));
+        'GET',
+        Uri.parse('${AdminApiConfig.apiV1Base}/analytics/events/live'),
+      );
       request.headers['Accept'] = 'text/event-stream';
       request.headers['Cache-Control'] = 'no-cache';
       final prefs = await SharedPreferences.getInstance();

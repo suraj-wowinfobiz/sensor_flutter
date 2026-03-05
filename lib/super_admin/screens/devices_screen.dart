@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider;
+import 'dart:convert';
 
 import '../api/device_api.dart';
 import '../models/device.dart';
@@ -44,7 +45,18 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
   }
 
   Map<String, dynamic> _normalizeDeviceResponse(Map<String, dynamic> source) {
-    // API returns flat structure directly
+    final nested = source['data'];
+    if (nested is Map<String, dynamic>) return nested;
+    if (nested is Map) return nested.cast<String, dynamic>();
+    if (nested is String && nested.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(nested);
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is Map) return decoded.cast<String, dynamic>();
+      } catch (_) {
+        // Fallback to top-level payload.
+      }
+    }
     return source;
   }
 
@@ -381,8 +393,8 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () async {
-                                final backend =
-                                    provider.Provider.of<SuperAdminBackendProvider>(
+                                final backend = provider.Provider.of<
+                                    SuperAdminBackendProvider>(
                                   context,
                                   listen: false,
                                 );
@@ -421,10 +433,14 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                                   }
                                   return;
                                 }
-                                if (int.tryParse(channelsCountCtrl.text.trim()) ==
+                                if (int.tryParse(
+                                            channelsCountCtrl.text.trim()) ==
                                         null ||
-                                    double.tryParse(latitudeCtrl.text.trim()) == null ||
-                                    double.tryParse(longitudeCtrl.text.trim()) == null) {
+                                    double.tryParse(latitudeCtrl.text.trim()) ==
+                                        null ||
+                                    double.tryParse(
+                                            longitudeCtrl.text.trim()) ==
+                                        null) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
@@ -451,7 +467,8 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                                 try {
                                   if (editingId.isEmpty) {
                                     await backend.create('devices', {
-                                      'serial_number': serialNumberCtrl.text.trim(),
+                                      'serial_number':
+                                          serialNumberCtrl.text.trim(),
                                       'firmware_version':
                                           firmwareVersionCtrl.text.trim(),
                                       'organization_id': organizationId,
@@ -461,7 +478,8 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                                       'ip_address': ipUrlCtrl.text.trim(),
                                       'number_of_channels':
                                           channelsCountCtrl.text.trim(),
-                                      'web_hook_url': webhookUrlCtrl.text.trim(),
+                                      'web_hook_url':
+                                          webhookUrlCtrl.text.trim(),
                                       'lat': latitudeCtrl.text.trim(),
                                       'log': longitudeCtrl.text.trim(),
                                       'last_heart_beat':
@@ -473,17 +491,20 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                                       'devices',
                                       editingId,
                                       {
-                                        'serial_number': serialNumberCtrl.text.trim(),
+                                        'serial_number':
+                                            serialNumberCtrl.text.trim(),
                                         'firmware_version':
                                             firmwareVersionCtrl.text.trim(),
                                         'organization_id': organizationId,
                                         'site_id': siteId,
                                         'zone_id': zoneId,
-                                        'mac_address': macAddressCtrl.text.trim(),
+                                        'mac_address':
+                                            macAddressCtrl.text.trim(),
                                         'ip_address': ipUrlCtrl.text.trim(),
                                         'number_of_channels':
                                             channelsCountCtrl.text.trim(),
-                                        'web_hook_url': webhookUrlCtrl.text.trim(),
+                                        'web_hook_url':
+                                            webhookUrlCtrl.text.trim(),
                                         'lat': latitudeCtrl.text.trim(),
                                         'log': longitudeCtrl.text.trim(),
                                         'last_heart_beat':
@@ -726,17 +747,6 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
     return item.value ?? '';
   }
 
-  String _macFor(int index) {
-    return '00:1B:44:${(0x10 + index).toRadixString(16).padLeft(2, '0').toUpperCase()}:'
-        '${(0x22 + (index * 2)).toRadixString(16).padLeft(2, '0').toUpperCase()}:'
-        '${(0xA0 + index).toRadixString(16).padLeft(2, '0').toUpperCase()}';
-  }
-
-  String _serialFor(int index) =>
-      'SN202400${index + 1}${String.fromCharCode(65 + index)}';
-
-  String _ipFor(int index) => '192.168.1.${100 + index}';
-
   String _date(DateTime date) {
     final d = date.day.toString().padLeft(2, '0');
     final m = date.month.toString().padLeft(2, '0');
@@ -752,37 +762,30 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
         '';
     await db.update('devices', device.id, {
       'device_code': device.deviceCode,
-      'serial_number': device.deviceCode,
-      'firmware_version': '1.0.0',
+      'serial_number': device.serialNumber,
+      'firmware_version': device.firmwareVersion,
       'organization_id': organizationId,
       'site_id': device.siteId,
       'zone_id': device.zoneId,
-      'mac_address': '',
-      'ip_address': '',
-      'number_of_channels': '0',
-      'web_hook_url': '',
-      'lat': '0',
-      'log': '0',
+      'mac_address': device.macAddress,
+      'ip_address': device.ipAddress,
+      'number_of_channels': device.numberOfChannels.toString(),
+      'web_hook_url': device.webHookUrl,
+      'lat': device.lat.toString(),
+      'log': device.log.toString(),
       'last_heart_beat': DateTime.now().toUtc().toIso8601String(),
       'status': next,
     });
   }
 
-  bool _hasWebhook(int index) => index.isEven;
-
   bool _matchesFilters(SuperAdminBackendProvider db, Device device) {
-    final globalIndex = db.devices.indexOf(device);
-    final safeIndex = globalIndex < 0 ? 0 : globalIndex;
-    final serial = _serialFor(safeIndex).toLowerCase();
-    final mac = _macFor(safeIndex).toLowerCase();
-    final ip = _ipFor(safeIndex).toLowerCase();
     final query = _searchQuery.trim().toLowerCase();
 
     if (query.isNotEmpty) {
       final matchesQuery = device.deviceCode.toLowerCase().contains(query) ||
-          serial.contains(query) ||
-          mac.contains(query) ||
-          ip.contains(query);
+          device.serialNumber.toLowerCase().contains(query) ||
+          device.macAddress.toLowerCase().contains(query) ||
+          device.ipAddress.toLowerCase().contains(query);
       if (!matchesQuery) return false;
     }
 
@@ -791,7 +794,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
     }
 
     if (_webhookFilter != 'all') {
-      final hasWebhook = _hasWebhook(safeIndex);
+      final hasWebhook = device.webHookUrl.isNotEmpty;
       if (_webhookFilter == 'configured' && !hasWebhook) return false;
       if (_webhookFilter == 'not_configured' && hasWebhook) return false;
     }
@@ -1198,7 +1201,6 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
           ),
           itemBuilder: (context, index) {
             final device = devices[index];
-            final globalIndex = db.devices.indexOf(device);
             final siteName = db.sites
                 .where((s) => s.id == device.siteId)
                 .map((s) => s.name)
@@ -1207,18 +1209,21 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                 .where((z) => z.id == device.zoneId)
                 .map((z) => z.name)
                 .firstOrNull;
-            final channels =
-                db.sensors.where((s) => s.deviceId == device.id).length;
+            final channels = device.numberOfChannels > 0
+                ? device.numberOfChannels
+                : db.sensors.where((s) => s.deviceId == device.id).length;
             final location = siteName ?? 'Location not set';
 
             return _DeviceCard(
               title: device.deviceCode,
-              serial: _serialFor(globalIndex < 0 ? index : globalIndex),
+              serial: device.serialNumber,
               status: device.status,
-              mac: _macFor(globalIndex < 0 ? index : globalIndex),
-              ip: _ipFor(globalIndex < 0 ? index : globalIndex),
-              channels: channels == 0 ? 4 + index : channels,
-              lastSeen: _date(device.installedAt),
+              mac: device.macAddress,
+              ip: device.ipAddress,
+              channels: channels,
+              lastSeen: device.lastHeartBeat.isNotEmpty
+                  ? device.lastHeartBeat
+                  : _date(device.installedAt),
               location: location,
               zone: zoneName ?? 'Unknown',
               onEdit: () => _showDeviceModal(device: device),
@@ -1250,8 +1255,6 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final device = devices[index];
-        final globalIndex = db.devices.indexOf(device);
-        final safeIndex = globalIndex < 0 ? index : globalIndex;
         final siteName = db.sites
             .where((s) => s.id == device.siteId)
             .map((s) => s.name)
@@ -1260,14 +1263,18 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
             .where((z) => z.id == device.zoneId)
             .map((z) => z.name)
             .firstOrNull;
-        final channels =
-            db.sensors.where((s) => s.deviceId == device.id).length;
+        final channels = device.numberOfChannels > 0
+            ? device.numberOfChannels
+            : db.sensors.where((s) => s.deviceId == device.id).length;
         final location = siteName ?? 'Location not set';
         final statusColor = device.status == 'active'
             ? const Color(0xFF0ca15f)
             : const Color(0xFF8397a3);
+        final lastSeen = device.lastHeartBeat.isNotEmpty
+            ? device.lastHeartBeat
+            : _date(device.installedAt);
         final metaLine =
-            '${_macFor(safeIndex)} • ${_ipFor(safeIndex)} • ${channels == 0 ? 4 + index : channels} • ${_date(device.installedAt)} • $location • ${zoneName ?? 'Unknown'}';
+            '${device.macAddress} • ${device.ipAddress} • $channels • $lastSeen • $location • ${zoneName ?? 'Unknown'}';
 
         return Container(
           padding: const EdgeInsets.all(14),
@@ -1286,7 +1293,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${device.deviceCode} • ${_serialFor(safeIndex)}',
+                      '${device.deviceCode} • ${device.serialNumber}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

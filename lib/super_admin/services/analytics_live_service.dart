@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../core/api/admin_api_config.dart';
 
 class AnalyticsEvent {
   final String eventType;
@@ -33,7 +34,7 @@ class AnalyticsEvent {
 
 class AnalyticsLiveService {
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'http://103.211.202.145:8091',
+    baseUrl: AdminApiConfig.baseUrl,
     connectTimeout: const Duration(seconds: 5),
     receiveTimeout: const Duration(seconds: 5),
   ));
@@ -43,10 +44,11 @@ class AnalyticsLiveService {
       debugPrint('🔵 Fetching live analytics from API...');
       final response = await _dio.get('/api/v1/analytics/events/live');
       debugPrint('🟢 Response received: ${response.data}');
-      
+
       if (response.data is List) {
         final List<dynamic> data = response.data as List<dynamic>;
-        final events = data.map((json) => AnalyticsEvent.fromJson(json)).toList();
+        final events =
+            data.map((json) => AnalyticsEvent.fromJson(json)).toList();
         debugPrint('✅ Parsed ${events.length} events');
         return events;
       } else if (response.data is Map) {

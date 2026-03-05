@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../super_admin/api/users_api.dart';
 import '../models/user.dart';
 import '../providers/user_admin_database_provider.dart';
 
@@ -28,6 +29,17 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
   String _role = 'operator';
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final db = context.read<UserAdminDatabaseProvider>();
+      await db.loadOrganizations();
+      await db.loadUsers();
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -50,34 +62,13 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     final emailController = TextEditingController(text: _email);
     final roleController = TextEditingController(text: _role);
     final organizationController = TextEditingController();
+    final maxUsersAllowedController = TextEditingController(text: '20');
+    final passwordController = TextEditingController();
 
-    const templates = <Map<String, String>>[
-      {
-        'title': 'Full Organization Admin',
-        'name': 'New Org Admin',
-        'email': 'admin@example.com',
-        'role': 'admin',
-        'organization': 'Default Organization',
-      },
-      {
-        'title': 'Site Installation Engineer',
-        'name': 'New Site Engineer',
-        'email': 'engineer@example.com',
-        'role': 'engineer',
-        'organization': 'Field Operations',
-      },
-      {
-        'title': 'Monitoring Operator',
-        'name': 'New Monitoring User',
-        'email': 'operator@example.com',
-        'role': 'operator',
-        'organization': 'Monitoring Center',
-      },
-    ];
-    var useTemplateTab = user == null;
-    var selectedTemplate = 0;
     final parentContext = context;
     final db = parentContext.read<UserAdminDatabaseProvider>();
+    var selectedOrganizationId =
+        db.organizations.isNotEmpty ? db.organizations.first.id : '';
 
     String normalizeRole(String value) {
       final lower = value.trim().toLowerCase();
@@ -94,14 +85,45 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
           final isLight = theme.brightness == Brightness.light;
           final isDialogLight = theme.brightness == Brightness.light;
 
-          void saveUser() {
+          Future<void> saveUser() async {
             final name = nameController.text.trim();
             final email = emailController.text.trim();
             final role = normalizeRole(roleController.text);
+            final maxUsersAllowed =
+                int.tryParse(maxUsersAllowedController.text.trim());
+            final password = passwordController.text.trim();
 
             if (name.isEmpty || email.isEmpty) {
               ScaffoldMessenger.of(parentContext).showSnackBar(
                 const SnackBar(content: Text('Name and email are required')),
+              );
+              return;
+            }
+            if (db.organizations.isEmpty) {
+              ScaffoldMessenger.of(parentContext).showSnackBar(
+                const SnackBar(
+                    content: Text('Please create organization first')),
+              );
+              return;
+            }
+            if (selectedOrganizationId.isEmpty) {
+              ScaffoldMessenger.of(parentContext).showSnackBar(
+                const SnackBar(content: Text('Please select organization')),
+              );
+              return;
+            }
+            if (_editingId == null &&
+                (maxUsersAllowed == null || maxUsersAllowed <= 0)) {
+              ScaffoldMessenger.of(parentContext).showSnackBar(
+                const SnackBar(
+                    content:
+                        Text('Max users allowed must be a positive number')),
+              );
+              return;
+            }
+            if (_editingId == null && password.isEmpty) {
+              ScaffoldMessenger.of(parentContext).showSnackBar(
+                const SnackBar(content: Text('Password is required')),
               );
               return;
             }
@@ -110,14 +132,23 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
               'name': name,
               'email': email,
               'role': role,
+              'organization_id': selectedOrganizationId,
+              if (_editingId == null) 'password': password,
+              if (_editingId == null) 'maxUsersAllowed': maxUsersAllowed,
             };
-
-            if (_editingId == null) {
-              db.create('users', payload);
-            } else {
-              db.update('users', _editingId!, payload);
+            try {
+              if (_editingId == null) {
+                await db.create('users', payload);
+              } else {
+                await db.update('users', _editingId!, payload);
+              }
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+            } catch (e) {
+              if (!parentContext.mounted) return;
+              ScaffoldMessenger.of(parentContext).showSnackBar(
+                SnackBar(content: Text('Failed to save user: $e')),
+              );
             }
-            Navigator.pop(dialogContext);
           }
 
           return Dialog(
@@ -182,7 +213,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                       ),
                       Text(
                         user == null
-                            ? 'Choose a template (optional) or enter details manually'
+                            ? 'Enter details to create a user'
                             : 'Update user details and access role',
                         style: TextStyle(
                           fontSize: 15,
@@ -192,158 +223,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      if (user == null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            color: isLight
-                                ? const Color(0xFFE7EFF3)
-                                : const Color(0xFF243E52),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _tabOption(
-                                  active: useTemplateTab,
-                                  icon: Icons.auto_awesome_outlined,
-                                  label: 'Theme',
-                                  onTap: () =>
-                                      setState(() => useTemplateTab = true),
-                                ),
-                              ),
-                              Expanded(
-                                child: _tabOption(
-                                  active: !useTemplateTab,
-                                  icon: Icons.build_outlined,
-                                  label: 'Manual',
-                                  onTap: () =>
-                                      setState(() => useTemplateTab = false),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        if (useTemplateTab) ...[
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: isLight
-                                  ? const Color(0xFFE9F5FB)
-                                  : const Color(0xFF1F3648),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: isLight
-                                    ? const Color(0xFFB8D9EA)
-                                    : const Color(0xFF35566D),
-                              ),
-                            ),
-                            child: Text(
-                              'Select a theme template to prefill fields.',
-                              style: TextStyle(
-                                color: isLight
-                                    ? const Color(0xFF2B5368)
-                                    : const Color(0xFFBBD0E0),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              final compact = constraints.maxWidth < 620;
-                              return Wrap(
-                                spacing: 10,
-                                runSpacing: 10,
-                                children: List.generate(templates.length, (i) {
-                                  final template = templates[i];
-                                  final active = i == selectedTemplate;
-                                  return InkWell(
-                                    onTap: () {
-                                      setState(() {
-                                        selectedTemplate = i;
-                                        nameController.text = template['name']!;
-                                        emailController.text =
-                                            template['email']!;
-                                        roleController.text = template['role']!;
-                                        organizationController.text =
-                                            template['organization']!;
-                                        useTemplateTab = false;
-                                      });
-                                    },
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: Container(
-                                      width: compact
-                                          ? constraints.maxWidth
-                                          : (constraints.maxWidth - 10) / 2,
-                                      padding: const EdgeInsets.all(14),
-                                      decoration: BoxDecoration(
-                                        gradient: active
-                                            ? LinearGradient(
-                                                colors: [
-                                                  isLight
-                                                      ? const Color(0xFFEAF5FC)
-                                                      : const Color(0xFF26475F),
-                                                  isLight
-                                                      ? const Color(0xFFF2F8FC)
-                                                      : const Color(0xFF1F3A4E),
-                                                ],
-                                              )
-                                            : null,
-                                        color: active
-                                            ? null
-                                            : (isLight
-                                                ? const Color(0xFFF7FBFD)
-                                                : const Color(0xFF20384B)),
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(
-                                          color: active
-                                              ? (isLight
-                                                  ? const Color(0xFF88BFD9)
-                                                  : const Color(0xFF4A7594))
-                                              : (isLight
-                                                  ? const Color(0xFFD7E5EC)
-                                                  : const Color(0xFF35566D)),
-                                        ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            template['title']!,
-                                            style: TextStyle(
-                                              fontSize: 17,
-                                              fontWeight: FontWeight.w800,
-                                              color: isLight
-                                                  ? const Color(0xFF152A36)
-                                                  : const Color(0xFFE2EDF8),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'Prefill: ${template['role']}',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: isLight
-                                                  ? const Color(0xFF4E6775)
-                                                  : const Color(0xFFBBD0E0),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                }),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 14),
-                        ],
-                      ],
-                      if (!useTemplateTab || user != null) ...[
+                      ...[
                         const SizedBox(height: 2),
                         Text(
                           'Full Name',
@@ -407,16 +287,24 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                         ),
                         const SizedBox(height: 6),
                         _inputBox(
-                          child: TextField(
-                            controller: roleController,
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding:
-                                  EdgeInsets.symmetric(vertical: 12),
-                              hintText: 'operator / engineer / admin',
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: normalizeRole(roleController.text),
+                              isExpanded: true,
+                              items: const [
+                                DropdownMenuItem(
+                                    value: 'admin', child: Text('Admin')),
+                                DropdownMenuItem(
+                                    value: 'engineer', child: Text('Engineer')),
+                                DropdownMenuItem(
+                                    value: 'operator', child: Text('Operator')),
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  roleController.text = value;
+                                }
+                              },
                             ),
-                            textAlignVertical: TextAlignVertical.center,
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -432,18 +320,86 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                         ),
                         const SizedBox(height: 6),
                         _inputBox(
-                          child: TextField(
-                            controller: organizationController,
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding:
-                                  EdgeInsets.symmetric(vertical: 12),
-                              hintText: 'Organization name',
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: db.organizations.any(
+                                (o) => o.id == selectedOrganizationId,
+                              )
+                                  ? selectedOrganizationId
+                                  : null,
+                              isExpanded: true,
+                              hint: const Text('Select organization'),
+                              items: db.organizations
+                                  .map((org) => DropdownMenuItem<String>(
+                                        value: org.id,
+                                        child: Text(org.name),
+                                      ))
+                                  .toList(),
+                              onChanged: (value) {
+                                if (value != null) {
+                                  selectedOrganizationId = value;
+                                  final org = db.organizations
+                                      .firstWhere((o) => o.id == value);
+                                  organizationController.text = org.name;
+                                }
+                              },
                             ),
-                            textAlignVertical: TextAlignVertical.center,
                           ),
                         ),
+                        if (_editingId == null) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            'Password',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isLight
+                                  ? const Color(0xFF1B313D)
+                                  : const Color(0xFFE2EDF8),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          _inputBox(
+                            child: TextField(
+                              controller: passwordController,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding:
+                                    EdgeInsets.symmetric(vertical: 12),
+                                hintText: 'Enter password',
+                              ),
+                              textAlignVertical: TextAlignVertical.center,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Max users allowed',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isLight
+                                  ? const Color(0xFF1B313D)
+                                  : const Color(0xFFE2EDF8),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          _inputBox(
+                            child: TextField(
+                              controller: maxUsersAllowedController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding:
+                                    EdgeInsets.symmetric(vertical: 12),
+                                hintText: '20',
+                              ),
+                              textAlignVertical: TextAlignVertical.center,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 14),
                         _dialogActions(
                           dialogContext: dialogContext,
@@ -464,52 +420,8 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     emailController.dispose();
     roleController.dispose();
     organizationController.dispose();
-  }
-
-  Widget _tabOption({
-    required bool active,
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: active
-              ? (isLight ? Colors.white : const Color(0xFF2B4659))
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: active ? Theme.of(context).dividerColor : Colors.transparent,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color:
-                  isLight ? const Color(0xFF203845) : const Color(0xFFD7E8F6),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color:
-                    isLight ? const Color(0xFF203845) : const Color(0xFFD7E8F6),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    maxUsersAllowedController.dispose();
+    passwordController.dispose();
   }
 
   Widget _dialogActions({
@@ -658,6 +570,80 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     };
   }
 
+  String _principalTypeForRole(String role) {
+    final normalized = role.trim().toLowerCase();
+    if (normalized == 'vendor') return 'VENDOR';
+    if (normalized == 'vendor_engineer') return 'VENDOR_ENGINEER';
+    if (normalized == 'super_admin') return 'SUPER_ADMIN';
+    return 'ADMIN';
+  }
+
+  Set<String> _assignmentKeysFromSelection({
+    required Set<String> siteIds,
+    required Set<String> zoneIds,
+  }) {
+    final assignmentKeys = <String>{};
+    for (final siteId in siteIds) {
+      final normalizedSiteId = siteId.trim();
+      if (normalizedSiteId.isNotEmpty) {
+        assignmentKeys.add('site|$normalizedSiteId');
+      }
+    }
+    for (final zoneId in zoneIds) {
+      final normalizedZoneId = zoneId.trim();
+      if (normalizedZoneId.isNotEmpty) {
+        assignmentKeys.add('zone|$normalizedZoneId');
+      }
+    }
+    return assignmentKeys;
+  }
+
+  Map<String, String> _parseAssignmentKey(String key) {
+    final parts = key.split('|');
+    return {
+      'type': parts.isNotEmpty ? parts.first : '',
+      'id': parts.length > 1 ? parts[1] : '',
+    };
+  }
+
+  Future<void> _syncAccessAssignments({
+    required String principalType,
+    required String principalId,
+    required Set<String> beforeKeys,
+    required Set<String> afterKeys,
+  }) async {
+    final keysToAssign = afterKeys.difference(beforeKeys);
+    final keysToRevoke = beforeKeys.difference(afterKeys);
+
+    if (keysToAssign.isNotEmpty) {
+      await Future.wait(
+        keysToAssign.map((key) {
+          final item = _parseAssignmentKey(key);
+          return UsersApi.assignAccess(
+            principalType: principalType,
+            principalId: principalId,
+            siteId: item['type'] == 'site' ? item['id'] : null,
+            zoneId: item['type'] == 'zone' ? item['id'] : null,
+          );
+        }),
+      );
+    }
+
+    if (keysToRevoke.isNotEmpty) {
+      await Future.wait(
+        keysToRevoke.map((key) {
+          final item = _parseAssignmentKey(key);
+          return UsersApi.revokeAccess(
+            principalType: principalType,
+            principalId: principalId,
+            siteId: item['type'] == 'site' ? item['id'] : null,
+            zoneId: item['type'] == 'zone' ? item['id'] : null,
+          );
+        }),
+      );
+    }
+  }
+
   void _showAccessDialog(
       BuildContext context, User user, UserAdminDatabaseProvider db) {
     final defaultAccess = _defaultAccessForUser(user, db);
@@ -698,6 +684,47 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
               .toList();
           final screenSize = MediaQuery.sizeOf(context);
           final dialogWidth = (screenSize.width * 0.92).clamp(320.0, 560.0);
+          final principalType = _principalTypeForRole(user.role);
+
+          Future<void> syncAfterSelectionChange({
+            required Set<String> previousOrganizationIds,
+            required Set<String> previousSiteIds,
+            required Set<String> previousZoneIds,
+          }) async {
+            final beforeKeys = _assignmentKeysFromSelection(
+              siteIds: previousSiteIds,
+              zoneIds: previousZoneIds,
+            );
+            final afterKeys = _assignmentKeysFromSelection(
+              siteIds: siteIds,
+              zoneIds: zoneIds,
+            );
+            try {
+              await _syncAccessAssignments(
+                principalType: principalType,
+                principalId: user.id,
+                beforeKeys: beforeKeys,
+                afterKeys: afterKeys,
+              );
+              if (!context.mounted) return;
+              setState(() {
+                _userOrganizationAccess[user.id] =
+                    Set<String>.from(organizationIds);
+                _userSiteAccess[user.id] = Set<String>.from(siteIds);
+                _userZoneAccess[user.id] = Set<String>.from(zoneIds);
+              });
+            } catch (e) {
+              if (!context.mounted) return;
+              setDialogState(() {
+                organizationIds = Set<String>.from(previousOrganizationIds);
+                siteIds = Set<String>.from(previousSiteIds);
+                zoneIds = Set<String>.from(previousZoneIds);
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to update access: $e')),
+              );
+            }
+          }
 
           return AlertDialog(
             backgroundColor: isLight
@@ -763,24 +790,35 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                             .toList(),
                         selected: organizationIds,
                         selectedLabels: organizations,
-                        onToggle: (id) => setDialogState(() {
-                          if (organizationIds.contains(id)) {
-                            organizationIds.remove(id);
-                          } else {
-                            organizationIds.add(id);
-                          }
-                          siteIds = siteIds
-                              .where((s) => db.sites.any((site) =>
-                                  site.id == s &&
-                                  organizationIds
-                                      .contains(site.organizationId)))
-                              .toSet();
-                          zoneIds = zoneIds
-                              .where((z) => db.zones.any((zone) =>
-                                  zone.id == z &&
-                                  siteIds.contains(zone.siteId)))
-                              .toSet();
-                        }),
+                        onToggle: (id) async {
+                          final previousOrganizationIds =
+                              Set<String>.from(organizationIds);
+                          final previousSiteIds = Set<String>.from(siteIds);
+                          final previousZoneIds = Set<String>.from(zoneIds);
+                          setDialogState(() {
+                            if (organizationIds.contains(id)) {
+                              organizationIds.remove(id);
+                            } else {
+                              organizationIds.add(id);
+                            }
+                            siteIds = siteIds
+                                .where((s) => db.sites.any((site) =>
+                                    site.id == s &&
+                                    organizationIds
+                                        .contains(site.organizationId)))
+                                .toSet();
+                            zoneIds = zoneIds
+                                .where((z) => db.zones.any((zone) =>
+                                    zone.id == z &&
+                                    siteIds.contains(zone.siteId)))
+                                .toSet();
+                          });
+                          await syncAfterSelectionChange(
+                            previousOrganizationIds: previousOrganizationIds,
+                            previousSiteIds: previousSiteIds,
+                            previousZoneIds: previousZoneIds,
+                          );
+                        },
                         onViewAll: () async {
                           final next = await _showAccessSelectorDialog(
                             context: context,
@@ -791,6 +829,10 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                             selected: organizationIds,
                           );
                           if (next == null || !context.mounted) return;
+                          final previousOrganizationIds =
+                              Set<String>.from(organizationIds);
+                          final previousSiteIds = Set<String>.from(siteIds);
+                          final previousZoneIds = Set<String>.from(zoneIds);
                           setDialogState(() {
                             organizationIds = next;
                             siteIds = siteIds
@@ -805,6 +847,11 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                                     siteIds.contains(zone.siteId)))
                                 .toSet();
                           });
+                          await syncAfterSelectionChange(
+                            previousOrganizationIds: previousOrganizationIds,
+                            previousSiteIds: previousSiteIds,
+                            previousZoneIds: previousZoneIds,
+                          );
                         },
                       ),
                       const SizedBox(height: 10),
@@ -816,18 +863,29 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                             .toList(),
                         selected: siteIds,
                         selectedLabels: sites,
-                        onToggle: (id) => setDialogState(() {
-                          if (siteIds.contains(id)) {
-                            siteIds.remove(id);
-                          } else {
-                            siteIds.add(id);
-                          }
-                          zoneIds = zoneIds
-                              .where((z) => db.zones.any((zone) =>
-                                  zone.id == z &&
-                                  siteIds.contains(zone.siteId)))
-                              .toSet();
-                        }),
+                        onToggle: (id) async {
+                          final previousOrganizationIds =
+                              Set<String>.from(organizationIds);
+                          final previousSiteIds = Set<String>.from(siteIds);
+                          final previousZoneIds = Set<String>.from(zoneIds);
+                          setDialogState(() {
+                            if (siteIds.contains(id)) {
+                              siteIds.remove(id);
+                            } else {
+                              siteIds.add(id);
+                            }
+                            zoneIds = zoneIds
+                                .where((z) => db.zones.any((zone) =>
+                                    zone.id == z &&
+                                    siteIds.contains(zone.siteId)))
+                                .toSet();
+                          });
+                          await syncAfterSelectionChange(
+                            previousOrganizationIds: previousOrganizationIds,
+                            previousSiteIds: previousSiteIds,
+                            previousZoneIds: previousZoneIds,
+                          );
+                        },
                         onViewAll: () async {
                           final next = await _showAccessSelectorDialog(
                             context: context,
@@ -838,6 +896,10 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                             selected: siteIds,
                           );
                           if (next == null || !context.mounted) return;
+                          final previousOrganizationIds =
+                              Set<String>.from(organizationIds);
+                          final previousSiteIds = Set<String>.from(siteIds);
+                          final previousZoneIds = Set<String>.from(zoneIds);
                           setDialogState(() {
                             siteIds = next;
                             zoneIds = zoneIds
@@ -846,6 +908,11 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                                     siteIds.contains(zone.siteId)))
                                 .toSet();
                           });
+                          await syncAfterSelectionChange(
+                            previousOrganizationIds: previousOrganizationIds,
+                            previousSiteIds: previousSiteIds,
+                            previousZoneIds: previousZoneIds,
+                          );
                         },
                       ),
                       const SizedBox(height: 10),
@@ -857,13 +924,24 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                             .toList(),
                         selected: zoneIds,
                         selectedLabels: zones,
-                        onToggle: (id) => setDialogState(() {
-                          if (zoneIds.contains(id)) {
-                            zoneIds.remove(id);
-                          } else {
-                            zoneIds.add(id);
-                          }
-                        }),
+                        onToggle: (id) async {
+                          final previousOrganizationIds =
+                              Set<String>.from(organizationIds);
+                          final previousSiteIds = Set<String>.from(siteIds);
+                          final previousZoneIds = Set<String>.from(zoneIds);
+                          setDialogState(() {
+                            if (zoneIds.contains(id)) {
+                              zoneIds.remove(id);
+                            } else {
+                              zoneIds.add(id);
+                            }
+                          });
+                          await syncAfterSelectionChange(
+                            previousOrganizationIds: previousOrganizationIds,
+                            previousSiteIds: previousSiteIds,
+                            previousZoneIds: previousZoneIds,
+                          );
+                        },
                         onViewAll: () async {
                           final next = await _showAccessSelectorDialog(
                             context: context,
@@ -874,9 +952,18 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                             selected: zoneIds,
                           );
                           if (next == null || !context.mounted) return;
+                          final previousOrganizationIds =
+                              Set<String>.from(organizationIds);
+                          final previousSiteIds = Set<String>.from(siteIds);
+                          final previousZoneIds = Set<String>.from(zoneIds);
                           setDialogState(() {
                             zoneIds = next;
                           });
+                          await syncAfterSelectionChange(
+                            previousOrganizationIds: previousOrganizationIds,
+                            previousSiteIds: previousSiteIds,
+                            previousZoneIds: previousZoneIds,
+                          );
                         },
                       ),
                     ],
@@ -885,19 +972,6 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
               ),
             ),
             actions: [
-              if (editMode)
-                FilledButton(
-                  onPressed: () {
-                    setState(() {
-                      _userOrganizationAccess[user.id] =
-                          Set<String>.from(organizationIds);
-                      _userSiteAccess[user.id] = Set<String>.from(siteIds);
-                      _userZoneAccess[user.id] = Set<String>.from(zoneIds);
-                    });
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Save Access'),
-                ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text('Close'),
@@ -1667,7 +1741,18 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                             _iconAction(
                               icon: Icons.delete_outline,
                               iconColor: Colors.red,
-                              onTap: () => db.delete('users', user.id),
+                              onTap: () async {
+                                try {
+                                  await db.delete('users', user.id);
+                                } catch (e) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                        content:
+                                            Text('Failed to delete user: $e')),
+                                  );
+                                }
+                              },
                             ),
                           ],
                         ),
@@ -1896,7 +1981,17 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                     _iconAction(
                       icon: Icons.delete_outline,
                       iconColor: Colors.red,
-                      onTap: () => db.delete('users', user.id),
+                      onTap: () async {
+                        try {
+                          await db.delete('users', user.id);
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text('Failed to delete user: $e')),
+                          );
+                        }
+                      },
                     ),
                   ],
                 ),

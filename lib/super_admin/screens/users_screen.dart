@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../api/users_api.dart';
 import '../models/user.dart';
 import '../providers/super_admin_backend_provider.dart';
 
@@ -61,6 +62,8 @@ class _UsersScreenState extends State<UsersScreen> {
     final emailController = TextEditingController(text: _email);
     final roleController = TextEditingController(text: _role);
     final organizationController = TextEditingController();
+    final maxUsersAllowedController = TextEditingController(text: '20');
+    final passwordController = TextEditingController();
 
     const templates = <Map<String, String>>[
       {
@@ -82,6 +85,8 @@ class _UsersScreenState extends State<UsersScreen> {
     var selectedTemplate = 0;
     final parentContext = context;
     final db = parentContext.read<SuperAdminBackendProvider>();
+    var selectedOrganizationId =
+        db.organizations.isNotEmpty ? db.organizations.first.id : '';
 
     String normalizeRole(String value) {
       final lower = value.trim().toLowerCase();
@@ -101,7 +106,9 @@ class _UsersScreenState extends State<UsersScreen> {
             final name = nameController.text.trim();
             final email = emailController.text.trim();
             final role = normalizeRole(roleController.text);
-            final organizationName = organizationController.text.trim();
+            final maxUsersAllowed =
+                int.tryParse(maxUsersAllowedController.text.trim());
+            final password = passwordController.text.trim();
 
             if (name.isEmpty || email.isEmpty) {
               ScaffoldMessenger.of(parentContext).showSnackBar(
@@ -111,21 +118,40 @@ class _UsersScreenState extends State<UsersScreen> {
             }
             if (db.organizations.isEmpty) {
               ScaffoldMessenger.of(parentContext).showSnackBar(
-                const SnackBar(content: Text('Please create organization first')),
+                const SnackBar(
+                    content: Text('Please create organization first')),
               );
               return;
             }
-            final selectedOrg = db.organizations.firstWhere(
-              (o) => o.name.toLowerCase() == organizationName.toLowerCase(),
-              orElse: () => db.organizations.first,
-            );
+            if (selectedOrganizationId.isEmpty) {
+              ScaffoldMessenger.of(parentContext).showSnackBar(
+                const SnackBar(content: Text('Please select organization')),
+              );
+              return;
+            }
+            if (_editingId == null &&
+                (maxUsersAllowed == null || maxUsersAllowed <= 0)) {
+              ScaffoldMessenger.of(parentContext).showSnackBar(
+                const SnackBar(
+                    content:
+                        Text('Max users allowed must be a positive number')),
+              );
+              return;
+            }
+            if (_editingId == null && password.isEmpty) {
+              ScaffoldMessenger.of(parentContext).showSnackBar(
+                const SnackBar(content: Text('Password is required')),
+              );
+              return;
+            }
 
             final payload = {
               'name': name,
               'email': email,
               'role': role,
-              'organization_id': selectedOrg.id,
-              'password': 'Temp@12345',
+              'organization_id': selectedOrganizationId,
+              if (_editingId == null) 'password': password,
+              if (_editingId == null) 'maxUsersAllowed': maxUsersAllowed,
             };
             try {
               if (_editingId == null) {
@@ -293,6 +319,19 @@ class _UsersScreenState extends State<UsersScreen> {
                                         roleController.text = template['role']!;
                                         organizationController.text =
                                             template['organization']!;
+                                        if (db.organizations.isNotEmpty) {
+                                          selectedOrganizationId = db
+                                              .organizations
+                                              .firstWhere(
+                                                (o) =>
+                                                    o.name.toLowerCase() ==
+                                                    template['organization']!
+                                                        .toLowerCase(),
+                                                orElse: () =>
+                                                    db.organizations.first,
+                                              )
+                                              .id;
+                                        }
                                         useTemplateTab = false;
                                       });
                                     },
@@ -436,8 +475,7 @@ class _UsersScreenState extends State<UsersScreen> {
                               isExpanded: true,
                               items: const [
                                 DropdownMenuItem(
-                                    value: 'admin',
-                                    child: Text('User Admin')),
+                                    value: 'admin', child: Text('User Admin')),
                                 DropdownMenuItem(
                                     value: 'vendor', child: Text('Vendor')),
                               ],
@@ -464,19 +502,11 @@ class _UsersScreenState extends State<UsersScreen> {
                         _inputBox(
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
-                              value: db.organizations.isEmpty
-                                  ? null
-                                  : (db.organizations.any((o) =>
-                                          o.name.toLowerCase() ==
-                                          organizationController.text
-                                              .toLowerCase())
-                                      ? db.organizations
-                                          .firstWhere((o) =>
-                                              o.name.toLowerCase() ==
-                                              organizationController.text
-                                                  .toLowerCase())
-                                          .id
-                                      : db.organizations.first.id),
+                              value: db.organizations.any(
+                                (o) => o.id == selectedOrganizationId,
+                              )
+                                  ? selectedOrganizationId
+                                  : null,
                               isExpanded: true,
                               hint: const Text('Select organization'),
                               items: db.organizations
@@ -487,6 +517,7 @@ class _UsersScreenState extends State<UsersScreen> {
                                   .toList(),
                               onChanged: (value) {
                                 if (value != null) {
+                                  selectedOrganizationId = value;
                                   final org = db.organizations
                                       .firstWhere((o) => o.id == value);
                                   organizationController.text = org.name;
@@ -495,6 +526,60 @@ class _UsersScreenState extends State<UsersScreen> {
                             ),
                           ),
                         ),
+                        if (_editingId == null) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            'Password',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isLight
+                                  ? const Color(0xFF1B313D)
+                                  : const Color(0xFFE2EDF8),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          _inputBox(
+                            child: TextField(
+                              controller: passwordController,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding:
+                                    EdgeInsets.symmetric(vertical: 12),
+                                hintText: 'Enter password',
+                              ),
+                              textAlignVertical: TextAlignVertical.center,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Max users allowed',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isLight
+                                  ? const Color(0xFF1B313D)
+                                  : const Color(0xFFE2EDF8),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          _inputBox(
+                            child: TextField(
+                              controller: maxUsersAllowedController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding:
+                                    EdgeInsets.symmetric(vertical: 12),
+                                hintText: '20',
+                              ),
+                              textAlignVertical: TextAlignVertical.center,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 14),
                         _dialogActions(
                           dialogContext: dialogContext,
@@ -510,7 +595,6 @@ class _UsersScreenState extends State<UsersScreen> {
         },
       ),
     );
-
   }
 
   Widget _tabOption({
@@ -705,7 +789,82 @@ class _UsersScreenState extends State<UsersScreen> {
     };
   }
 
-  void _showAccessDialog(BuildContext context, User user, SuperAdminBackendProvider db) {
+  String _principalTypeForRole(String role) {
+    final normalized = role.trim().toLowerCase();
+    if (normalized == 'vendor') return 'VENDOR';
+    if (normalized == 'vendor_engineer') return 'VENDOR_ENGINEER';
+    if (normalized == 'super_admin') return 'SUPER_ADMIN';
+    return 'ADMIN';
+  }
+
+  Set<String> _assignmentKeysFromSelection({
+    required Set<String> siteIds,
+    required Set<String> zoneIds,
+  }) {
+    final assignmentKeys = <String>{};
+    for (final siteId in siteIds) {
+      final normalizedSiteId = siteId.trim();
+      if (normalizedSiteId.isNotEmpty) {
+        assignmentKeys.add('site|$normalizedSiteId');
+      }
+    }
+    for (final zoneId in zoneIds) {
+      final normalizedZoneId = zoneId.trim();
+      if (normalizedZoneId.isNotEmpty) {
+        assignmentKeys.add('zone|$normalizedZoneId');
+      }
+    }
+    return assignmentKeys;
+  }
+
+  Map<String, String> _parseAssignmentKey(String key) {
+    final parts = key.split('|');
+    return {
+      'type': parts.isNotEmpty ? parts.first : '',
+      'id': parts.length > 1 ? parts[1] : '',
+    };
+  }
+
+  Future<void> _syncAccessAssignments({
+    required String principalType,
+    required String principalId,
+    required Set<String> beforeKeys,
+    required Set<String> afterKeys,
+  }) async {
+    final keysToAssign = afterKeys.difference(beforeKeys);
+    final keysToRevoke = beforeKeys.difference(afterKeys);
+
+    if (keysToAssign.isNotEmpty) {
+      await Future.wait(
+        keysToAssign.map((key) {
+          final item = _parseAssignmentKey(key);
+          return UsersApi.assignAccess(
+            principalType: principalType,
+            principalId: principalId,
+            siteId: item['type'] == 'site' ? item['id'] : null,
+            zoneId: item['type'] == 'zone' ? item['id'] : null,
+          );
+        }),
+      );
+    }
+
+    if (keysToRevoke.isNotEmpty) {
+      await Future.wait(
+        keysToRevoke.map((key) {
+          final item = _parseAssignmentKey(key);
+          return UsersApi.revokeAccess(
+            principalType: principalType,
+            principalId: principalId,
+            siteId: item['type'] == 'site' ? item['id'] : null,
+            zoneId: item['type'] == 'zone' ? item['id'] : null,
+          );
+        }),
+      );
+    }
+  }
+
+  void _showAccessDialog(
+      BuildContext context, User user, SuperAdminBackendProvider db) {
     final defaultAccess = _defaultAccessForUser(user, db);
     final defaultOrganizations = defaultAccess['organizations'] ?? <String>{};
     final defaultSites = defaultAccess['sites'] ?? <String>{};
@@ -744,6 +903,47 @@ class _UsersScreenState extends State<UsersScreen> {
               .toList();
           final screenSize = MediaQuery.sizeOf(context);
           final dialogWidth = (screenSize.width * 0.92).clamp(320.0, 560.0);
+          final principalType = _principalTypeForRole(user.role);
+
+          Future<void> syncAfterSelectionChange({
+            required Set<String> previousOrganizationIds,
+            required Set<String> previousSiteIds,
+            required Set<String> previousZoneIds,
+          }) async {
+            final beforeKeys = _assignmentKeysFromSelection(
+              siteIds: previousSiteIds,
+              zoneIds: previousZoneIds,
+            );
+            final afterKeys = _assignmentKeysFromSelection(
+              siteIds: siteIds,
+              zoneIds: zoneIds,
+            );
+            try {
+              await _syncAccessAssignments(
+                principalType: principalType,
+                principalId: user.id,
+                beforeKeys: beforeKeys,
+                afterKeys: afterKeys,
+              );
+              if (!context.mounted) return;
+              setState(() {
+                _userOrganizationAccess[user.id] =
+                    Set<String>.from(organizationIds);
+                _userSiteAccess[user.id] = Set<String>.from(siteIds);
+                _userZoneAccess[user.id] = Set<String>.from(zoneIds);
+              });
+            } catch (e) {
+              if (!context.mounted) return;
+              setDialogState(() {
+                organizationIds = Set<String>.from(previousOrganizationIds);
+                siteIds = Set<String>.from(previousSiteIds);
+                zoneIds = Set<String>.from(previousZoneIds);
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to update access: $e')),
+              );
+            }
+          }
 
           return AlertDialog(
             backgroundColor: isLight
@@ -809,24 +1009,35 @@ class _UsersScreenState extends State<UsersScreen> {
                             .toList(),
                         selected: organizationIds,
                         selectedLabels: organizations,
-                        onToggle: (id) => setDialogState(() {
-                          if (organizationIds.contains(id)) {
-                            organizationIds.remove(id);
-                          } else {
-                            organizationIds.add(id);
-                          }
-                          siteIds = siteIds
-                              .where((s) => db.sites.any((site) =>
-                                  site.id == s &&
-                                  organizationIds
-                                      .contains(site.organizationId)))
-                              .toSet();
-                          zoneIds = zoneIds
-                              .where((z) => db.zones.any((zone) =>
-                                  zone.id == z &&
-                                  siteIds.contains(zone.siteId)))
-                              .toSet();
-                        }),
+                        onToggle: (id) async {
+                          final previousOrganizationIds =
+                              Set<String>.from(organizationIds);
+                          final previousSiteIds = Set<String>.from(siteIds);
+                          final previousZoneIds = Set<String>.from(zoneIds);
+                          setDialogState(() {
+                            if (organizationIds.contains(id)) {
+                              organizationIds.remove(id);
+                            } else {
+                              organizationIds.add(id);
+                            }
+                            siteIds = siteIds
+                                .where((s) => db.sites.any((site) =>
+                                    site.id == s &&
+                                    organizationIds
+                                        .contains(site.organizationId)))
+                                .toSet();
+                            zoneIds = zoneIds
+                                .where((z) => db.zones.any((zone) =>
+                                    zone.id == z &&
+                                    siteIds.contains(zone.siteId)))
+                                .toSet();
+                          });
+                          await syncAfterSelectionChange(
+                            previousOrganizationIds: previousOrganizationIds,
+                            previousSiteIds: previousSiteIds,
+                            previousZoneIds: previousZoneIds,
+                          );
+                        },
                         onViewAll: () async {
                           final next = await _showAccessSelectorDialog(
                             context: context,
@@ -837,6 +1048,10 @@ class _UsersScreenState extends State<UsersScreen> {
                             selected: organizationIds,
                           );
                           if (next == null || !context.mounted) return;
+                          final previousOrganizationIds =
+                              Set<String>.from(organizationIds);
+                          final previousSiteIds = Set<String>.from(siteIds);
+                          final previousZoneIds = Set<String>.from(zoneIds);
                           setDialogState(() {
                             organizationIds = next;
                             siteIds = siteIds
@@ -851,6 +1066,11 @@ class _UsersScreenState extends State<UsersScreen> {
                                     siteIds.contains(zone.siteId)))
                                 .toSet();
                           });
+                          await syncAfterSelectionChange(
+                            previousOrganizationIds: previousOrganizationIds,
+                            previousSiteIds: previousSiteIds,
+                            previousZoneIds: previousZoneIds,
+                          );
                         },
                       ),
                       const SizedBox(height: 10),
@@ -862,18 +1082,29 @@ class _UsersScreenState extends State<UsersScreen> {
                             .toList(),
                         selected: siteIds,
                         selectedLabels: sites,
-                        onToggle: (id) => setDialogState(() {
-                          if (siteIds.contains(id)) {
-                            siteIds.remove(id);
-                          } else {
-                            siteIds.add(id);
-                          }
-                          zoneIds = zoneIds
-                              .where((z) => db.zones.any((zone) =>
-                                  zone.id == z &&
-                                  siteIds.contains(zone.siteId)))
-                              .toSet();
-                        }),
+                        onToggle: (id) async {
+                          final previousOrganizationIds =
+                              Set<String>.from(organizationIds);
+                          final previousSiteIds = Set<String>.from(siteIds);
+                          final previousZoneIds = Set<String>.from(zoneIds);
+                          setDialogState(() {
+                            if (siteIds.contains(id)) {
+                              siteIds.remove(id);
+                            } else {
+                              siteIds.add(id);
+                            }
+                            zoneIds = zoneIds
+                                .where((z) => db.zones.any((zone) =>
+                                    zone.id == z &&
+                                    siteIds.contains(zone.siteId)))
+                                .toSet();
+                          });
+                          await syncAfterSelectionChange(
+                            previousOrganizationIds: previousOrganizationIds,
+                            previousSiteIds: previousSiteIds,
+                            previousZoneIds: previousZoneIds,
+                          );
+                        },
                         onViewAll: () async {
                           final next = await _showAccessSelectorDialog(
                             context: context,
@@ -884,6 +1115,10 @@ class _UsersScreenState extends State<UsersScreen> {
                             selected: siteIds,
                           );
                           if (next == null || !context.mounted) return;
+                          final previousOrganizationIds =
+                              Set<String>.from(organizationIds);
+                          final previousSiteIds = Set<String>.from(siteIds);
+                          final previousZoneIds = Set<String>.from(zoneIds);
                           setDialogState(() {
                             siteIds = next;
                             zoneIds = zoneIds
@@ -892,6 +1127,11 @@ class _UsersScreenState extends State<UsersScreen> {
                                     siteIds.contains(zone.siteId)))
                                 .toSet();
                           });
+                          await syncAfterSelectionChange(
+                            previousOrganizationIds: previousOrganizationIds,
+                            previousSiteIds: previousSiteIds,
+                            previousZoneIds: previousZoneIds,
+                          );
                         },
                       ),
                       const SizedBox(height: 10),
@@ -903,13 +1143,24 @@ class _UsersScreenState extends State<UsersScreen> {
                             .toList(),
                         selected: zoneIds,
                         selectedLabels: zones,
-                        onToggle: (id) => setDialogState(() {
-                          if (zoneIds.contains(id)) {
-                            zoneIds.remove(id);
-                          } else {
-                            zoneIds.add(id);
-                          }
-                        }),
+                        onToggle: (id) async {
+                          final previousOrganizationIds =
+                              Set<String>.from(organizationIds);
+                          final previousSiteIds = Set<String>.from(siteIds);
+                          final previousZoneIds = Set<String>.from(zoneIds);
+                          setDialogState(() {
+                            if (zoneIds.contains(id)) {
+                              zoneIds.remove(id);
+                            } else {
+                              zoneIds.add(id);
+                            }
+                          });
+                          await syncAfterSelectionChange(
+                            previousOrganizationIds: previousOrganizationIds,
+                            previousSiteIds: previousSiteIds,
+                            previousZoneIds: previousZoneIds,
+                          );
+                        },
                         onViewAll: () async {
                           final next = await _showAccessSelectorDialog(
                             context: context,
@@ -920,9 +1171,18 @@ class _UsersScreenState extends State<UsersScreen> {
                             selected: zoneIds,
                           );
                           if (next == null || !context.mounted) return;
+                          final previousOrganizationIds =
+                              Set<String>.from(organizationIds);
+                          final previousSiteIds = Set<String>.from(siteIds);
+                          final previousZoneIds = Set<String>.from(zoneIds);
                           setDialogState(() {
                             zoneIds = next;
                           });
+                          await syncAfterSelectionChange(
+                            previousOrganizationIds: previousOrganizationIds,
+                            previousSiteIds: previousSiteIds,
+                            previousZoneIds: previousZoneIds,
+                          );
                         },
                       ),
                     ],
@@ -931,19 +1191,6 @@ class _UsersScreenState extends State<UsersScreen> {
               ),
             ),
             actions: [
-              if (editMode)
-                FilledButton(
-                  onPressed: () {
-                    setState(() {
-                      _userOrganizationAccess[user.id] =
-                          Set<String>.from(organizationIds);
-                      _userSiteAccess[user.id] = Set<String>.from(siteIds);
-                      _userZoneAccess[user.id] = Set<String>.from(zoneIds);
-                    });
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Save Access'),
-                ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text('Close'),

@@ -141,10 +141,17 @@ class _UserAdminOrganizationsScreenState
                   throw Exception('Name and email are required');
                 }
                 if (organization == null) {
-                  await db.createOrganization(
-                    name: name.trim(),
-                    email: email.trim(),
-                  );
+                  await db.create('organizations', {
+                    'name': name.trim(),
+                    'email': email.trim(),
+                    'status': status,
+                    'owner_user_id': '',
+                  });
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Organization created')),
+                    );
+                  }
                 } else {
                   await db.updateOrganization(
                     organizationId: organization.id,

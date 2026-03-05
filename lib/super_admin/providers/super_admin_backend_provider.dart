@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -115,6 +116,21 @@ class SuperAdminBackendProvider extends ChangeNotifier {
       return DateTime.tryParse(value) ?? DateTime.now();
     }
     return DateTime.now();
+  }
+
+  Map<String, dynamic> _devicePayloadFrom(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return raw.cast<String, dynamic>();
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is Map) return decoded.cast<String, dynamic>();
+      } catch (_) {
+        // Ignore malformed JSON string and fallback to empty map.
+      }
+    }
+    return const <String, dynamic>{};
   }
 
   void _initializeData() {
@@ -309,30 +325,50 @@ class SuperAdminBackendProvider extends ChangeNotifier {
       try {
         final body = await DeviceApi.getAllDevices();
         final loadedDevices = body.map((json) {
-          final rawSite = json['site'];
-          final rawZone = json['zone'];
+          // Backend returns {data: {...}, id: ..., organizationId: ...}
+          // Also handles `data` as JSON string.
+          final nested = _devicePayloadFrom(json['data']);
+          final data = nested.isNotEmpty ? nested : json;
+          final rawSite = data['site'];
+          final rawZone = data['zone'];
           final resolvedSiteId = _asString(
-            json['siteId'] ?? json['site_id'] ?? json['sitesID'],
+            data['siteId'] ?? data['site_id'] ?? data['sitesID'],
             rawSite is Map ? _asString(rawSite['sitesID']) : '',
           );
           final resolvedZoneId = _asString(
-            json['zoneId'] ?? json['zone_id'],
+            data['zoneId'] ?? data['zone_id'],
             rawZone is Map ? _asString(rawZone['zoneId']) : '',
           );
           return Device(
-            id: _asString(json['id'] ?? json['deviceId'], _uuid()),
+            id: _asString(
+                data['id'] ?? data['deviceId'] ?? json['id'], _uuid()),
             siteId: resolvedSiteId,
             zoneId: resolvedZoneId,
             deviceCode: _asString(
-              json['serialNumber'] ?? json['device_code'] ?? json['name'],
+              data['serialNumber'] ?? data['device_code'] ?? data['name'],
               'DEV-${_uuid().substring(0, 8)}',
             ),
-            status: _asString(json['status'], 'active').toLowerCase(),
+            status: _asString(data['status'], 'active').toLowerCase(),
             installedAt: _asDate(
-              json['lastHeartBeat'] ??
-                  json['installed_at'] ??
-                  json['createdAt'],
+              data['lastHeartBeat'] ??
+                  data['installed_at'] ??
+                  data['createdAt'],
             ),
+            serialNumber:
+                _asString(data['serialNumber'] ?? data['serial_number']),
+            firmwareVersion:
+                _asString(data['firmwareVersion'] ?? data['firmware_version']),
+            macAddress: _asString(data['macAddress'] ?? data['mac_address']),
+            ipAddress: _asString(data['ipAddress'] ?? data['ip_address']),
+            numberOfChannels: int.tryParse(_asString(
+                    data['numberOfChannels'] ?? data['number_of_channels'],
+                    '0')) ??
+                0,
+            webHookUrl: _asString(data['webHookUrl'] ?? data['web_hook_url']),
+            lat: double.tryParse(_asString(data['lat'], '0')) ?? 0.0,
+            log: double.tryParse(_asString(data['log'], '0')) ?? 0.0,
+            lastHeartBeat:
+                _asString(data['lastHeartBeat'] ?? data['last_heart_beat']),
           );
         }).toList();
         final deduped = <String, Device>{};
@@ -521,11 +557,18 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         break;
       case 'users':
         final role = _asString(data['role'], 'admin').toLowerCase();
-        // TEMP: Force organizationId to 1 until org selection flow is finalized.
-        const organizationId = '1';
+        final organizationId =
+            _asString(data['organization_id'] ?? data['organizationId']);
         final name = data['name'] as String;
         final email = data['email'] as String;
         final password = _asString(data['password'], 'Temp@12345');
+        final maxUsersAllowed = int.tryParse(
+          _asString(data['maxUsersAllowed'] ?? data['max_users_allowed'], '20'),
+        );
+
+        if (organizationId.isEmpty) {
+          throw ArgumentError('organization_id is required to create user');
+        }
 
         if (role == 'admin') {
           await UsersApi.createAdminUser(
@@ -533,6 +576,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
             email: email,
             organizationId: organizationId,
             password: password,
+            maxUsersAllowed: maxUsersAllowed,
           );
         } else if (role == 'vendor') {
           await UsersApi.createVendor(
@@ -540,6 +584,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
             email: email,
             organizationId: organizationId,
             password: password,
+            maxUsersAllowed: maxUsersAllowed,
           );
         } else {
           throw ArgumentError('Unsupported user role: $role');

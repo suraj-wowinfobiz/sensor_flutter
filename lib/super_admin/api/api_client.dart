@@ -1,10 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/api/admin_api_config.dart';
 
 class ApiClient {
   ApiClient._();
 
-  static const String baseUrl = 'http://103.211.202.145:8091';
+  static const String baseUrl = AdminApiConfig.baseUrl;
   static const String _tokenStorageKey = 'super_admin_auth_token';
   static const Duration _requestDeadline = Duration(seconds: 30);
   static String? _authToken;
@@ -68,7 +69,8 @@ class ApiClient {
           queryParameters: queryParameters,
         )
         .timeout(_requestDeadline);
-    print('🌐 GET $path -> statusCode=${response.statusCode}, data=${response.data}');
+    print(
+        '🌐 GET $path -> statusCode=${response.statusCode}, data=${response.data}');
     return ApiEnvelope.fromResponse(response.data);
   }
 

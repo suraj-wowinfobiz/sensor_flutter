@@ -1,4 +1,5 @@
 import '../../super_admin/core/api/auth_api.dart';
+import 'user_api_config.dart';
 
 class UserLoginApi {
   static Future<LoginResponse> login({
@@ -10,6 +11,9 @@ class UserLoginApi {
       password: password,
       role: 'user',
     );
-    return AuthApi.login(request);
+    return AuthApi.login(
+      request,
+      baseUrl: UserApiConfig.baseUrl,
+    );
   }
 }

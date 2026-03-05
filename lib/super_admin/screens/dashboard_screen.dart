@@ -26,7 +26,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       GenericSseService('/api/v1/ingestion/readings/live');
   final GenericSseService _processedSseService =
       GenericSseService('/api/v1/processing/readings/live');
-  final List<FlSpot> _liveData = [];
   final List<FlSpot> _rawXData = [];
   final List<FlSpot> _rawYData = [];
   final List<FlSpot> _rawZData = [];
@@ -34,13 +33,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   final List<FlSpot> _processedYData = [];
   final List<FlSpot> _processedZData = [];
   final List<FlSpot> _processedMagnitudeData = [];
+  final List<FlSpot> _processedVibrationData = [];
+  final List<FlSpot> _processedMotionData = [];
   final List<FlSpot> _analyzedXData = [];
   final List<FlSpot> _analyzedYData = [];
   final List<FlSpot> _analyzedZData = [];
-  int _dataPointIndex = 0;
+  final List<FlSpot> _analyzedRollData = [];
+  final List<FlSpot> _analyzedPitchData = [];
+  final List<FlSpot> _analyzedTiltData = [];
+  final List<FlSpot> _analyzedAngularVelocityData = [];
+  final List<FlSpot> _analyzedAccelerationData = [];
+  final List<FlSpot> _processedAngularVelocityData = [];
+  final List<FlSpot> _processedAccelerationData = [];
+  _AnalyzedDetailSnapshot? _latestAnalyzedSnapshot;
+  final List<_ProcessedReadingSnapshot> _processedSnapshots = [];
+  final Set<String> _processedSensorIds = <String>{};
+  DateTime? _lastProcessedAt;
   int _rawIndex = 0;
   int _processedIndex = 0;
   int _analyzedIndex = 0;
+  double? _previousAnalyzedTilt;
+  double? _previousAnalyzedTimestamp;
+  double? _previousAnalyzedAngularVelocity;
+  double? _previousProcessedTilt;
+  double? _previousProcessedTimestampSec;
+  double? _previousProcessedAngularVelocity;
   StreamSubscription? _analyticsSubscription;
   StreamSubscription? _rawSubscription;
   StreamSubscription? _processedSubscription;
@@ -55,18 +72,38 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     await _analyticsSseService.connect();
     _analyticsSubscription = _analyticsSseService.stream.listen((data) {
       if (!mounted) return;
-      final metrics = _extractAnalyzedMetricsFromPayload(data);
-      if (metrics == null) return;
+      final detail = _extractAnalyzedDetailFromPayload(data);
+      if (detail == null) return;
+      final roll = detail.roll ?? 0.0;
+      final pitch = detail.pitch ?? 0.0;
+      final tilt = detail.tilt ?? sqrt((roll * roll) + (pitch * pitch));
+      final dtRaw = (_previousAnalyzedTimestamp == null)
+          ? null
+          : (detail.streamTimestamp - _previousAnalyzedTimestamp!);
+      final dt = _deltaSeconds(dtRaw);
+      final angularVelocity =
+          (_previousAnalyzedTilt == null || dt == null || dt <= 0)
+              ? 0.0
+              : (tilt - _previousAnalyzedTilt!) / dt;
+      final angularAcceleration =
+          (_previousAnalyzedAngularVelocity == null || dt == null || dt <= 0)
+              ? 0.0
+              : (angularVelocity - _previousAnalyzedAngularVelocity!) / dt;
       setState(() {
-        _appendAnalyzedPoint(_analyzedXData, metrics.$1);
-        _appendAnalyzedPoint(_analyzedYData, metrics.$2);
-        _appendAnalyzedPoint(_analyzedZData, metrics.$3);
+        _appendAnalyzedPoint(_analyzedXData, detail.x);
+        _appendAnalyzedPoint(_analyzedYData, detail.y);
+        _appendAnalyzedPoint(_analyzedZData, detail.z);
+        _appendAnalyzedPoint(_analyzedRollData, roll);
+        _appendAnalyzedPoint(_analyzedPitchData, pitch);
+        _appendAnalyzedPoint(_analyzedTiltData, tilt);
+        _appendAnalyzedPoint(_analyzedAngularVelocityData, angularVelocity);
+        _appendAnalyzedPoint(_analyzedAccelerationData, angularAcceleration);
         _analyzedIndex++;
         _trimAndReindexAnalyzedSeries();
-
-        _liveData.add(FlSpot(_dataPointIndex.toDouble(), metrics.$4));
-        _dataPointIndex++;
-        _trimAndReindexRealtime();
+        _latestAnalyzedSnapshot = detail;
+        _previousAnalyzedTilt = tilt;
+        _previousAnalyzedTimestamp = detail.streamTimestamp;
+        _previousAnalyzedAngularVelocity = angularVelocity;
       });
     });
 
@@ -87,19 +124,43 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     await _processedSseService.connect();
     _processedSubscription = _processedSseService.stream.listen((data) {
       if (!mounted) return;
-      final processedValues = _extractProcessedValues(data);
-      if (processedValues == null) return;
-      final magnitude = _extractProcessedMagnitude(data) ??
-          sqrt((processedValues.$1 * processedValues.$1) +
-              (processedValues.$2 * processedValues.$2) +
-              (processedValues.$3 * processedValues.$3));
+      final snapshot = _extractProcessedSnapshot(data);
+      if (snapshot == null) return;
+      final nowSec = DateTime.now().millisecondsSinceEpoch / 1000.0;
+      final dt = (_previousProcessedTimestampSec == null)
+          ? null
+          : nowSec - _previousProcessedTimestampSec!;
+      final angularVelocity =
+          (_previousProcessedTilt == null || dt == null || dt <= 0)
+              ? 0.0
+              : (snapshot.tilt - _previousProcessedTilt!) / dt;
+      final angularAcceleration =
+          (_previousProcessedAngularVelocity == null || dt == null || dt <= 0)
+              ? 0.0
+              : (angularVelocity - _previousProcessedAngularVelocity!) / dt;
       setState(() {
-        _appendProcessedPoint(_processedXData, processedValues.$1);
-        _appendProcessedPoint(_processedYData, processedValues.$2);
-        _appendProcessedPoint(_processedZData, processedValues.$3);
-        _appendProcessedPoint(_processedMagnitudeData, magnitude);
+        _appendProcessedPoint(_processedXData, snapshot.roll);
+        _appendProcessedPoint(_processedYData, snapshot.pitch);
+        _appendProcessedPoint(_processedZData, snapshot.tilt);
+        _appendProcessedPoint(_processedMagnitudeData, snapshot.magnitude);
+        _appendProcessedPoint(_processedAngularVelocityData, angularVelocity);
+        _appendProcessedPoint(_processedAccelerationData, angularAcceleration);
+        if (snapshot.vibrationRms != null) {
+          _appendProcessedPoint(
+              _processedVibrationData, snapshot.vibrationRms!);
+        }
+        _appendProcessedPoint(
+          _processedMotionData,
+          snapshot.motionDetected ? 1 : 0,
+        );
         _processedIndex++;
+        _processedSnapshots.add(snapshot);
+        _processedSensorIds.add(snapshot.sensorId);
+        _lastProcessedAt = snapshot.receivedAt;
         _trimAndReindexProcessedSeries();
+        _previousProcessedTilt = snapshot.tilt;
+        _previousProcessedTimestampSec = nowSec;
+        _previousProcessedAngularVelocity = angularVelocity;
       });
     });
   }
@@ -137,6 +198,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     while (_analyzedZData.length > 65) {
       _analyzedZData.removeAt(0);
     }
+    while (_analyzedRollData.length > 65) {
+      _analyzedRollData.removeAt(0);
+    }
+    while (_analyzedPitchData.length > 65) {
+      _analyzedPitchData.removeAt(0);
+    }
+    while (_analyzedTiltData.length > 65) {
+      _analyzedTiltData.removeAt(0);
+    }
+    while (_analyzedAngularVelocityData.length > 65) {
+      _analyzedAngularVelocityData.removeAt(0);
+    }
+    while (_analyzedAccelerationData.length > 65) {
+      _analyzedAccelerationData.removeAt(0);
+    }
 
     for (int i = 0; i < _analyzedXData.length; i++) {
       _analyzedXData[i] = FlSpot(i.toDouble(), _analyzedXData[i].y);
@@ -147,17 +223,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     for (int i = 0; i < _analyzedZData.length; i++) {
       _analyzedZData[i] = FlSpot(i.toDouble(), _analyzedZData[i].y);
     }
+    for (int i = 0; i < _analyzedRollData.length; i++) {
+      _analyzedRollData[i] = FlSpot(i.toDouble(), _analyzedRollData[i].y);
+    }
+    for (int i = 0; i < _analyzedPitchData.length; i++) {
+      _analyzedPitchData[i] = FlSpot(i.toDouble(), _analyzedPitchData[i].y);
+    }
+    for (int i = 0; i < _analyzedTiltData.length; i++) {
+      _analyzedTiltData[i] = FlSpot(i.toDouble(), _analyzedTiltData[i].y);
+    }
+    for (int i = 0; i < _analyzedAngularVelocityData.length; i++) {
+      _analyzedAngularVelocityData[i] =
+          FlSpot(i.toDouble(), _analyzedAngularVelocityData[i].y);
+    }
+    for (int i = 0; i < _analyzedAccelerationData.length; i++) {
+      _analyzedAccelerationData[i] =
+          FlSpot(i.toDouble(), _analyzedAccelerationData[i].y);
+    }
     _analyzedIndex = _analyzedXData.length;
-  }
-
-  void _trimAndReindexRealtime() {
-    while (_liveData.length > 65) {
-      _liveData.removeAt(0);
-    }
-    for (int i = 0; i < _liveData.length; i++) {
-      _liveData[i] = FlSpot(i.toDouble(), _liveData[i].y);
-    }
-    _dataPointIndex = _liveData.length;
   }
 
   void _trimAndReindexRawSeries() {
@@ -196,6 +279,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     while (_processedMagnitudeData.length > 65) {
       _processedMagnitudeData.removeAt(0);
     }
+    while (_processedAngularVelocityData.length > 65) {
+      _processedAngularVelocityData.removeAt(0);
+    }
+    while (_processedAccelerationData.length > 65) {
+      _processedAccelerationData.removeAt(0);
+    }
+    while (_processedVibrationData.length > 65) {
+      _processedVibrationData.removeAt(0);
+    }
+    while (_processedMotionData.length > 65) {
+      _processedMotionData.removeAt(0);
+    }
+    while (_processedSnapshots.length > 120) {
+      _processedSnapshots.removeAt(0);
+    }
 
     for (int i = 0; i < _processedXData.length; i++) {
       _processedXData[i] = FlSpot(i.toDouble(), _processedXData[i].y);
@@ -209,6 +307,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     for (int i = 0; i < _processedMagnitudeData.length; i++) {
       _processedMagnitudeData[i] =
           FlSpot(i.toDouble(), _processedMagnitudeData[i].y);
+    }
+    for (int i = 0; i < _processedAngularVelocityData.length; i++) {
+      _processedAngularVelocityData[i] =
+          FlSpot(i.toDouble(), _processedAngularVelocityData[i].y);
+    }
+    for (int i = 0; i < _processedAccelerationData.length; i++) {
+      _processedAccelerationData[i] =
+          FlSpot(i.toDouble(), _processedAccelerationData[i].y);
+    }
+    for (int i = 0; i < _processedVibrationData.length; i++) {
+      _processedVibrationData[i] =
+          FlSpot(i.toDouble(), _processedVibrationData[i].y);
+    }
+    for (int i = 0; i < _processedMotionData.length; i++) {
+      _processedMotionData[i] = FlSpot(i.toDouble(), _processedMotionData[i].y);
     }
     _processedIndex = _processedXData.length;
   }
@@ -242,27 +355,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return null;
   }
 
-  (double, double, double)? _extractProcessedValues(dynamic payload) {
-    for (final map in _candidateMaps(payload)) {
-      final processedPayload = map['processedPayload'];
-      if (processedPayload is Map) {
-        final roll = _toDouble(processedPayload['rollDegrees']);
-        final pitch = _toDouble(processedPayload['pitchDegrees']);
-        final tilt = _toDouble(processedPayload['tiltFromVerticalDegrees']);
-        if (roll != null && pitch != null && tilt != null) {
-          return (roll, pitch, tilt);
-        }
-
-        final x = _toDouble(processedPayload['x']);
-        final y = _toDouble(processedPayload['y']);
-        final z = _toDouble(processedPayload['z']);
-        if (x != null && y != null && z != null) return (x, y, z);
-      }
-    }
-
-    return _extractXyzValues(payload);
-  }
-
   double? _extractProcessedMagnitude(dynamic payload) {
     for (final map in _candidateMaps(payload)) {
       final processedPayload = map['processedPayload'];
@@ -294,6 +386,50 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return null;
   }
 
+  _ProcessedReadingSnapshot? _extractProcessedSnapshot(dynamic payload) {
+    for (final map in _candidateMaps(payload)) {
+      final processedPayload = map['processedPayload'];
+      if (processedPayload is! Map) continue;
+
+      final roll = _toDouble(processedPayload['rollDegrees']) ??
+          _toDouble(processedPayload['x']);
+      final pitch = _toDouble(processedPayload['pitchDegrees']) ??
+          _toDouble(processedPayload['y']);
+      final tilt = _toDouble(processedPayload['tiltFromVerticalDegrees']) ??
+          _toDouble(processedPayload['z']);
+      if (roll == null || pitch == null || tilt == null) continue;
+
+      final magnitude = _toDouble(processedPayload['horizontalMagnitude']) ??
+          _extractProcessedMagnitude(map) ??
+          sqrt((roll * roll) + (pitch * pitch) + (tilt * tilt));
+
+      final rawPayload = map['rawPayload'];
+      final rawParams = rawPayload is Map ? rawPayload['parameters'] : null;
+      final vibrationRms =
+          rawParams is Map ? _toDouble(rawParams['vibRMS']) : null;
+      final motionDetected = _toBoolOrNumberTrue(
+            rawParams is Map ? rawParams['motionDetected'] : null,
+          ) ??
+          _toBoolOrNumberTrue(processedPayload['motionDetected']) ??
+          false;
+
+      final rawSensorId = map['sensorId'] ??
+          (rawPayload is Map ? rawPayload['sensorId'] : null);
+      final sensorId = (rawSensorId ?? 'unknown').toString();
+      return _ProcessedReadingSnapshot(
+        sensorId: sensorId,
+        roll: roll,
+        pitch: pitch,
+        tilt: tilt,
+        magnitude: magnitude,
+        vibrationRms: vibrationRms,
+        motionDetected: motionDetected,
+        receivedAt: DateTime.now(),
+      );
+    }
+    return null;
+  }
+
   Iterable<Map<dynamic, dynamic>> _candidateMaps(
     dynamic payload, {
     int depth = 0,
@@ -318,17 +454,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
   }
 
-  (double, double, double, double)? _extractAnalyzedMetricsFromPayload(
-    dynamic payload,
-  ) {
+  _AnalyzedDetailSnapshot? _extractAnalyzedDetailFromPayload(dynamic payload) {
     for (final map in _candidateMaps(payload)) {
-      final metrics = _extractAnalyzedMetricsFromEvent(map);
-      if (metrics != null) return metrics;
+      final detail = _extractAnalyzedDetailFromEvent(map);
+      if (detail != null) return detail;
     }
     return null;
   }
 
-  (double, double, double, double)? _extractAnalyzedMetricsFromEvent(
+  _AnalyzedDetailSnapshot? _extractAnalyzedDetailFromEvent(
     Map<dynamic, dynamic> event,
   ) {
     final series = event['series'];
@@ -344,6 +478,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       }
     }
 
+    final evaluations = event['evaluations'];
+    if (evaluations is List) {
+      for (final item in evaluations) {
+        if (item is! Map) continue;
+        final name = item['parameterName']?.toString();
+        final value = _toDouble(item['value']);
+        if (name == null || value == null) continue;
+        values[name] = value;
+      }
+    }
+
+    final roll = values['rollDegrees'] ?? values['roll'];
+    final pitch = values['pitchDegrees'] ?? values['pitch'];
+    final tilt =
+        values['tiltFromVerticalDegrees'] ?? values['inclinationDegrees'];
+    final horizontalMagnitude = values['horizontalMagnitude'] ??
+        values['accelerationMagnitude'] ??
+        values['vibration.vibrationRms'];
+
     final x = values['x'] ??
         values['tilt.x'] ??
         values['vibration.x'] ??
@@ -358,18 +511,55 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         _toDouble(event['z']);
     if (x == null || y == null || z == null) return null;
 
-    final realtimeMagnitude = values['accelerationMagnitude'] ??
-        values['vibration.vibrationRms'] ??
-        values['inclinometer.inclinationDegrees'] ??
-        sqrt((x * x) + (y * y) + (z * z));
+    final sensorId = (event['sensorId'] ?? '').toString();
+    final readingId = (event['readingId'] ?? '').toString();
+    final alertCount = (event['alertCount'] as num?)?.toInt() ?? 0;
+    final timestampValue = _toDouble(event['timestamp']) ?? 0;
 
-    return (x, y, z, realtimeMagnitude);
+    return _AnalyzedDetailSnapshot(
+      sensorId: sensorId,
+      readingId: readingId,
+      x: x,
+      y: y,
+      z: z,
+      roll: roll,
+      pitch: pitch,
+      tilt: tilt,
+      horizontalMagnitude: horizontalMagnitude,
+      alertCount: alertCount,
+      streamTimestamp: timestampValue,
+    );
   }
 
   double? _toDouble(dynamic value) {
     if (value == null) return null;
     if (value is num) return value.toDouble();
     return double.tryParse(value.toString());
+  }
+
+  bool? _toBoolOrNumberTrue(dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final text = value.toString().trim().toLowerCase();
+    if (text == '1' || text == 'true' || text == 'yes') return true;
+    if (text == '0' || text == 'false' || text == 'no') return false;
+    return null;
+  }
+
+  double? _deltaSeconds(double? rawDelta) {
+    if (rawDelta == null || rawDelta <= 0) return null;
+    if (rawDelta > 1000) return rawDelta / 1000.0;
+    return rawDelta;
+  }
+
+  String _agoLabel(DateTime? when) {
+    if (when == null) return 'No updates';
+    final seconds = DateTime.now().difference(when).inSeconds;
+    if (seconds < 5) return 'Just now';
+    if (seconds < 60) return '${seconds}s ago';
+    final minutes = seconds ~/ 60;
+    return '${minutes}m ago';
   }
 
   @override
@@ -399,8 +589,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         children: [
           _buildTopStats(context, avgTilt, maxTilt, activeAlerts),
           const SizedBox(height: 18),
-          _buildRealtimeCard(context),
-          const SizedBox(height: 18),
           _buildLiveSeriesCard(
             context,
             title: 'Sensor Live Records',
@@ -408,6 +596,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             xData: _rawXData,
             yData: _rawYData,
             zData: _rawZData,
+            yAxisLabel: 'Raw acceleration',
+            xAxisLabel: 'Raw sample index',
           ),
           const SizedBox(height: 18),
           _buildLiveSeriesCard(
@@ -420,24 +610,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             xLabel: 'Roll',
             yLabel: 'Pitch',
             zLabel: 'Tilt',
+            yAxisLabel: 'Processed angle (°)',
+            xAxisLabel: 'Processed sample index',
           ),
           const SizedBox(height: 18),
-          _buildLiveSeriesCard(
-            context,
-            title: 'Analyzed Live Data',
-            icon: Icons.psychology_alt_outlined,
-            xData: _analyzedXData,
-            yData: _analyzedYData,
-            zData: _analyzedZData,
-          ),
+          _buildKinematicsRow(context),
           const SizedBox(height: 18),
-          _buildAnalyticsGrid(context),
+          _buildAnalyzedRow(context),
+          const SizedBox(height: 18),
+          _buildAnalyticsGrid(context, db),
           const SizedBox(height: 18),
           _buildScatterCard(context),
           const SizedBox(height: 18),
           _buildSensorReadingsCard(context),
           const SizedBox(height: 18),
-          _buildBottomLiveStats(context),
+          _buildBottomLiveStats(context, db),
           const SizedBox(height: 18),
           _buildTiltRangeDistribution(context, db),
           const SizedBox(height: 18),
@@ -464,6 +651,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     String xLabel = 'X',
     String yLabel = 'Y',
     String zLabel = 'Z',
+    String yAxisLabel = 'Value',
+    String xAxisLabel = 'Sample',
   }) {
     final allSpots = [...xData, ...yData, ...zData];
     final hasData = allSpots.isNotEmpty;
@@ -522,6 +711,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     sideTitles: SideTitles(showTitles: false),
                   ),
                   leftTitles: AxisTitles(
+                    axisNameWidget: Text(
+                      yAxisLabel,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: _mutedTextColor(context),
+                      ),
+                    ),
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 40,
@@ -535,6 +732,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                   ),
                   bottomTitles: AxisTitles(
+                    axisNameWidget: Text(
+                      xAxisLabel,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: _mutedTextColor(context),
+                      ),
+                    ),
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 24,
@@ -586,35 +791,51 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     double maxTilt,
     int activeAlerts,
   ) {
+    final liveAvgTilt = _processedZData.isEmpty
+        ? avgTilt
+        : _processedZData.map((e) => e.y.abs()).reduce((a, b) => a + b) /
+            _processedZData.length;
+    final liveMaxTilt = _processedZData.isEmpty
+        ? maxTilt
+        : _processedZData.map((e) => e.y.abs()).reduce(max);
+    final motionRate = _processedMotionData.isEmpty
+        ? 0.0
+        : _processedMotionData.map((e) => e.y).reduce((a, b) => a + b) /
+            _processedMotionData.length;
+    final systemHealth =
+        (100 - (activeAlerts * 2) - (motionRate * 18)).clamp(0, 100).toDouble();
+
     final cards = [
       _MetricData(
         title: 'AVG TILT ANGLE',
-        value: '${avgTilt.toStringAsFixed(2)}°',
-        subtitle: 'Current',
+        value: '${liveAvgTilt.toStringAsFixed(2)}°',
+        subtitle: _processedZData.isEmpty ? 'Baseline' : 'Processed live',
         icon: Icons.trending_up,
         tint: const Color(0xFF5973d8),
         isHighlight: false,
       ),
       _MetricData(
         title: 'MAX TILT ANGLE',
-        value: '${maxTilt.toStringAsFixed(2)}°',
-        subtitle: 'Tower',
+        value: '${liveMaxTilt.toStringAsFixed(2)}°',
+        subtitle: _processedZData.isEmpty ? 'Fallback' : 'Live window',
         icon: Icons.warning_amber_rounded,
         tint: const Color(0xFFd29a00),
       ),
       _MetricData(
         title: 'SYSTEM HEALTH',
-        value: '${(100 - (activeAlerts * 2)).clamp(84, 100)}%',
-        subtitle: 'Operational',
+        value: '${systemHealth.toStringAsFixed(0)}%',
+        subtitle: _processedMotionData.isEmpty
+            ? 'Operational'
+            : 'Alerts + motion aware',
         icon: Icons.check_circle_outline,
         tint: const Color(0xFF0ea65b),
       ),
-      const _MetricData(
+      _MetricData(
         title: 'LAST UPDATE',
-        value: 'SSE',
-        subtitle: 'Live stream',
+        value: _processedZData.isEmpty ? 'Idle' : 'SSE',
+        subtitle: _agoLabel(_lastProcessedAt),
         icon: Icons.notifications_none,
-        tint: Color(0xFF5973d8),
+        tint: const Color(0xFF5973d8),
       ),
     ];
 
@@ -651,157 +872,359 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildRealtimeCard(BuildContext context) {
-    final hasLiveData = _liveData.isNotEmpty;
-    final minLiveY =
-        hasLiveData ? _liveData.map((e) => e.y).reduce(min) - 2 : 42.0;
-    final maxLiveY =
-        hasLiveData ? _liveData.map((e) => e.y).reduce(max) + 2 : 72.0;
+  Widget _buildKinematicsRow(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final twoCols = constraints.maxWidth >= 1050;
+        if (!twoCols) {
+          return Column(
+            children: [
+              _buildVelocityCard(context),
+              const SizedBox(height: 16),
+              _buildAccelerationTrendCard(context),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: _buildVelocityCard(context)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildAccelerationTrendCard(context)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildAnalyzedRow(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final twoCols = constraints.maxWidth >= 1050;
+        const rowCardHeight = 520.0;
+        final analyzedCard = _buildLiveSeriesCard(
+          context,
+          title: 'Analyzed Live Data',
+          icon: Icons.psychology_alt_outlined,
+          xData: _analyzedRollData,
+          yData: _analyzedPitchData,
+          zData: _analyzedTiltData,
+          xLabel: 'Roll',
+          yLabel: 'Pitch',
+          zLabel: 'Tilt',
+          yAxisLabel: 'Analyzed angle (°)',
+          xAxisLabel: 'Analyzed sample index',
+        );
+        final radarCard = _buildAnalyzedRadarCard(context);
+        if (!twoCols) {
+          return Column(
+            children: [
+              analyzedCard,
+              const SizedBox(height: 16),
+              radarCard,
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: rowCardHeight,
+                child: analyzedCard,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: SizedBox(
+                height: rowCardHeight,
+                child: radarCard,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildVelocityCard(BuildContext context) {
+    final velocityAll = [
+      ..._analyzedAngularVelocityData,
+      ..._processedAngularVelocityData,
+    ];
+    final hasVelocity = velocityAll.isNotEmpty;
+    final minVelocity =
+        hasVelocity ? velocityAll.map((e) => e.y).reduce(min) : -2.0;
+    final maxVelocity =
+        hasVelocity ? velocityAll.map((e) => e.y).reduce(max) : 2.0;
 
     return _DashboardPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.trending_up, color: Color(0xFF5f78de)),
-                  const SizedBox(width: 10),
-                  Flexible(
-                    child: Text(
-                      'Real-Time Tilt Monitoring - All Sensors',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: _titleColor(context),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _liveData.isEmpty ? Colors.orange : Colors.green,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _liveData.isEmpty
-                          ? 'Waiting...'
-                          : 'Live ${_liveData.length} pts',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-              Wrap(
-                spacing: 8,
-                children: [
-                  _chip(context, 'Pause', icon: Icons.pause, selected: false),
-                  _chip(context, '1H', selected: true),
-                  _chip(context, '6H'),
-                  _chip(context, '1D'),
-                  _chip(context, '7D'),
-                ],
-              ),
-            ],
+          _panelTitle(context, 'Velocity Analytics', Icons.speed_outlined),
+          const SizedBox(height: 8),
+          Text(
+            'Angular velocity ω = Δθ/Δt (deg/s) from analyzed and processed streams.',
+            style: TextStyle(fontSize: 12, color: _mutedTextColor(context)),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           SizedBox(
-            height: 350,
-            child: LineChart(
-              LineChartData(
-                minY: minLiveY,
-                maxY: maxLiveY,
-                gridData: FlGridData(
-                  drawVerticalLine: false,
-                  horizontalInterval: 5,
-                  getDrawingHorizontalLine: (_) => const FlLine(
-                    color: Color(0xFFd2dbe0),
-                    strokeWidth: 1,
-                  ),
-                ),
-                borderData: FlBorderData(
-                  show: true,
-                  border: Border(
-                    left: BorderSide(color: Colors.blueGrey.shade200),
-                    bottom: BorderSide(color: Colors.blueGrey.shade200),
-                    top: BorderSide.none,
-                    right: BorderSide.none,
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: 5,
-                      reservedSize: 34,
-                      getTitlesWidget: (value, meta) => Text(
-                        value.toInt().toString(),
-                        style: TextStyle(
-                            fontSize: 11, color: _mutedTextColor(context)),
+            height: 300,
+            child: hasVelocity
+                ? LineChart(
+                    LineChartData(
+                      minY: minVelocity - 0.2,
+                      maxY: max(maxVelocity + 0.2, minVelocity + 0.4),
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        getDrawingHorizontalLine: (_) =>
+                            const FlLine(color: Color(0xFFd2dbe0)),
                       ),
+                      borderData: FlBorderData(
+                        show: true,
+                        border: Border(
+                          left: BorderSide(color: Colors.blueGrey.shade200),
+                          bottom: BorderSide(color: Colors.blueGrey.shade200),
+                          top: BorderSide.none,
+                          right: BorderSide.none,
+                        ),
+                      ),
+                      titlesData: FlTitlesData(
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        leftTitles: AxisTitles(
+                          axisNameWidget: Text(
+                            'ω (deg/s)',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _mutedTextColor(context),
+                            ),
+                          ),
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 40,
+                            getTitlesWidget: (value, _) => Text(
+                              value.toStringAsFixed(2),
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: _mutedTextColor(context)),
+                            ),
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          axisNameWidget: Text(
+                            'Sample index',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _mutedTextColor(context),
+                            ),
+                          ),
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 24,
+                            interval: 10,
+                            getTitlesWidget: (value, _) => Text(
+                              value.toInt().toString(),
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: _mutedTextColor(context)),
+                            ),
+                          ),
+                        ),
+                      ),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: _analyzedAngularVelocityData,
+                          isCurved: true,
+                          color: const Color(0xFF0f9ca0),
+                          barWidth: 2.5,
+                          dotData: const FlDotData(show: false),
+                        ),
+                        LineChartBarData(
+                          spots: _processedAngularVelocityData,
+                          isCurved: true,
+                          color: const Color(0xFFF59E0B),
+                          barWidth: 2.0,
+                          dotData: const FlDotData(show: false),
+                        ),
+                      ],
+                    ),
+                  )
+                : Center(
+                    child: Text(
+                      'Waiting for velocity stream...',
+                      style: TextStyle(color: _mutedTextColor(context)),
                     ),
                   ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: 10,
-                      reservedSize: 28,
-                      getTitlesWidget: (value, meta) {
-                        final sec = value.toInt();
-                        final minute = 43 + (sec ~/ 20);
-                        final second = (sec * 3) % 60;
-                        return Text(
-                          '14:${minute.toString().padLeft(2, '0')}:${second.toString().padLeft(2, '0')}',
-                          style: TextStyle(
-                              fontSize: 10, color: _mutedTextColor(context)),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: _liveData.isEmpty
-                        ? List.generate(65, (i) {
-                            final y = 47 +
-                                (sin(i / 5) * 6) +
-                                (Random(i + 2).nextDouble() * 16);
-                            return FlSpot(i.toDouble(), y);
-                          })
-                        : _liveData,
-                    isCurved: true,
-                    color: const Color(0xFF0f9ca0),
-                    barWidth: 3,
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(show: false),
-                  ),
-                ],
-              ),
-            ),
+          ),
+          const SizedBox(height: 8),
+          const Wrap(
+            spacing: 12,
+            runSpacing: 6,
+            children: [
+              _LegendItem(color: Color(0xFF0f9ca0), label: 'Analyzed ω'),
+              _LegendItem(color: Color(0xFFF59E0B), label: 'Processed ω'),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildAnalyticsGrid(BuildContext context) {
+  Widget _buildAccelerationTrendCard(BuildContext context) {
+    final accelerationAll = [
+      ..._analyzedAccelerationData,
+      ..._processedAccelerationData,
+    ];
+    final hasAcceleration = accelerationAll.isNotEmpty;
+    final minAcc =
+        hasAcceleration ? accelerationAll.map((e) => e.y).reduce(min) : -1.0;
+    final maxAcc =
+        hasAcceleration ? accelerationAll.map((e) => e.y).reduce(max) : 1.0;
+
+    return _DashboardPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _panelTitle(
+            context,
+            'Acceleration Analytics',
+            Icons.timelapse_outlined,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Angular acceleration α = Δω/Δt (deg/s²) from analyzed and processed streams.',
+            style: TextStyle(fontSize: 12, color: _mutedTextColor(context)),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 300,
+            child: hasAcceleration
+                ? LineChart(
+                    LineChartData(
+                      minY: minAcc - 0.1,
+                      maxY: max(maxAcc + 0.1, minAcc + 0.2),
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        getDrawingHorizontalLine: (_) =>
+                            const FlLine(color: Color(0xFFd2dbe0)),
+                      ),
+                      borderData: FlBorderData(
+                        show: true,
+                        border: Border(
+                          left: BorderSide(color: Colors.blueGrey.shade200),
+                          bottom: BorderSide(color: Colors.blueGrey.shade200),
+                          top: BorderSide.none,
+                          right: BorderSide.none,
+                        ),
+                      ),
+                      extraLinesData: ExtraLinesData(
+                        horizontalLines: [
+                          HorizontalLine(
+                            y: 0,
+                            color: const Color(0xFF6b7280),
+                            strokeWidth: 1,
+                            dashArray: [6, 4],
+                          ),
+                        ],
+                      ),
+                      titlesData: FlTitlesData(
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        leftTitles: AxisTitles(
+                          axisNameWidget: Text(
+                            'α (deg/s²)',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _mutedTextColor(context),
+                            ),
+                          ),
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 44,
+                            getTitlesWidget: (value, _) => Text(
+                              value.toStringAsFixed(3),
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: _mutedTextColor(context)),
+                            ),
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          axisNameWidget: Text(
+                            'Sample index',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _mutedTextColor(context),
+                            ),
+                          ),
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 24,
+                            interval: 10,
+                            getTitlesWidget: (value, _) => Text(
+                              value.toInt().toString(),
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: _mutedTextColor(context)),
+                            ),
+                          ),
+                        ),
+                      ),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: _analyzedAccelerationData,
+                          isCurved: true,
+                          color: const Color(0xFF7C3AED),
+                          barWidth: 2.4,
+                          dotData: const FlDotData(show: false),
+                        ),
+                        LineChartBarData(
+                          spots: _processedAccelerationData,
+                          isCurved: true,
+                          color: const Color(0xFFEF4444),
+                          barWidth: 2.0,
+                          dotData: const FlDotData(show: false),
+                        ),
+                      ],
+                    ),
+                  )
+                : Center(
+                    child: Text(
+                      'Waiting for acceleration rate...',
+                      style: TextStyle(color: _mutedTextColor(context)),
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 8),
+          const Wrap(
+            spacing: 12,
+            runSpacing: 6,
+            children: [
+              _LegendItem(color: Color(0xFF7C3AED), label: 'Analyzed α'),
+              _LegendItem(color: Color(0xFFEF4444), label: 'Processed α'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsGrid(BuildContext context, dynamic db) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final twoCols = constraints.maxWidth >= 1050;
@@ -810,11 +1233,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             children: [
               _historicalTrendCard(context),
               const SizedBox(height: 16),
-              _statusDistributionCard(context),
+              _statusDistributionCard(context, db),
               const SizedBox(height: 16),
               _tiltPatternCard(context),
               const SizedBox(height: 16),
-              _thresholdMonitoringCard(context),
+              _thresholdMonitoringCard(context, db),
             ],
           );
         }
@@ -824,7 +1247,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               children: [
                 Expanded(child: _historicalTrendCard(context)),
                 const SizedBox(width: 16),
-                Expanded(child: _statusDistributionCard(context)),
+                Expanded(child: _statusDistributionCard(context, db)),
               ],
             ),
             const SizedBox(height: 16),
@@ -832,12 +1255,147 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               children: [
                 Expanded(child: _tiltPatternCard(context)),
                 const SizedBox(width: 16),
-                Expanded(child: _thresholdMonitoringCard(context)),
+                Expanded(child: _thresholdMonitoringCard(context, db)),
               ],
             ),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildAnalyzedRadarCard(BuildContext context) {
+    final snapshot = _latestAnalyzedSnapshot;
+    return _DashboardPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _panelTitle(
+            context,
+            'Analyzed Profile Radar',
+            Icons.radar_outlined,
+          ),
+          const SizedBox(height: 8),
+          if (snapshot == null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 26),
+              child: Center(
+                child: Text(
+                  'Waiting for analytics-live profile data...',
+                  style: TextStyle(color: _mutedTextColor(context)),
+                ),
+              ),
+            )
+          else ...[
+            SizedBox(
+              height: 300,
+              child: RadarChart(
+                RadarChartData(
+                  radarShape: RadarShape.polygon,
+                  tickCount: 5,
+                  titlePositionPercentageOffset: 0.16,
+                  titleTextStyle: TextStyle(
+                    color: _mutedTextColor(context),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  ticksTextStyle: TextStyle(
+                    color: _mutedTextColor(context),
+                    fontSize: 10,
+                  ),
+                  tickBorderData: BorderSide(
+                    color: Theme.of(context).dividerColor,
+                    width: 1,
+                  ),
+                  gridBorderData: BorderSide(
+                    color: Theme.of(context).dividerColor,
+                    width: 1,
+                  ),
+                  getTitle: (index, angle) {
+                    const titles = [
+                      'Roll',
+                      'Pitch',
+                      'Tilt',
+                      'H-Mag',
+                      '|X|',
+                      '|Y|',
+                      '|Z|',
+                    ];
+                    return RadarChartTitle(
+                      text: titles[index],
+                      angle: angle,
+                    );
+                  },
+                  dataSets: [
+                    RadarDataSet(
+                      fillColor:
+                          Theme.of(context).colorScheme.primary.withValues(
+                                alpha: 0.20,
+                              ),
+                      borderColor: Theme.of(context).colorScheme.primary,
+                      borderWidth: 2.2,
+                      entryRadius: 3.2,
+                      dataEntries: [
+                        RadarEntry(
+                            value: _radarScale(snapshot.roll?.abs(), 15)),
+                        RadarEntry(
+                            value: _radarScale(snapshot.pitch?.abs(), 15)),
+                        RadarEntry(
+                            value: _radarScale(snapshot.tilt?.abs(), 15)),
+                        RadarEntry(
+                          value: _radarScale(
+                            snapshot.horizontalMagnitude?.abs(),
+                            1.0,
+                          ),
+                        ),
+                        RadarEntry(value: _radarScale(snapshot.x.abs(), 1.0)),
+                        RadarEntry(value: _radarScale(snapshot.y.abs(), 1.0)),
+                        RadarEntry(value: _radarScale(snapshot.z.abs(), 2.0)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: [
+                _valueChip(
+                  context,
+                  'Roll',
+                  snapshot.roll?.toStringAsFixed(3) ?? '--',
+                ),
+                _valueChip(
+                  context,
+                  'Pitch',
+                  snapshot.pitch?.toStringAsFixed(3) ?? '--',
+                ),
+                _valueChip(
+                  context,
+                  'Tilt',
+                  snapshot.tilt?.toStringAsFixed(3) ?? '--',
+                ),
+                _valueChip(
+                  context,
+                  'H-Mag',
+                  snapshot.horizontalMagnitude?.toStringAsFixed(4) ?? '--',
+                ),
+                _valueChip(context, 'X', snapshot.x.toStringAsFixed(5)),
+                _valueChip(context, 'Y', snapshot.y.toStringAsFixed(5)),
+                _valueChip(context, 'Z', snapshot.z.toStringAsFixed(5)),
+                _valueChip(context, 'Alerts', snapshot.alertCount.toString()),
+                _valueChip(
+                  context,
+                  'Sensor',
+                  snapshot.sensorId.isEmpty ? '--' : snapshot.sensorId,
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -969,7 +1527,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _statusDistributionCard(BuildContext context) {
+  Widget _statusDistributionCard(BuildContext context, dynamic db) {
+    final thresholds = _dashboardThresholds(db);
+    int normal = 0;
+    int warning = 0;
+    int critical = 0;
+    for (final spot in _processedZData) {
+      final level = _levelForTilt(spot.y.abs(), thresholds);
+      if (level == 'critical') {
+        critical++;
+      } else if (level == 'warning') {
+        warning++;
+      } else {
+        normal++;
+      }
+    }
+    if (_processedZData.isEmpty) {
+      normal = 1;
+    }
+
     return _DashboardPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -985,19 +1561,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 centerSpaceRadius: 60,
                 sections: [
                   PieChartSectionData(
-                    value: 68,
+                    value: normal.toDouble(),
                     color: const Color(0xFF0ca15f),
                     title: '',
                     radius: 60,
                   ),
                   PieChartSectionData(
-                    value: 25,
+                    value: warning.toDouble(),
                     color: const Color(0xFFd39a00),
                     title: '',
                     radius: 60,
                   ),
                   PieChartSectionData(
-                    value: 7,
+                    value: critical.toDouble(),
                     color: const Color(0xFFea3e43),
                     title: '',
                     radius: 60,
@@ -1022,6 +1598,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _tiltPatternCard(BuildContext context) {
+    final bars = _processedZData.length > 24
+        ? _processedZData.sublist(_processedZData.length - 24)
+        : _processedZData;
+    final maxTilt = bars.isEmpty
+        ? 2.0
+        : max(2.0, bars.map((e) => e.y.abs()).reduce(max) + 0.5);
+
     return _DashboardPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1033,11 +1616,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             child: BarChart(
               BarChartData(
                 minY: 0,
-                maxY: 2.0,
+                maxY: maxTilt,
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: 0.5,
+                  horizontalInterval: (maxTilt / 4).clamp(0.5, 10.0),
                   getDrawingHorizontalLine: (_) =>
                       const FlLine(color: Color(0xFFd2dbe0)),
                 ),
@@ -1058,12 +1641,28 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     sideTitles: SideTitles(showTitles: false),
                   ),
                   leftTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: true, reservedSize: 30),
+                    axisNameWidget: Text(
+                      '|Tilt| (°)',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E2930),
+                      ),
+                    ),
+                    sideTitles: SideTitles(showTitles: true, reservedSize: 34),
                   ),
                   bottomTitles: AxisTitles(
+                    axisNameWidget: const Text(
+                      'Recent sample index',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E2930),
+                      ),
+                    ),
                     sideTitles: SideTitles(
                       showTitles: true,
-                      interval: 4,
+                      interval: 6,
                       getTitlesWidget: (value, meta) => Text(
                         value.toInt().toString(),
                         style: TextStyle(
@@ -1072,12 +1671,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                   ),
                 ),
-                barGroups: List.generate(24, (i) {
+                barGroups: List.generate(bars.length, (i) {
+                  final value = bars[i].y.abs();
                   return BarChartGroupData(
                     x: i,
                     barRods: [
                       BarChartRodData(
-                        toY: 0.8 + Random(i + 12).nextDouble() * 0.8,
+                        toY: value,
                         width: 14,
                         color: const Color(0xFF0f8b89),
                         borderRadius: BorderRadius.circular(1),
@@ -1093,7 +1693,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _thresholdMonitoringCard(BuildContext context) {
+  Widget _thresholdMonitoringCard(BuildContext context, dynamic db) {
+    final thresholds = _dashboardThresholds(db);
+    final warningCutoff = thresholds.$1;
+    final criticalCutoff = thresholds.$2;
+    final bars = _processedZData.length > 7
+        ? _processedZData.sublist(_processedZData.length - 7)
+        : _processedZData;
+    final barSnapshots = _processedSnapshots.length > bars.length
+        ? _processedSnapshots.sublist(_processedSnapshots.length - bars.length)
+        : List<_ProcessedReadingSnapshot>.from(_processedSnapshots);
+    final maxBar = bars.isEmpty
+        ? 5.0
+        : max(5.0, bars.map((e) => e.y.abs()).reduce(max) + 0.5);
+
     return _DashboardPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1106,11 +1719,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             child: BarChart(
               BarChartData(
                 minY: 0,
-                maxY: 5,
+                maxY: maxBar,
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: 1,
+                  horizontalInterval: (maxBar / 5).clamp(0.5, 20.0),
                   getDrawingHorizontalLine: (_) =>
                       const FlLine(color: Color(0xFFd2dbe0)),
                 ),
@@ -1131,15 +1744,38 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     sideTitles: SideTitles(showTitles: false),
                   ),
                   leftTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: true, reservedSize: 28),
+                    axisNameWidget: Text(
+                      'Tilt (°)',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E2930),
+                      ),
+                    ),
+                    sideTitles: SideTitles(showTitles: true, reservedSize: 34),
                   ),
                   bottomTitles: AxisTitles(
+                    axisNameWidget: const Text(
+                      'Recent samples',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E2930),
+                      ),
+                    ),
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (value, meta) => Transform.rotate(
                         angle: -0.7,
                         child: Text(
-                          'TLT-${(value.toInt() + 1).toString().padLeft(3, '0')}',
+                          () {
+                            final i = value.toInt();
+                            if (i < 0 || i >= barSnapshots.length) return '--';
+                            final sensor = barSnapshots[i].sensorId;
+                            return sensor.length > 6
+                                ? sensor.substring(sensor.length - 6)
+                                : sensor;
+                          }(),
                           style: TextStyle(
                               fontSize: 10, color: _mutedTextColor(context)),
                         ),
@@ -1153,11 +1789,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ThresholdGraphTarget.dashboardThresholdMonitoring,
                   ),
                 ),
-                barGroups: List.generate(7, (i) {
-                  final value = [1.2, 0.8, 1.8, 1.5, 1.1, 1.6, 0.9][i];
-                  final color = (value >= 1.6)
-                      ? const Color(0xFFd39a00)
-                      : const Color(0xFF0ca15f);
+                barGroups: List.generate(bars.length, (i) {
+                  final value = bars[i].y.abs();
+                  final color = value >= criticalCutoff
+                      ? const Color(0xFFea3e43)
+                      : value >= warningCutoff
+                          ? const Color(0xFFd39a00)
+                          : const Color(0xFF0ca15f);
                   return BarChartGroupData(
                     x: i,
                     barRods: [
@@ -1179,6 +1817,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildScatterCard(BuildContext context) {
+    final points = <ScatterSpot>[];
+    final start = max(0, _processedXData.length - 40);
+    for (int i = start; i < _processedXData.length; i++) {
+      points.add(
+        ScatterSpot(
+          _processedXData[i].y,
+          i < _processedYData.length ? _processedYData[i].y : 0,
+          dotPainter: FlDotCirclePainter(
+            radius: 4,
+            color: const Color(0xFF2d8f93),
+          ),
+        ),
+      );
+    }
+
+    final hasPoints = points.isNotEmpty;
+    final minX = hasPoints ? points.map((p) => p.x).reduce(min) - 0.2 : -1.0;
+    final maxX = hasPoints ? points.map((p) => p.x).reduce(max) + 0.2 : 1.0;
+    final minY = hasPoints ? points.map((p) => p.y).reduce(min) - 0.2 : -1.0;
+    final maxY = hasPoints ? points.map((p) => p.y).reduce(max) + 0.2 : 1.0;
+
     return _DashboardPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1189,10 +1848,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             height: 300,
             child: ScatterChart(
               ScatterChartData(
-                minX: -2,
-                maxX: 2,
-                minY: -2,
-                maxY: 2,
+                minX: minX,
+                maxX: max(maxX, minX + 0.5),
+                minY: minY,
+                maxY: max(maxY, minY + 0.5),
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: true,
@@ -1202,88 +1861,94 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   getDrawingVerticalLine: (_) =>
                       const FlLine(color: Color(0xFFd2dbe0), strokeWidth: 1),
                 ),
-                titlesData: const FlTitlesData(
-                  topTitles: AxisTitles(
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(
                     sideTitles: SideTitles(showTitles: false),
                   ),
-                  rightTitles: AxisTitles(
+                  rightTitles: const AxisTitles(
                     sideTitles: SideTitles(showTitles: false),
+                  ),
+                  leftTitles: AxisTitles(
+                    axisNameWidget: const Text(
+                      'Pitch (°)',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E2930),
+                      ),
+                    ),
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 36,
+                      getTitlesWidget: (value, _) => Text(
+                        value.toStringAsFixed(1),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: _mutedTextColor(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    axisNameWidget: const Text(
+                      'Roll (°)',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E2930),
+                      ),
+                    ),
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 24,
+                      getTitlesWidget: (value, _) => Text(
+                        value.toStringAsFixed(1),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: _mutedTextColor(context),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 borderData: FlBorderData(show: false),
-                scatterSpots: List.generate(24, (i) {
-                  final x =
-                      (Random(i + 77).nextDouble() * 2) * (i.isEven ? 1 : -1);
-                  final y = (Random(i + 177).nextDouble() * 2) *
-                      (i % 3 == 0 ? 1 : -1);
-                  return ScatterSpot(x, y,
-                      dotPainter: FlDotCirclePainter(
-                        radius: 4,
-                        color: const Color(0xFF2d8f93),
-                      ));
-                }),
+                scatterSpots: points,
                 showingTooltipIndicators: const [],
               ),
             ),
           ),
+          if (points.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Waiting for processed X/Y data...',
+                style: TextStyle(color: _mutedTextColor(context)),
+              ),
+            ),
         ],
       ),
     );
   }
 
   Widget _buildSensorReadingsCard(BuildContext context) {
-    const rows = [
-      [
-        'TLT-001',
-        'Building A - Column 7',
-        'Tower',
-        '1.46°',
-        '-0.86°',
-        '1.36°',
-        'normal',
-        'Just now'
-      ],
-      [
-        'TLT-002',
-        'Building A - Column 12',
-        'Tower',
-        '1.20°',
-        '-1.03°',
-        '-0.05°',
-        'normal',
-        'Just now'
-      ],
-      [
-        'TLT-003',
-        'Building B - Foundation',
-        'Wall',
-        '0.01°',
-        '-1.37°',
-        '1.33°',
-        'normal',
-        'Just now'
-      ],
-      [
-        'TLT-004',
-        'Bridge Section 9',
-        'Bridge',
-        '1.47°',
-        '1.91°',
-        '2.22°',
-        'warning',
-        'Just now'
-      ],
-      [
-        'TLT-005',
-        'Water Tank Base',
-        'Basin',
-        '-0.52°',
-        '0.79°',
-        '0.63°',
-        'normal',
-        'Just now'
-      ],
-    ];
+    final db = ref.watch(superAdminBackendChangeNotifierProvider);
+    final thresholds = _dashboardThresholds(db);
+    final rows = _processedSnapshots.reversed.take(8).map((snapshot) {
+      final shortId = snapshot.sensorId.length > 12
+          ? '${snapshot.sensorId.substring(0, 12)}…'
+          : snapshot.sensorId;
+      final status = _levelForTilt(snapshot.tilt.abs(), thresholds);
+      return [
+        shortId,
+        'Processed stream',
+        'Tilting',
+        '${snapshot.roll.toStringAsFixed(2)}°',
+        '${snapshot.pitch.toStringAsFixed(2)}°',
+        '${snapshot.tilt.toStringAsFixed(2)}°',
+        status,
+        _agoLabel(snapshot.receivedAt),
+      ];
+    }).toList();
 
     return _DashboardPanel(
       child: Column(
@@ -1333,6 +1998,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 rows: rows.map((r) {
                   final status = r[6];
                   final isWarning = status == 'warning';
+                  final isCritical = status == 'critical';
                   return DataRow(cells: [
                     DataCell(Text(r[0])),
                     DataCell(Text(r[1])),
@@ -1344,22 +2010,28 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 3),
                       decoration: BoxDecoration(
-                        color: isWarning
-                            ? const Color(0xFFf9edc9)
-                            : const Color(0xFFd7f2df),
+                        color: isCritical
+                            ? const Color(0xFFf7d3d6)
+                            : isWarning
+                                ? const Color(0xFFf9edc9)
+                                : const Color(0xFFd7f2df),
                         border: Border.all(
-                          color: isWarning
-                              ? const Color(0xFFd9a21d)
-                              : const Color(0xFF2eaf61),
+                          color: isCritical
+                              ? const Color(0xFFe35b63)
+                              : isWarning
+                                  ? const Color(0xFFd9a21d)
+                                  : const Color(0xFF2eaf61),
                         ),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Text(
                         status,
                         style: TextStyle(
-                          color: isWarning
-                              ? const Color(0xFFb38200)
-                              : const Color(0xFF0d9a4d),
+                          color: isCritical
+                              ? const Color(0xFFb2262e)
+                              : isWarning
+                                  ? const Color(0xFFb38200)
+                                  : const Color(0xFF0d9a4d),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -1370,6 +2042,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
             ),
           ),
+          if (rows.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                'Waiting for processed stream data...',
+                style: TextStyle(color: _mutedTextColor(context)),
+              ),
+            ),
         ],
       ),
     );
@@ -1388,43 +2068,56 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildBottomLiveStats(BuildContext context) {
-    const cards = [
+  Widget _buildBottomLiveStats(BuildContext context, dynamic db) {
+    final now = DateTime.now();
+    final samplesPerMinute = _processedSnapshots
+        .where((s) => now.difference(s.receivedAt).inSeconds <= 60)
+        .length;
+    final throughput = samplesPerMinute / 60.0;
+    final motionRate = _processedMotionData.isEmpty
+        ? 0.0
+        : (_processedMotionData.map((e) => e.y).reduce((a, b) => a + b) /
+                _processedMotionData.length) *
+            100;
+    final lastVibration =
+        _processedVibrationData.isEmpty ? null : _processedVibrationData.last.y;
+
+    final cards = [
       _MiniStatData(
         title: 'ACTIVE SENSORS',
-        value: '124',
+        value: _processedSensorIds.length.toString(),
         unit: 'sensors',
-        detail: 'of 214 total',
-        badge: 'Live',
+        detail: 'of ${(db.sensors as List).length} total',
+        badge: _processedSensorIds.isEmpty ? 'Idle' : 'Live',
         icon: Icons.monitor_heart_outlined,
-        iconColor: Color(0xFF0aa34f),
+        iconColor: const Color(0xFF0aa34f),
       ),
       _MiniStatData(
         title: 'DATA THROUGHPUT',
-        value: '62.0',
+        value: throughput.toStringAsFixed(2),
         unit: 'pts/sec',
-        detail: '',
-        badge: 'Live',
+        detail: '$samplesPerMinute samples in 1m',
+        badge: throughput > 0 ? 'Live' : 'Idle',
         icon: Icons.bolt_outlined,
-        iconColor: Color(0xFF5f78de),
+        iconColor: const Color(0xFF5f78de),
       ),
       _MiniStatData(
-        title: 'SYSTEM LOAD',
-        value: '100',
+        title: 'MOTION RATE',
+        value: motionRate.toStringAsFixed(0),
         unit: '%',
-        detail: '',
-        badge: 'Live',
+        detail: 'detected in window',
+        badge: motionRate >= 50 ? 'High' : 'Normal',
         icon: Icons.trending_up,
-        iconColor: Color(0xFFd39a00),
+        iconColor: const Color(0xFFd39a00),
       ),
       _MiniStatData(
-        title: 'NETWORK LATENCY',
-        value: '37',
-        unit: 'ms',
-        detail: '',
-        badge: 'Stable',
+        title: 'VIBRATION RMS',
+        value: lastVibration?.toStringAsFixed(2) ?? '--',
+        unit: '',
+        detail: 'latest processed',
+        badge: lastVibration == null ? 'N/A' : 'Live',
         icon: Icons.network_ping,
-        iconColor: Color(0xFF2b8ab8),
+        iconColor: const Color(0xFF2b8ab8),
       ),
     ];
 
@@ -1458,22 +2151,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildTiltRangeDistribution(BuildContext context, dynamic db) {
-    final readings = (db.sensors as List)
-        .map((sensor) => (sensor.lastReading as num).abs().toDouble())
-        .toList();
+    // Prefer live processed tilt stream; fallback to backend sensor snapshots.
+    final readings = _processedZData.isNotEmpty
+        ? _processedZData.map((spot) => spot.y.abs()).toList()
+        : (db.sensors as List)
+            .map((sensor) => (sensor.lastReading as num).abs().toDouble())
+            .toList();
     final bins = [0, 0, 0, 0];
     for (final value in readings) {
-      if (value < 0.5) {
+      // Real stream values are commonly around 6-10 degrees, so use
+      // operationally meaningful bands instead of sub-degree bins.
+      if (value < 2.0) {
         bins[0]++;
-      } else if (value < 1.0) {
+      } else if (value < 5.0) {
         bins[1]++;
-      } else if (value < 1.5) {
+      } else if (value < 10.0) {
         bins[2]++;
       } else {
         bins[3]++;
       }
     }
-    final labels = ['0-0.5°', '0.5-1.0°', '1.0-1.5°', '>1.5°'];
+    final labels = ['0-2°', '2-5°', '5-10°', '>10°'];
     final maxCount = bins.reduce(max).clamp(1, 999);
 
     return _DashboardPanel(
@@ -1487,10 +2185,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            'Shows how many sensors are in each tilt severity band.',
+            _processedZData.isNotEmpty
+                ? 'Shows distribution from live processed tilt stream.'
+                : 'Shows distribution from last known sensor readings.',
             style: TextStyle(fontSize: 12, color: _mutedTextColor(context)),
           ),
           const SizedBox(height: 12),
+          if (readings.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Waiting for tilt data...',
+                style: TextStyle(fontSize: 12, color: _mutedTextColor(context)),
+              ),
+            ),
           SizedBox(
             height: 270,
             child: BarChart(
@@ -2164,6 +2872,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
+  double _radarScale(double? value, double maxAbs) {
+    if (value == null || maxAbs <= 0) return 0;
+    return ((value / maxAbs) * 100).clamp(0, 100);
+  }
+
+  Widget _valueChip(BuildContext context, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.light
+            ? const Color(0xFFEAF0F4)
+            : const Color(0xFF23394A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Text(
+        '$label: $value',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: _titleColor(context),
+        ),
+      ),
+    );
+  }
+
   Color _titleColor(BuildContext context) {
     return Theme.of(context).brightness == Brightness.light
         ? const Color(0xFF1c2a33)
@@ -2174,6 +2908,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Theme.of(context).brightness == Brightness.light
         ? const Color(0xFF60717c)
         : const Color(0xFF9FB4C6);
+  }
+
+  (double, double) _dashboardThresholds(dynamic db) {
+    final rules = db
+        .thresholdRulesForGraph(
+            ThresholdGraphTarget.dashboardThresholdMonitoring)
+        .map((rule) => rule.value)
+        .toList()
+      ..sort();
+    final warning = rules.isNotEmpty ? rules.first : 2.8;
+    final critical = rules.length > 1 ? rules[1] : warning + 1.2;
+    return (warning, critical);
+  }
+
+  String _levelForTilt(double value, (double, double) thresholds) {
+    if (value >= thresholds.$2) return 'critical';
+    if (value >= thresholds.$1) return 'warning';
+    return 'normal';
   }
 
   List<HorizontalLine> _thresholdLinesForGraph(
@@ -2201,6 +2953,56 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         )
         .toList();
   }
+}
+
+class _ProcessedReadingSnapshot {
+  const _ProcessedReadingSnapshot({
+    required this.sensorId,
+    required this.roll,
+    required this.pitch,
+    required this.tilt,
+    required this.magnitude,
+    required this.vibrationRms,
+    required this.motionDetected,
+    required this.receivedAt,
+  });
+
+  final String sensorId;
+  final double roll;
+  final double pitch;
+  final double tilt;
+  final double magnitude;
+  final double? vibrationRms;
+  final bool motionDetected;
+  final DateTime receivedAt;
+}
+
+class _AnalyzedDetailSnapshot {
+  const _AnalyzedDetailSnapshot({
+    required this.sensorId,
+    required this.readingId,
+    required this.x,
+    required this.y,
+    required this.z,
+    required this.roll,
+    required this.pitch,
+    required this.tilt,
+    required this.horizontalMagnitude,
+    required this.alertCount,
+    required this.streamTimestamp,
+  });
+
+  final String sensorId;
+  final String readingId;
+  final double x;
+  final double y;
+  final double z;
+  final double? roll;
+  final double? pitch;
+  final double? tilt;
+  final double? horizontalMagnitude;
+  final int alertCount;
+  final double streamTimestamp;
 }
 
 class _DashboardPanel extends StatelessWidget {
