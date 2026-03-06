@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../super_admin/api/api_client.dart';
+import '../api/analytics_login_api.dart';
 import '../analytics_page.dart';
 import '../providers/analytics_riverpod_provider.dart';
 
@@ -16,7 +19,7 @@ class _AnalyticsLoginScreenState extends ConsumerState<AnalyticsLoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  void _login() {
+  Future<void> _login() async {
     if (_emailController.text.trim().isEmpty ||
         _passwordController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -27,19 +30,46 @@ class _AnalyticsLoginScreenState extends ConsumerState<AnalyticsLoginScreen> {
 
     ref.read(analyticsLoginLoadingStateProvider.notifier).state = true;
 
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (!mounted) return;
-      ref.read(analyticsLoginLoadingStateProvider.notifier).state = false;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const AnalyticsPage()),
+    try {
+      final response = await AnalyticsLoginApi.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
       );
-    });
+
+      if (!mounted) return;
+      if (response.status.toUpperCase() == 'SUCCESS') {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'analytics_principal_id',
+          response.body.principalId.trim(),
+        );
+        await ApiClient.setAuthToken(response.body.token);
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const AnalyticsPage()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login failed')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        ref.read(analyticsLoginLoadingStateProvider.notifier).state = false;
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isLoading = ref.watch(analyticsLoginLoadingStateProvider);
-    final obscurePassword = ref.watch(analyticsLoginObscurePasswordStateProvider);
+    final obscurePassword =
+        ref.watch(analyticsLoginObscurePasswordStateProvider);
     final isLight = Theme.of(context).brightness == Brightness.light;
     final titleColor =
         isLight ? const Color(0xFF1A2B3C) : const Color(0xFFD7E8F6);
@@ -158,12 +188,10 @@ class _AnalyticsLoginScreenState extends ConsumerState<AnalyticsLoginScreen> {
                         color: subColor,
                       ),
                       onPressed: () => ref
-                              .read(
-                                analyticsLoginObscurePasswordStateProvider
-                                    .notifier,
-                              )
-                              .state =
-                          !obscurePassword,
+                          .read(
+                            analyticsLoginObscurePasswordStateProvider.notifier,
+                          )
+                          .state = !obscurePassword,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),

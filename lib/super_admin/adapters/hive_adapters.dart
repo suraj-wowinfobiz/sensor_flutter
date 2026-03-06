@@ -37,14 +37,25 @@ class AlertAdapter extends TypeAdapter<Alert> {
 
   @override
   Alert read(BinaryReader reader) {
+    String readNullableString() {
+      final value = reader.read();
+      return value?.toString() ?? '';
+    }
+
+    final id = readNullableString();
+    final sensorId = readNullableString();
+    final sensorParameterId = readNullableString();
+    final alertLevel = readNullableString();
+    final message = readNullableString();
+    final triggeredAt = DateTime.fromMillisecondsSinceEpoch(reader.readInt());
     final hasResolved = reader.readBool();
     return Alert(
-      id: reader.readString(),
-      sensorId: reader.readString(),
-      sensorParameterId: reader.readString(),
-      alertLevel: reader.readString(),
-      message: reader.readString(),
-      triggeredAt: DateTime.fromMillisecondsSinceEpoch(reader.readInt()),
+      id: id,
+      sensorId: sensorId,
+      sensorParameterId: sensorParameterId,
+      alertLevel: alertLevel,
+      message: message,
+      triggeredAt: triggeredAt,
       resolvedAt: hasResolved
           ? DateTime.fromMillisecondsSinceEpoch(reader.readInt())
           : null,

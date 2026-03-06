@@ -119,8 +119,6 @@ class SideMenu extends StatelessWidget {
                           context, 'Sensors', Icons.sensors, 'sensors'),
                       _buildMenuItem(
                           context, 'Alerts', Icons.notifications, 'alerts'),
-                      _buildMenuItem(
-                          context, 'Reports', Icons.assessment, 'reports'),
                       _buildMenuItem(context, 'Users', Icons.people, 'users'),
                       _buildMenuItem(context, 'Organization', Icons.business,
                           'organizations'),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/users_api.dart';
 import '../models/user.dart';
@@ -26,6 +27,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
   String? _editingId;
   String _name = '';
   String _email = '';
+  String _currentPrincipalId = '';
 
   @override
   void initState() {
@@ -33,8 +35,14 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final db = context.read<UserAdminDatabaseProvider>();
-      await db.loadOrganizations();
-      await db.loadUsers();
+      final prefs = await SharedPreferences.getInstance();
+      _currentPrincipalId =
+          prefs.getString('user_admin_principal_id')?.trim() ?? '';
+      if (!mounted) return;
+      await Future.wait([
+        db.loadUsers(),
+        db.loadOrganizations(),
+      ]);
     });
   }
 
@@ -485,6 +493,10 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
 
   List<User> _applyFilters(List<User> users) {
     return users.where((u) {
+      if (_currentPrincipalId.isNotEmpty &&
+          u.id.trim() == _currentPrincipalId) {
+        return false;
+      }
       final matchesSearch = _searchText.isEmpty ||
           u.name.toLowerCase().contains(_searchText.toLowerCase()) ||
           u.email.toLowerCase().contains(_searchText.toLowerCase());

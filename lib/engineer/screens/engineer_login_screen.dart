@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../super_admin/api/api_client.dart';
+import '../api/api_client.dart' as engineer_api_client;
 import '../api/engineer_login_api.dart';
 import '../engineer_page.dart';
 import '../providers/engineer_riverpod_provider.dart';
@@ -37,14 +38,19 @@ class _EngineerLoginScreenState extends ConsumerState<EngineerLoginScreen> {
 
       if (!mounted) return;
       if (response.status.toUpperCase() == 'SUCCESS') {
-        await ApiClient.setAuthToken(response.body.token);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'engineer_principal_id',
+          response.body.principalId.trim(),
+        );
+        await engineer_api_client.ApiClient.setAuthToken(response.body.token);
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const EngineerPage()),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.message)),
+          const SnackBar(content: Text('Login failed')),
         );
       }
     } catch (e) {

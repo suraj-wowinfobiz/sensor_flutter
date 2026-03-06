@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/alerts_api.dart';
+import '../api/sensor_api.dart';
 import '../models/alert.dart';
 import '../providers/super_admin_api_riverpod_provider.dart';
-import '../providers/super_admin_riverpod_provider.dart';
+import '../widgets/crud_modal.dart';
 
 class AlertsScreen extends ConsumerWidget {
   const AlertsScreen({super.key});
@@ -18,6 +19,8 @@ class AlertsScreen extends ConsumerWidget {
   }
 
   void _showDetails(BuildContext context, Alert alert) {
+    String fmtDate(DateTime? value) => value == null ? '-' : _formatDate(value);
+    String fmtText(String value) => value.trim().isEmpty ? '-' : value.trim();
     showDialog<void>(
       context: context,
       builder: (_) {
@@ -27,13 +30,25 @@ class AlertsScreen extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Message: ${alert.message}'),
+              Text('Alert ID: ${fmtText(alert.id)}'),
               const SizedBox(height: 8),
-              Text('Level: ${alert.alertLevel}'),
+              Text('Status: ${fmtText(alert.status)}'),
               const SizedBox(height: 8),
-              Text('Sensor ID: ${alert.sensorId}'),
+              Text('Level: ${fmtText(alert.alertLevel)}'),
               const SizedBox(height: 8),
-              Text('Triggered: ${_formatDate(alert.triggeredAt)}'),
+              Text('Message: ${fmtText(alert.message)}'),
+              const SizedBox(height: 8),
+              Text('Sensor ID: ${fmtText(alert.sensorId)}'),
+              const SizedBox(height: 8),
+              Text('Sensor Parameter ID: ${fmtText(alert.sensorParameterId)}'),
+              const SizedBox(height: 8),
+              Text('Assigned To: ${fmtText(alert.assignedTo)}'),
+              const SizedBox(height: 8),
+              Text('Triggered: ${fmtDate(alert.triggeredAt)}'),
+              const SizedBox(height: 8),
+              Text('Acknowledged: ${fmtDate(alert.acknowledgedAt)}'),
+              const SizedBox(height: 8),
+              Text('Resolved: ${fmtDate(alert.resolvedAt)}'),
             ],
           ),
           actions: [
@@ -47,67 +62,348 @@ class AlertsScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _showCreateAlertDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final sensors = await SensorApi.getAllSensors();
+    if (!context.mounted) return;
+    final sensorOptions = <Map<String, String>>[];
+    final sensorParameterBySensorId = <String, String>{};
+    for (final sensor in sensors) {
+      final id = (sensor['sensorId'] ?? sensor['id'] ?? '').toString().trim();
+      if (id.isEmpty) continue;
+      final label =
+          (sensor['name'] ?? sensor['serialNumber'] ?? id).toString().trim();
+      sensorOptions.add({'value': id, 'label': label.isEmpty ? id : label});
+      sensorParameterBySensorId[id] = (sensor['sensorParameterId'] ??
+              sensor['sensor_parameter_id'] ??
+              sensor['parameterId'] ??
+              id)
+          .toString()
+          .trim();
+    }
+
+    String sensorId = '';
+    String alertLevel = '';
+    String message = '';
+    String assignedTo = '';
+    if (sensorOptions.isNotEmpty) {
+      sensorId = sensorOptions.first['value']!;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return CrudModal(
+            title: 'Add Alert',
+            fields: [
+              if (sensorOptions.isNotEmpty)
+                {
+                  'label': 'sensor',
+                  'type': 'select',
+                  'value': sensorId.isEmpty ? null : sensorId,
+                  'options': sensorOptions,
+                  'onChanged': (String? value) =>
+                      setDialogState(() => sensorId = value ?? ''),
+                }
+              else
+                {
+                  'label': 'sensor',
+                  'value': sensorId,
+                  'onChanged': (String value) =>
+                      setDialogState(() => sensorId = value),
+                  'keyboardType': TextInputType.text,
+                },
+              {
+                'label': 'alertLevel',
+                'value': alertLevel,
+                'onChanged': (String value) =>
+                    setDialogState(() => alertLevel = value),
+                'keyboardType': TextInputType.text,
+              },
+              {
+                'label': 'message',
+                'value': message,
+                'onChanged': (String value) =>
+                    setDialogState(() => message = value),
+                'keyboardType': TextInputType.text,
+              },
+              {
+                'label': 'assignedTo',
+                'value': assignedTo,
+                'onChanged': (String value) =>
+                    setDialogState(() => assignedTo = value),
+                'keyboardType': TextInputType.text,
+              },
+            ],
+            onSave: () async {
+              final sensorParameterId =
+                  sensorParameterBySensorId[sensorId]?.trim() ?? '';
+              if (sensorId.trim().isEmpty ||
+                  sensorParameterId.trim().isEmpty ||
+                  alertLevel.trim().isEmpty ||
+                  message.trim().isEmpty ||
+                  assignedTo.trim().isEmpty) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(
+                    content: Text('All alert fields are required'),
+                  ),
+                );
+                return;
+              }
+              try {
+                await AlertsApi.createAlert(
+                  sensorId: sensorId,
+                  sensorParameterId: sensorParameterId,
+                  alertLevel: alertLevel,
+                  message: message,
+                  assignedTo: assignedTo,
+                );
+                ref.invalidate(superAdminAlertsApiProvider);
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              } catch (e) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content: Text('Failed to create alert: $e')),
+                  );
+                }
+              }
+            },
+            onCancel: () => Navigator.pop(dialogContext),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _showEditAlertDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Alert alert,
+  ) async {
+    final sensors = await SensorApi.getAllSensors();
+    if (!context.mounted) return;
+    final sensorOptions = <Map<String, String>>[];
+    final sensorParameterBySensorId = <String, String>{};
+    for (final sensor in sensors) {
+      final id = (sensor['sensorId'] ?? sensor['id'] ?? '').toString().trim();
+      if (id.isEmpty) continue;
+      final label =
+          (sensor['name'] ?? sensor['serialNumber'] ?? id).toString().trim();
+      sensorOptions.add({'value': id, 'label': label.isEmpty ? id : label});
+      sensorParameterBySensorId[id] = (sensor['sensorParameterId'] ??
+              sensor['sensor_parameter_id'] ??
+              sensor['parameterId'] ??
+              id)
+          .toString()
+          .trim();
+    }
+
+    String sensorId = alert.sensorId.trim();
+    String alertLevel = alert.alertLevel.trim();
+    String message = alert.message.trim();
+    String assignedTo = alert.assignedTo.trim();
+    if (sensorId.isEmpty && sensorOptions.isNotEmpty) {
+      sensorId = sensorOptions.first['value']!;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return CrudModal(
+            title: 'Edit Alert',
+            fields: [
+              if (sensorOptions.isNotEmpty)
+                {
+                  'label': 'sensor',
+                  'type': 'select',
+                  'value': sensorId.isEmpty ? null : sensorId,
+                  'options': sensorOptions,
+                  'onChanged': (String? value) =>
+                      setDialogState(() => sensorId = value ?? ''),
+                }
+              else
+                {
+                  'label': 'sensor',
+                  'value': sensorId,
+                  'onChanged': (String value) =>
+                      setDialogState(() => sensorId = value),
+                  'keyboardType': TextInputType.text,
+                },
+              {
+                'label': 'alertLevel',
+                'value': alertLevel,
+                'onChanged': (String value) =>
+                    setDialogState(() => alertLevel = value),
+                'keyboardType': TextInputType.text,
+              },
+              {
+                'label': 'message',
+                'value': message,
+                'onChanged': (String value) =>
+                    setDialogState(() => message = value),
+                'keyboardType': TextInputType.text,
+              },
+              {
+                'label': 'assignedTo',
+                'value': assignedTo,
+                'onChanged': (String value) =>
+                    setDialogState(() => assignedTo = value),
+                'keyboardType': TextInputType.text,
+              },
+            ],
+            onSave: () async {
+              final sensorParameterId =
+                  sensorParameterBySensorId[sensorId]?.trim() ?? '';
+              if (alert.id.trim().isEmpty ||
+                  sensorId.trim().isEmpty ||
+                  sensorParameterId.isEmpty ||
+                  alertLevel.trim().isEmpty ||
+                  message.trim().isEmpty ||
+                  assignedTo.trim().isEmpty) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(
+                    content: Text('All alert fields are required'),
+                  ),
+                );
+                return;
+              }
+              try {
+                await AlertsApi.updateAlert(
+                  id: alert.id,
+                  sensorId: sensorId,
+                  sensorParameterId: sensorParameterId,
+                  alertLevel: alertLevel,
+                  message: message,
+                  assignedTo: assignedTo,
+                );
+                ref.invalidate(superAdminAlertsApiProvider);
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              } catch (e) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content: Text('Failed to update alert: $e')),
+                  );
+                }
+              }
+            },
+            onCancel: () => Navigator.pop(dialogContext),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _deleteAlert(
+    BuildContext context,
+    WidgetRef ref,
+    Alert alert,
+  ) async {
+    if (alert.id.trim().isEmpty) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Alert'),
+        content: const Text('Are you sure you want to delete this alert?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !context.mounted) return;
+    try {
+      await AlertsApi.deleteAlert(alert.id);
+      ref.invalidate(superAdminAlertsApiProvider);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete alert: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final alertsAsync = ref.watch(superAdminAlertsApiProvider);
-    final fallbackDb = ref.watch(superAdminBackendChangeNotifierProvider);
     final apiAlerts = alertsAsync.maybeWhen(
       data: (value) => value,
       orElse: () => const <Alert>[],
     );
-    final sourceAlerts = apiAlerts.isNotEmpty
-        ? apiAlerts
-        : fallbackDb.alerts.where((a) => !a.isResolved).toList();
-    final activeAlerts = sourceAlerts.where((a) => !a.isResolved).toList();
-    final criticalCount =
-        activeAlerts.where((a) => a.alertLevel == 'critical').length;
-    final warningCount =
-        activeAlerts.where((a) => a.alertLevel != 'critical').length;
+    final allAlerts = apiAlerts;
+    final activeCount = allAlerts
+        .where((a) => a.status.trim().toUpperCase() == 'ACTIVE')
+        .length;
+    final criticalCount = allAlerts
+        .where((a) => a.alertLevel.trim().toLowerCase() == 'critical')
+        .length;
+    final warningCount = allAlerts
+        .where((a) => a.alertLevel.trim().toLowerCase() != 'critical')
+        .length;
 
     return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Alert Management',
-                style: TextStyle(
-                  fontSize: 34,
-                  fontWeight: FontWeight.w800,
-                  color: Theme.of(context).brightness == Brightness.light
-                      ? const Color(0xFF0f202d)
-                      : const Color(0xFFd4e4ef),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Monitor and manage system alerts',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: isLight
-                      ? const Color(0xFF4e6473)
-                      : const Color(0xFF9db7d2),
-                ),
-              ),
-              const SizedBox(height: 18),
-              _buildSummaryCards(
-                activeCount: activeAlerts.length,
-                criticalCount: criticalCount,
-                warningCount: warningCount,
-              ),
-              const SizedBox(height: 16),
-              _buildActiveAlertsPanel(
-                context,
-                activeAlerts,
-                onAcknowledge: (alertId) async {
-                  await AlertsApi.resolveAlert(alertId);
-                  ref.invalidate(superAdminAlertsApiProvider);
-                },
-              ),
-            ],
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Alert Management',
+            style: TextStyle(
+              fontSize: 34,
+              fontWeight: FontWeight.w800,
+              color: Theme.of(context).brightness == Brightness.light
+                  ? const Color(0xFF0f202d)
+                  : const Color(0xFFd4e4ef),
+            ),
           ),
-        );
+          const SizedBox(height: 2),
+          Text(
+            'Monitor and manage system alerts',
+            style: TextStyle(
+              fontSize: 15,
+              color:
+                  isLight ? const Color(0xFF4e6473) : const Color(0xFF9db7d2),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              onPressed: () => _showCreateAlertDialog(context, ref),
+              icon: const Icon(Icons.add_alert),
+              label: const Text('Add Alert'),
+            ),
+          ),
+          const SizedBox(height: 18),
+          _buildSummaryCards(
+            activeCount: activeCount,
+            criticalCount: criticalCount,
+            warningCount: warningCount,
+          ),
+          const SizedBox(height: 16),
+          _buildActiveAlertsPanel(
+            context,
+            allAlerts,
+            onAcknowledge: (alertId) async {
+              await AlertsApi.resolveAlert(alertId);
+              ref.invalidate(superAdminAlertsApiProvider);
+            },
+            onEdit: (alert) => _showEditAlertDialog(context, ref, alert),
+            onDelete: (alert) => _deleteAlert(context, ref, alert),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildSummaryCards({
@@ -244,9 +540,11 @@ class AlertsScreen extends ConsumerWidget {
 
   Widget _buildActiveAlertsPanel(
     BuildContext context,
-    List<Alert> activeAlerts,
-    {required Future<void> Function(String alertId) onAcknowledge}
-  ) {
+    List<Alert> alerts, {
+    required Future<void> Function(String alertId) onAcknowledge,
+    required Future<void> Function(Alert alert) onEdit,
+    required Future<void> Function(Alert alert) onDelete,
+  }) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: double.infinity,
@@ -260,7 +558,7 @@ class AlertsScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Active Alerts',
+            'Alerts',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
@@ -269,11 +567,11 @@ class AlertsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 14),
-          if (activeAlerts.isEmpty)
+          if (alerts.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Text(
-                'No active alerts',
+                'No alerts found',
                 style: TextStyle(
                   color: isLight
                       ? const Color(0xFF60717c)
@@ -281,8 +579,25 @@ class AlertsScreen extends ConsumerWidget {
                 ),
               ),
             ),
-          ...activeAlerts.map((alert) {
-            final isCritical = alert.alertLevel == 'critical';
+          ...alerts.map((alert) {
+            final isCritical =
+                alert.alertLevel.trim().toLowerCase() == 'critical';
+            final messageText =
+                alert.message.trim().isEmpty ? '-' : alert.message.trim();
+            final statusText =
+                alert.status.trim().isEmpty ? '-' : alert.status.trim();
+            final sensorText =
+                alert.sensorId.trim().isEmpty ? '-' : alert.sensorId.trim();
+            final sensorParameterText = alert.sensorParameterId.trim().isEmpty
+                ? '-'
+                : alert.sensorParameterId.trim();
+            final assignedToText =
+                alert.assignedTo.trim().isEmpty ? '-' : alert.assignedTo.trim();
+            final acknowledgedText = alert.acknowledgedAt == null
+                ? '-'
+                : _formatDate(alert.acknowledgedAt!);
+            final resolvedText =
+                alert.resolvedAt == null ? '-' : _formatDate(alert.resolvedAt!);
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(16),
@@ -335,7 +650,7 @@ class AlertsScreen extends ConsumerWidget {
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                alert.message,
+                                messageText,
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -357,6 +672,46 @@ class AlertsScreen extends ConsumerWidget {
                                 : const Color(0xFF9FB4C6),
                           ),
                         ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Status: $statusText',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isLight
+                                ? const Color(0xFF506775)
+                                : const Color(0xFF9FB4C6),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Sensor: $sensorText | Parameter: $sensorParameterText',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isLight
+                                ? const Color(0xFF506775)
+                                : const Color(0xFF9FB4C6),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Assigned To: $assignedToText',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isLight
+                                ? const Color(0xFF506775)
+                                : const Color(0xFF9FB4C6),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Acknowledged: $acknowledgedText | Resolved: $resolvedText',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isLight
+                                ? const Color(0xFF506775)
+                                : const Color(0xFF9FB4C6),
+                          ),
+                        ),
                         const SizedBox(height: 10),
                         Wrap(
                           spacing: 8,
@@ -365,12 +720,24 @@ class AlertsScreen extends ConsumerWidget {
                             _actionButton(
                               context,
                               label: 'Acknowledge',
-                              onTap: () => onAcknowledge(alert.id),
+                              onTap: alert.id.trim().isEmpty
+                                  ? () {}
+                                  : () => onAcknowledge(alert.id),
                             ),
                             _actionButton(
                               context,
                               label: 'View Details',
                               onTap: () => _showDetails(context, alert),
+                            ),
+                            _actionButton(
+                              context,
+                              label: 'Edit',
+                              onTap: () => onEdit(alert),
+                            ),
+                            _actionButton(
+                              context,
+                              label: 'Delete',
+                              onTap: () => onDelete(alert),
                             ),
                           ],
                         ),
@@ -400,7 +767,7 @@ class AlertsScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              alert.message,
+                              messageText,
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
@@ -419,6 +786,46 @@ class AlertsScreen extends ConsumerWidget {
                                     : const Color(0xFF9FB4C6),
                               ),
                             ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Status: $statusText',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isLight
+                                    ? const Color(0xFF506775)
+                                    : const Color(0xFF9FB4C6),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Sensor: $sensorText | Parameter: $sensorParameterText',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isLight
+                                    ? const Color(0xFF506775)
+                                    : const Color(0xFF9FB4C6),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Assigned To: $assignedToText',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isLight
+                                    ? const Color(0xFF506775)
+                                    : const Color(0xFF9FB4C6),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Acknowledged: $acknowledgedText | Resolved: $resolvedText',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isLight
+                                    ? const Color(0xFF506775)
+                                    : const Color(0xFF9FB4C6),
+                              ),
+                            ),
                             const SizedBox(height: 10),
                             Wrap(
                               spacing: 8,
@@ -427,12 +834,24 @@ class AlertsScreen extends ConsumerWidget {
                                 _actionButton(
                                   context,
                                   label: 'Acknowledge',
-                                  onTap: () => onAcknowledge(alert.id),
+                                  onTap: alert.id.trim().isEmpty
+                                      ? () {}
+                                      : () => onAcknowledge(alert.id),
                                 ),
                                 _actionButton(
                                   context,
                                   label: 'View Details',
                                   onTap: () => _showDetails(context, alert),
+                                ),
+                                _actionButton(
+                                  context,
+                                  label: 'Edit',
+                                  onTap: () => onEdit(alert),
+                                ),
+                                _actionButton(
+                                  context,
+                                  label: 'Delete',
+                                  onTap: () => onDelete(alert),
                                 ),
                               ],
                             ),

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../super_admin/api/api_client.dart';
+import '../api/analytics_role_login_api.dart';
 import '../analytics_role_page.dart';
 import '../providers/analytics_role_riverpod_provider.dart';
 
@@ -17,7 +20,7 @@ class _AnalyticsRoleLoginScreenState
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  void _login() {
+  Future<void> _login() async {
     if (_emailController.text.trim().isEmpty ||
         _passwordController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -28,13 +31,39 @@ class _AnalyticsRoleLoginScreenState
 
     ref.read(analyticsRoleLoginLoadingStateProvider.notifier).state = true;
 
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (!mounted) return;
-      ref.read(analyticsRoleLoginLoadingStateProvider.notifier).state = false;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const AnalyticsRolePage()),
+    try {
+      final response = await AnalyticsRoleLoginApi.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
       );
-    });
+
+      if (!mounted) return;
+      if (response.status.toUpperCase() == 'SUCCESS') {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'analytics_role_principal_id',
+          response.body.principalId.trim(),
+        );
+        await ApiClient.setAuthToken(response.body.token);
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const AnalyticsRolePage()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login failed')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        ref.read(analyticsRoleLoginLoadingStateProvider.notifier).state = false;
+      }
+    }
   }
 
   @override
@@ -160,12 +189,11 @@ class _AnalyticsRoleLoginScreenState
                         color: subColor,
                       ),
                       onPressed: () => ref
-                              .read(
-                                analyticsRoleLoginObscurePasswordStateProvider
-                                    .notifier,
-                              )
-                              .state =
-                          !obscurePassword,
+                          .read(
+                            analyticsRoleLoginObscurePasswordStateProvider
+                                .notifier,
+                          )
+                          .state = !obscurePassword,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),

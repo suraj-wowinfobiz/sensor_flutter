@@ -5,22 +5,23 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../shared/models/threshold_rule.dart';
-import '../providers/super_admin_api_riverpod_provider.dart';
-import '../providers/super_admin_riverpod_provider.dart';
-import '../services/analytics_sse_service.dart';
-import '../services/generic_sse_service.dart';
+import '../../super_admin/services/analytics_sse_service.dart';
+import '../../super_admin/services/generic_sse_service.dart';
+import '../../super_admin/shared/models/threshold_rule.dart';
+import '../providers/user_api_riverpod_provider.dart';
+import '../providers/user_riverpod_provider.dart';
 
-class DashboardScreen extends ConsumerStatefulWidget {
+class UserDashboardScreen extends ConsumerStatefulWidget {
   final bool embeddedScroll;
 
-  const DashboardScreen({super.key, this.embeddedScroll = false});
+  const UserDashboardScreen({super.key, this.embeddedScroll = false});
 
   @override
-  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+  ConsumerState<UserDashboardScreen> createState() =>
+      _UserDashboardScreenState();
 }
 
-class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
   final AnalyticsSseService _analyticsSseService = AnalyticsSseService();
   final GenericSseService _rawSseService =
       GenericSseService('/api/v1/ingestion/readings/live');
@@ -564,8 +565,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final db = ref.watch(superAdminBackendChangeNotifierProvider);
-    final statsApi = ref.watch(superAdminDashboardStatsApiProvider).valueOrNull;
+    final db = ref.watch(userDatabaseChangeNotifierProvider);
+    final statsApi = ref.watch(userDashboardStatsApiProvider).valueOrNull;
     final activeAlerts = (statsApi?['activeAlerts'] as num?)?.toInt() ??
         db.getActiveAlerts().length;
     final avgTilt = (statsApi?['averageTilt'] as num?)?.toDouble() ??
@@ -1931,7 +1932,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildSensorReadingsCard(BuildContext context) {
-    final db = ref.watch(superAdminBackendChangeNotifierProvider);
+    final db = ref.watch(userDatabaseChangeNotifierProvider);
     final thresholds = _dashboardThresholds(db);
     final rows = _processedSnapshots.reversed.take(8).map((snapshot) {
       final shortId = snapshot.sensorId.length > 12
@@ -2932,7 +2933,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     BuildContext context,
     ThresholdGraphTarget target,
   ) {
-    final db = ref.watch(superAdminBackendChangeNotifierProvider);
+    final db = ref.watch(userDatabaseChangeNotifierProvider);
     final rules = db.thresholdRulesForGraph(target);
 
     return rules

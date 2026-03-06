@@ -4,13 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../super_admin/core/responsive/responsive_extensions.dart';
 import '../../super_admin/core/theme/custom_theme_tokens.dart';
+import '../../super_admin/screens/analytics_screen.dart';
+import '../../super_admin/screens/organizations_screen.dart';
+import '../../super_admin/screens/users_screen.dart';
 import '../../user/widgets/nav_bar.dart';
 import '../providers/vendor_riverpod_provider.dart';
 import 'dashboard_screen.dart';
-import 'engineers_screen.dart';
 import 'map_screen.dart';
 import 'settings_screen.dart';
-import 'site_allocation_screen.dart';
 import 'vendor_login_screen.dart';
 
 class VendorScreen extends ConsumerStatefulWidget {
@@ -59,7 +60,46 @@ class _VendorScreenState extends ConsumerState<VendorScreen>
   void _setCurrentView(String view) {
     final normalized = _normalizeView(view);
     if (_currentView == normalized) return;
+    if (normalized == 'users') {
+      _loadUsersPageData();
+    }
+    if (normalized == 'organizations') {
+      _loadOrganizationsPageData();
+    }
+    if (normalized == 'analytics') {
+      final db = ref.read(vendorDatabaseChangeNotifierProvider);
+      db.loadDevices();
+      db.loadSensors();
+      db.loadSensorTypes();
+    }
     setState(() => _currentView = normalized);
+  }
+
+  Future<void> _loadUsersPageData() async {
+    final db = ref.read(vendorDatabaseChangeNotifierProvider);
+    try {
+      await db.loadOrganizations();
+      await db.loadSites();
+      for (final site in db.sites) {
+        await db.loadZones(site.id);
+      }
+      await db.loadUsers();
+    } catch (_) {
+      // Keep view navigation responsive even if API calls fail.
+    }
+  }
+
+  Future<void> _loadOrganizationsPageData() async {
+    final db = ref.read(vendorDatabaseChangeNotifierProvider);
+    try {
+      await db.loadOrganizations();
+      await db.loadSites();
+      for (final site in db.sites) {
+        await db.loadZones(site.id);
+      }
+    } catch (_) {
+      // Keep view navigation responsive even if API calls fail.
+    }
   }
 
   bool _onScroll(UserScrollNotification notification) {
@@ -224,7 +264,14 @@ class _VendorScreenState extends ConsumerState<VendorScreen>
     required String currentView,
     required ValueChanged<String> onViewChanged,
   }) {
-    const views = ['dashboard', 'engineers', 'map', 'allocation', 'settings'];
+    const views = [
+      'dashboard',
+      'users',
+      'analytics',
+      'map',
+      'organizations',
+      'settings'
+    ];
     final index = views.indexOf(currentView);
     final isLight = Theme.of(context).brightness == Brightness.light;
     final selectedColor = Theme.of(context).colorScheme.primary;
@@ -273,8 +320,13 @@ class _VendorScreenState extends ConsumerState<VendorScreen>
                 label: '',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.engineering_outlined),
-                activeIcon: Icon(Icons.engineering),
+                icon: Icon(Icons.people_outline),
+                activeIcon: Icon(Icons.people),
+                label: '',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.analytics_outlined),
+                activeIcon: Icon(Icons.analytics),
                 label: '',
               ),
               BottomNavigationBarItem(
@@ -283,8 +335,8 @@ class _VendorScreenState extends ConsumerState<VendorScreen>
                 label: '',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.place_outlined),
-                activeIcon: Icon(Icons.place),
+                icon: Icon(Icons.business_outlined),
+                activeIcon: Icon(Icons.business),
                 label: '',
               ),
               BottomNavigationBarItem(
@@ -314,12 +366,17 @@ class _VendorScreenState extends ConsumerState<VendorScreen>
     switch (view) {
       case 'dashboard':
         return const VendorDashboardScreen();
-      case 'engineers':
-        return const VendorEngineersScreen();
+      case 'users':
+        return const UsersScreen(
+          createDefaultRole: 'Vendor_engineer',
+          selectableRoles: ['Vendor_engineer'],
+        );
+      case 'analytics':
+        return const AnalyticsScreen();
       case 'map':
         return const VendorMapScreen();
-      case 'allocation':
-        return const VendorSiteAllocationScreen();
+      case 'organizations':
+        return const OrganizationsScreen();
       case 'settings':
         return const VendorSettingsScreen();
       default:
@@ -473,9 +530,15 @@ class _VendorSideMenu extends StatelessWidget {
                     ),
                     _buildMenuItem(
                       context,
-                      'Engineers',
-                      Icons.engineering,
-                      'engineers',
+                      'Users',
+                      Icons.people_outline,
+                      'users',
+                    ),
+                    _buildMenuItem(
+                      context,
+                      'Analytics',
+                      Icons.analytics_outlined,
+                      'analytics',
                     ),
                     _buildMenuItem(
                       context,
@@ -485,9 +548,9 @@ class _VendorSideMenu extends StatelessWidget {
                     ),
                     _buildMenuItem(
                       context,
-                      'Site Allocation',
-                      Icons.place_outlined,
-                      'allocation',
+                      'Organizations',
+                      Icons.business_outlined,
+                      'organizations',
                     ),
                     _buildMenuItem(
                       context,

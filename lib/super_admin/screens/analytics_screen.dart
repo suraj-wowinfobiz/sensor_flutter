@@ -17,7 +17,7 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
-  String? _selectedSensorId;
+  String? _selectedDeviceId;
   String _compareMode = 'none';
   String _range = '24h';
   bool _paused = false;
@@ -50,6 +50,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       if (!mounted || _paused) return;
       final metrics = _extractProcessedMetrics(payload);
       if (metrics == null) return;
+      final selectedDeviceId = _selectedDeviceId?.trim();
+      if (selectedDeviceId != null && selectedDeviceId.isNotEmpty) {
+        final db = context.read<SuperAdminBackendProvider>();
+        final sensor =
+            db.sensors.where((s) => s.id == metrics.sensorId).firstOrNull;
+        if (sensor == null || sensor.deviceId != selectedDeviceId) {
+          return;
+        }
+      }
       setState(() {
         final xIndex = _dataPointIndex.toDouble();
         _gravityMagnitudeData.add(FlSpot(xIndex, metrics.gravityMagnitude));
@@ -125,6 +134,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             : null;
         final gravityMagnitude = horizontalMagnitude ?? computedRms;
         if (gravityMagnitude == null) continue;
+        final sensorId = (map['sensorId'] ??
+                map['sensor_id'] ??
+                (rawPayload is Map ? rawPayload['sensorId'] : null) ??
+                (rawPayload is Map ? rawPayload['sensor_id'] : null) ??
+                processedPayload['sensorId'] ??
+                processedPayload['sensor_id'] ??
+                '')
+            .toString()
+            .trim();
         final motion = _toBoolOrNumberTrue(
               rawParams is Map ? rawParams['motionDetected'] : null,
             ) ??
@@ -132,6 +150,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             false;
 
         return _ProcessedMetrics(
+          sensorId: sensorId,
           gravityMagnitude: gravityMagnitude,
           motionDetected: motion,
         );
@@ -142,7 +161,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final z = _toDouble(map['z']);
       if (x != null && y != null && z != null) {
         final magnitude = sqrt((x * x) + (y * y) + (z * z));
+        final sensorId =
+            (map['sensorId'] ?? map['sensor_id'] ?? '').toString().trim();
         return _ProcessedMetrics(
+          sensorId: sensorId,
           gravityMagnitude: magnitude,
           motionDetected: false,
         );
@@ -270,18 +292,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       _selectCard(
                         context,
                         width: selectorCardWidth,
-                        title: 'Sensor',
+                        title: 'Device',
                         child: _dropdown(
-                          value: _selectedSensorId,
-                          hint: 'Select a sensor',
-                          items: filteredSensors
-                              .map((s) => DropdownMenuItem(
-                                    value: s.id,
-                                    child: Text(s.serialNumber),
+                          value: _selectedDeviceId,
+                          hint: 'Select a device',
+                          items: db.devices
+                              .map((d) => DropdownMenuItem(
+                                    value: d.id,
+                                    child: Text(d.deviceCode),
                                   ))
                               .toList(),
-                          onChanged: (value) =>
-                              setState(() => _selectedSensorId = value),
+                          onChanged: (value) => setState(() {
+                            _selectedDeviceId = value;
+                            _gravityMagnitudeData.clear();
+                            _motionData.clear();
+                            _dataPointIndex = 0;
+                          }),
                         ),
                       ),
                       _selectCard(
@@ -1123,10 +1149,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
 class _ProcessedMetrics {
   const _ProcessedMetrics({
+    required this.sensorId,
     required this.gravityMagnitude,
     required this.motionDetected,
   });
 
+  final String sensorId;
   final double gravityMagnitude;
   final bool motionDetected;
 }

@@ -32,8 +32,6 @@ class ThresholdsApi {
     double? warrningLevel,
     String? sensorParamterId,
   }) async {
-    final legacyWarningLevel = warrningLevel ?? warningLevel;
-    final legacySensorParamterId = sensorParamterId ?? sensorParameterId;
     final response = await ApiClient.post(
       '/api/v1/thresholds',
       data: {
@@ -43,8 +41,6 @@ class ThresholdsApi {
         'maxThresholdValue': maxThresholdValue,
         'warningLevel': warningLevel,
         'criticalLevel': criticalLevel,
-        'warrningLevel': legacyWarningLevel,
-        'sensorParamterId': legacySensorParamterId,
       },
     );
     return _asMap(response.body);
@@ -67,8 +63,31 @@ class ThresholdsApi {
   }
 
   static List<Map<String, dynamic>> _asListMap(dynamic body) {
-    if (body is! List) return const [];
-    return body.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
+    if (body is List) {
+      return body
+          .whereType<Map>()
+          .map((e) => e.cast<String, dynamic>())
+          .toList();
+    }
+    if (body is Map) {
+      final map = body.cast<String, dynamic>();
+      final candidates = [
+        map['data'],
+        map['items'],
+        map['results'],
+        map['profiles'],
+        map['thresholdProfiles'],
+      ];
+      for (final candidate in candidates) {
+        if (candidate is List) {
+          return candidate
+              .whereType<Map>()
+              .map((e) => e.cast<String, dynamic>())
+              .toList();
+        }
+      }
+    }
+    return const [];
   }
 
   static Map<String, dynamic> _asMap(dynamic body) {

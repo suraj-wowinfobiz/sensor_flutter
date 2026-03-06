@@ -79,6 +79,9 @@ class _UserScreenState extends ConsumerState<UserScreen>
   void _setCurrentView(String view) {
     final normalized = _normalizeView(view);
     if (_currentView == normalized) return;
+    if (normalized == 'alerts') {
+      ref.read(userDatabaseChangeNotifierProvider).loadAlerts();
+    }
     setState(() => _currentView = normalized);
   }
 

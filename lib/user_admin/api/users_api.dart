@@ -1,6 +1,11 @@
 import 'api_client.dart';
 
 class UsersApi {
+  static Future<Map<String, dynamic>> getUserById(String userId) async {
+    final response = await ApiClient.get('/api/v1/users/$userId');
+    return _asMap(response.body);
+  }
+
   static Future<List<Map<String, dynamic>>> getUsers() async {
     final response = await ApiClient.get('/api/v1/users/get-all');
     final body = response.body;
@@ -82,6 +87,53 @@ class UsersApi {
         'name': name,
         'email': email,
         'role': role,
+      },
+    );
+    return _asMap(response.body);
+  }
+
+  static Future<Map<String, dynamic>> updateUserById({
+    required String userId,
+    required String name,
+    required String email,
+    required String password,
+    required String organizationId,
+    required int maxUsersAllowed,
+    required bool active,
+  }) async {
+    final response = await ApiClient.put(
+      '/api/v1/users/$userId',
+      data: {
+        'name': name,
+        'email': email,
+        'password': password,
+        'organizationId': organizationId,
+        'maxUsersAllowed': maxUsersAllowed,
+        'active': active,
+      },
+    );
+    return _asMap(response.body);
+  }
+
+  static Future<Map<String, dynamic>> updateUserProfile({
+    required String userId,
+    required String name,
+    required String email,
+    String? password,
+    required String organizationId,
+    required int maxUsersAllowed,
+    required bool active,
+  }) async {
+    final response = await ApiClient.put(
+      '/api/v1/users/$userId',
+      data: {
+        'name': name,
+        'email': email,
+        if (password != null && password.trim().isNotEmpty)
+          'password': password.trim(),
+        'organizationId': organizationId.trim(),
+        'maxUsersAllowed': maxUsersAllowed,
+        'active': active,
       },
     );
     return _asMap(response.body);

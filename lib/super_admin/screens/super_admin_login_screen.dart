@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
 import '../api/super_admin_login_api.dart';
@@ -35,11 +36,17 @@ class _SuperAdminLoginScreenState extends ConsumerState<SuperAdminLoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      print('API Response: status=${response.status}, message=${response.message}');
+      print(
+          'API Response: status=${response.status}, message=${response.message}');
 
       if (!mounted) return;
 
       if (response.status.toUpperCase() == 'SUCCESS') {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'super_admin_principal_id',
+          response.body.principalId.trim(),
+        );
         await ApiClient.setAuthToken(response.body.token);
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
@@ -181,9 +188,8 @@ class _SuperAdminLoginScreenState extends ConsumerState<SuperAdminLoginScreen> {
                         color: subColor,
                       ),
                       onPressed: () => ref
-                          .read(
-                              superAdminLoginObscurePasswordStateProvider
-                                  .notifier)
+                          .read(superAdminLoginObscurePasswordStateProvider
+                              .notifier)
                           .state = !obscurePassword,
                     ),
                     border: OutlineInputBorder(

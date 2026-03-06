@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import '../../super_admin/api/device_api.dart';
 import '../../super_admin/api/sensor_api.dart';
 import '../../super_admin/shared/models/threshold_rule.dart';
+import '../api/alerts_api.dart';
+import '../api/thresholds_api.dart';
 import '../models/alert.dart';
 import '../models/audit_log.dart';
 import '../models/config.dart';
@@ -323,17 +325,63 @@ class UserDatabaseProvider extends ChangeNotifier {
   }
 
   Future<void> loadThresholdProfiles() async {
-    thresholdProfiles = [];
+    try {
+      final body = await ThresholdsApi.getProfiles();
+      thresholdProfiles = body.map((json) {
+        return ThresholdProfile(
+          id: _asString(json['thresholdProfileId'] ?? json['id'], _uuid()),
+          name: _asString(json['name'], 'Profile'),
+          description: _asString(json['description']),
+        );
+      }).toList();
+    } catch (_) {
+      thresholdProfiles = [];
+    }
     notifyListeners();
   }
 
   Future<void> loadThresholdValues() async {
-    thresholdValues = [];
+    try {
+      final body = await ThresholdsApi.getThresholds();
+      thresholdValues = body.map((json) {
+        return ThresholdValue(
+          id: _asString(
+            json['thresholdValueId'] ?? json['thresholdId'] ?? json['id'],
+            _uuid(),
+          ),
+          sensorParameterId: _asString(
+            json['sensorParameterId'] ??
+                json['sensorParamterId'] ??
+                json['sensor_parameter_id'],
+          ),
+          thresholdProfileId: _asString(
+            json['thresholdProfileId'] ?? json['threshold_profile_id'],
+          ),
+          minThreshold:
+              _asDouble(json['minThresholdValue'] ?? json['min_threshold']),
+          maxThreshold:
+              _asDouble(json['maxThresholdValue'] ?? json['max_threshold']),
+          warningLevel: _asDouble(
+            json['warningLevel'] ??
+                json['warrningLevel'] ??
+                json['warning_level'],
+          ),
+          criticalLevel:
+              _asDouble(json['criticalLevel'] ?? json['critical_level']),
+        );
+      }).toList();
+    } catch (_) {
+      thresholdValues = [];
+    }
     notifyListeners();
   }
 
   Future<void> loadAlerts() async {
-    alerts = [];
+    try {
+      alerts = await AlertsApi.getAlerts();
+    } catch (_) {
+      alerts = [];
+    }
     notifyListeners();
   }
 
@@ -442,6 +490,11 @@ class UserDatabaseProvider extends ChangeNotifier {
   }
 
   Future<void> resolveAlert(String id) async {
+    try {
+      await AlertsApi.resolveAlert(id);
+    } catch (_) {
+      // Keep UI responsive and still clear local list entry.
+    }
     alerts.removeWhere((item) => item.id == id);
     notifyListeners();
   }

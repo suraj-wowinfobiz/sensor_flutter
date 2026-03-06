@@ -25,8 +25,6 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
   String _maxThresholdValue = '0';
   String _warningLevel = '0';
   String _criticalLevel = '0';
-  String _warrningLevel = '0';
-  String _sensorParamterId = '';
 
   @override
   void initState() {
@@ -105,8 +103,12 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
     );
   }
 
-  void _showThresholdValueModal() {
+  Future<void> _showThresholdValueModal() async {
     final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
+    await db.loadSensors();
+    await db.loadThresholdProfiles();
+    if (!mounted) return;
+
     final sensorOptions = db.sensors
         .where((sensor) => sensor.id.trim().isNotEmpty)
         .map((sensor) => {
@@ -128,15 +130,12 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
 
     _sensorParameterId =
         sensorOptions.isNotEmpty ? sensorOptions.first['value']! : '';
-    _thresholdProfileId = db.thresholdProfiles.isNotEmpty
-        ? db.thresholdProfiles.first.id
-        : '';
+    _thresholdProfileId =
+        db.thresholdProfiles.isNotEmpty ? db.thresholdProfiles.first.id : '';
     _minThresholdValue = '0';
     _maxThresholdValue = '0';
     _warningLevel = '0';
     _criticalLevel = '0';
-    _warrningLevel = '0';
-    _sensorParamterId = _sensorParameterId;
 
     showDialog(
       context: context,
@@ -155,15 +154,11 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
               {
                 'label': 'sensorParameterId',
                 'type': 'select',
-                'value':
-                    _sensorParameterId.isEmpty ? null : _sensorParameterId,
+                'value': _sensorParameterId.isEmpty ? null : _sensorParameterId,
                 'options': sensorOptions,
                 'onChanged': (String? value) => setState(() {
-                  _sensorParameterId = value ?? '';
-                  if (_sensorParamterId.isEmpty) {
-                    _sensorParamterId = _sensorParameterId;
-                  }
-                }),
+                      _sensorParameterId = value ?? '';
+                    }),
               },
               {
                 'label': 'thresholdProfileId',
@@ -173,7 +168,9 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
                 'options': db.thresholdProfiles
                     .map((profile) => {
                           'value': profile.id,
-                          'label': profile.name,
+                          'label': profile.description.trim().isEmpty
+                              ? profile.name
+                              : '${profile.name} - ${profile.description}',
                         })
                     .toList(),
                 'onChanged': (String? value) =>
@@ -200,21 +197,6 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
                     setState(() => _criticalLevel = value),
                 'keyboardType': TextInputType.number,
               },
-              {
-                'label': 'warrningLevel',
-                'value': _warrningLevel,
-                'onChanged': (String value) =>
-                    setState(() => _warrningLevel = value),
-                'keyboardType': TextInputType.number,
-              },
-              {
-                'label': 'sensorParamterId',
-                'type': 'select',
-                'value': _sensorParamterId.isEmpty ? null : _sensorParamterId,
-                'options': sensorOptions,
-                'onChanged': (String? value) =>
-                    setState(() => _sensorParamterId = value ?? ''),
-              },
             ],
             onSave: () async {
               if (_thresholdProfileId.trim().isEmpty ||
@@ -231,12 +213,10 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
               final maxValue = int.tryParse(_maxThresholdValue.trim());
               final warning = int.tryParse(_warningLevel.trim());
               final critical = int.tryParse(_criticalLevel.trim());
-              final warrning = int.tryParse(_warrningLevel.trim());
               if (minValue == null ||
                   maxValue == null ||
                   warning == null ||
-                  critical == null ||
-                  warrning == null) {
+                  critical == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Threshold values must be integer numbers'),
@@ -257,10 +237,6 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
                   'maxThresholdValue': maxValue,
                   'warningLevel': warning,
                   'criticalLevel': critical,
-                  'warrningLevel': warrning,
-                  'sensorParamterId': _sensorParamterId.trim().isEmpty
-                      ? _sensorParameterId.trim()
-                      : _sensorParamterId.trim(),
                 });
                 if (context.mounted) Navigator.pop(context);
               } catch (e) {
@@ -336,6 +312,7 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
                       title: 'Threshold Values',
                       icon: Icons.tune,
                       columns: const [
+                        'Threshold Value ID',
                         'Profile',
                         'Sensor Parameter ID',
                         'Min',
@@ -345,6 +322,7 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
                       ],
                       data: db.thresholdValues
                           .map((value) => [
+                                value.id,
                                 profileNameById[value.thresholdProfileId] ??
                                     value.thresholdProfileId,
                                 value.sensorParameterId,

@@ -1,11 +1,38 @@
 import 'api_client.dart';
 
 class UsersApi {
+  static Future<Map<String, dynamic>> getUserById(String userId) async {
+    final response = await ApiClient.get('/api/v1/users/$userId');
+    return _asMap(response.body);
+  }
+
   static Future<List<Map<String, dynamic>>> getUsers() async {
     final response = await ApiClient.get('/api/v1/users/get-all');
     final body = response.body;
-    if (body is! List) return const [];
-    return body.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
+    if (body is List) {
+      return body
+          .whereType<Map>()
+          .map((e) => e.cast<String, dynamic>())
+          .toList();
+    }
+    if (body is Map) {
+      final map = body.cast<String, dynamic>();
+      final candidates = [
+        map['data'],
+        map['users'],
+        map['items'],
+        map['results'],
+      ];
+      for (final candidate in candidates) {
+        if (candidate is List) {
+          return candidate
+              .whereType<Map>()
+              .map((e) => e.cast<String, dynamic>())
+              .toList();
+        }
+      }
+    }
+    return const [];
   }
 
   static Future<Map<String, dynamic>> createUser({
@@ -75,6 +102,7 @@ class UsersApi {
     required String name,
     required String email,
     required String role,
+    String? password,
   }) async {
     final response = await ApiClient.put(
       '/api/v1/users/$id',
@@ -82,6 +110,32 @@ class UsersApi {
         'name': name,
         'email': email,
         'role': role,
+        if (password != null && password.trim().isNotEmpty)
+          'password': password.trim(),
+      },
+    );
+    return _asMap(response.body);
+  }
+
+  static Future<Map<String, dynamic>> updateUserProfile({
+    required String userId,
+    required String name,
+    required String email,
+    String? password,
+    required String organizationId,
+    required int maxUsersAllowed,
+    required bool active,
+  }) async {
+    final response = await ApiClient.put(
+      '/api/v1/users/$userId',
+      data: {
+        'name': name,
+        'email': email,
+        if (password != null && password.trim().isNotEmpty)
+          'password': password.trim(),
+        'organizationId': organizationId.trim(),
+        'maxUsersAllowed': maxUsersAllowed,
+        'active': active,
       },
     );
     return _asMap(response.body);

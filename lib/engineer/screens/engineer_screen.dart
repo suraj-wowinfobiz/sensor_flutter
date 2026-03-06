@@ -37,6 +37,16 @@ class _EngineerScreenState extends ConsumerState<EngineerScreen>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final db = ref.read(engineerDatabaseChangeNotifierProvider);
+      try {
+        await db.loadDevices();
+        await db.loadSensors();
+      } catch (_) {
+        // Keep UI usable even if one API endpoint fails.
+      }
+    });
   }
 
   void toggleMenu() {
@@ -69,6 +79,13 @@ class _EngineerScreenState extends ConsumerState<EngineerScreen>
   void _setCurrentView(String view) {
     final normalized = _normalizeView(view);
     if (_currentView == normalized) return;
+    if (normalized == 'devices') {
+      ref.read(engineerDatabaseChangeNotifierProvider).loadDevices();
+    } else if (normalized == 'sensors') {
+      ref.read(engineerDatabaseChangeNotifierProvider).loadSensors();
+    } else if (normalized == 'alerts') {
+      ref.read(engineerDatabaseChangeNotifierProvider).loadAlerts();
+    }
     setState(() => _currentView = normalized);
   }
 

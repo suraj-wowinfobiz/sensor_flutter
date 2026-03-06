@@ -1,21 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../main_page.dart';
 import '../api/thresholds_api.dart';
-import '../core/theme/custom_theme_tokens.dart';
+import '../api/users_api.dart';
 import '../providers/theme_provider.dart';
-import '../shared/models/threshold_rule.dart';
 import '../providers/super_admin_backend_provider.dart';
 import 'crud_modal.dart';
-
-enum _SettingsTab {
-  profile,
-  preferences,
-  notifications,
-  thresholds
-}
 
 class AdminAccountSettingsPanel extends StatefulWidget {
   final String roleLabel;
@@ -35,24 +27,213 @@ class AdminAccountSettingsPanel extends StatefulWidget {
 }
 
 class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
-  final TextEditingController _presetNameController =
-      TextEditingController(text: 'My Preset');
-  _SettingsTab _activeTab = _SettingsTab.profile;
-  bool _emailNotifications = true;
-  bool _smsNotifications = false;
-  bool _whatsAppNotifications = false;
-  bool _pushNotifications = true;
-  bool _criticalAlerts = true;
-  bool _warningAlerts = true;
-  bool _infoAlerts = false;
-  bool _deviceUpdates = true;
-  bool _systemNotifications = true;
-  bool _dailyDigest = false;
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _currentPasswordController =
+      TextEditingController();
+  final TextEditingController _newPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
+  final TextEditingController _organizationIdController =
+      TextEditingController();
+  final TextEditingController _maxUsersAllowedController =
+      TextEditingController();
+  bool _notificationsEnabled = true;
+  String? _profileUserId;
+  bool _profileActive = true;
+  bool _profileLoading = false;
+  bool _profileSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.text = widget.userName;
+    _emailController.text = widget.userEmail;
+    _loadProfileForm();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _prepareThresholdsTab();
+    });
+  }
 
   @override
   void dispose() {
-    _presetNameController.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    _organizationIdController.dispose();
+    _maxUsersAllowedController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadProfileForm() async {
+    setState(() => _profileLoading = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('super_admin_principal_id')?.trim() ?? '';
+      if (userId.isEmpty) {
+        throw Exception('User id not found. Please login again.');
+      }
+      final data = await UsersApi.getUserById(userId);
+      if (!mounted) return;
+      _profileUserId = userId;
+      _nameController.text = (data['name'] ?? widget.userName).toString();
+      _emailController.text = (data['email'] ?? widget.userEmail).toString();
+      _organizationIdController.text =
+          (data['organizationId'] ?? data['organization_id'] ?? '').toString();
+      _maxUsersAllowedController.text =
+          (data['maxUsersAllowed'] ?? data['max_users_allowed'] ?? '0')
+              .toString();
+      _profileActive = (data['active'] ?? true) == true;
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load profile: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _profileLoading = false);
+    }
+  }
+
+  Future<bool> _saveProfileForm() async {
+    if (_profileUserId == null || _profileUserId!.isEmpty) return false;
+
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final currentPassword = _currentPasswordController.text.trim();
+    final newPassword = _newPasswordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
+    final organizationId = _organizationIdController.text.trim();
+    final maxUsersAllowed =
+        int.tryParse(_maxUsersAllowedController.text.trim());
+    if (name.isEmpty ||
+        email.isEmpty ||
+        organizationId.isEmpty ||
+        maxUsersAllowed == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Fill name and email'),
+        ),
+      );
+      return false;
+    }
+    if (currentPassword.isNotEmpty ||
+        newPassword.isNotEmpty ||
+        confirmPassword.isNotEmpty) {
+      if (currentPassword.isEmpty ||
+          newPassword.isEmpty ||
+          confirmPassword.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Fill all password fields')),
+        );
+        return false;
+      }
+      if (newPassword != confirmPassword) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('New password and confirm password must match')),
+        );
+        return false;
+      }
+    }
+    final resolvedPassword =
+        newPassword.isNotEmpty ? newPassword : currentPassword;
+
+    setState(() => _profileSaving = true);
+    try {
+      await UsersApi.updateUserProfile(
+        userId: _profileUserId!,
+        name: name,
+        email: email,
+        password: resolvedPassword.isEmpty ? null : resolvedPassword,
+        organizationId: organizationId,
+        maxUsersAllowed: maxUsersAllowed,
+        active: _profileActive,
+      );
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated')),
+      );
+      _currentPasswordController.clear();
+      _newPasswordController.clear();
+      _confirmPasswordController.clear();
+      await _loadProfileForm();
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update profile: $e')),
+      );
+      return false;
+    } finally {
+      if (mounted) setState(() => _profileSaving = false);
+    }
+  }
+
+  Future<void> _showChangePasswordDialog(BuildContext context) async {
+    _currentPasswordController.clear();
+    _newPasswordController.clear();
+    _confirmPasswordController.clear();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Change Password'),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _editableField(
+                dialogContext,
+                label: 'currentPassword',
+                controller: _currentPasswordController,
+                obscureText: true,
+              ),
+              const SizedBox(height: 10),
+              _editableField(
+                dialogContext,
+                label: 'newPassword',
+                controller: _newPasswordController,
+                obscureText: true,
+              ),
+              const SizedBox(height: 10),
+              _editableField(
+                dialogContext,
+                label: 'confirmNewPassword',
+                controller: _confirmPasswordController,
+                obscureText: true,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: _profileSaving
+                ? null
+                : () async {
+                    final ok = await _saveProfileForm();
+                    if (ok && dialogContext.mounted) {
+                      Navigator.pop(dialogContext);
+                    }
+                  },
+            child: const Text('Update Password'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _prepareThresholdsTab() async {
+    final db = context.read<SuperAdminBackendProvider>();
+    db.loadSensors();
+    db.loadThresholdProfiles();
+    db.loadThresholdValues();
   }
 
   @override
@@ -86,7 +267,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'User Profile',
+              'Settings',
               style: TextStyle(
                 fontSize: headlineSize,
                 fontWeight: FontWeight.w800,
@@ -95,88 +276,24 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Manage your account settings and preferences',
+              'Manage profile, preferences, notifications and thresholds',
               style: TextStyle(fontSize: 15, color: subColor),
             ),
             const SizedBox(height: 18),
-            _buildTabBar(context),
-            const SizedBox(height: 18),
-            if (_activeTab == _SettingsTab.profile) _buildProfileTab(context),
-            if (_activeTab == _SettingsTab.preferences)
-              _buildPreferencesTab(context),
-            if (_activeTab == _SettingsTab.notifications)
-              _buildNotificationsTab(context),
-            if (_activeTab == _SettingsTab.thresholds)
-              _buildThresholdsTab(context),
+            _buildProfileTab(context),
+            const SizedBox(height: 16),
+            _buildPreferencesTab(context),
+            const SizedBox(height: 16),
+            _buildNotificationsTab(context),
+            const SizedBox(height: 16),
+            _buildThresholdsTab(context),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTabBar(BuildContext context) {
-    final tabs = [
-      (_SettingsTab.profile, Icons.person_outline, 'Profile'),
-      (_SettingsTab.preferences, Icons.palette_outlined, 'Preferences'),
-      (_SettingsTab.notifications, Icons.notifications_none, 'Notifications'),
-      (_SettingsTab.thresholds, Icons.tune, 'Thresholds'),
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.light
-            ? const Color(0xFFdbe5ea)
-            : const Color(0xFF223d57),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: tabs.map((item) {
-            final isActive = _activeTab == item.$1;
-            return GestureDetector(
-              onTap: () => setState(() => _activeTab = item.$1),
-              child: Container(
-                width: 180,
-                margin: const EdgeInsets.all(3),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? Theme.of(context).cardColor
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  border: isActive
-                      ? Border.all(color: Theme.of(context).dividerColor)
-                      : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(item.$2, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      item.$3,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
   Widget _buildProfileTab(BuildContext context) {
-    final isCompact = MediaQuery.of(context).size.width < 900;
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final subColor =
-        isLight ? const Color(0xFF4f6b82) : const Color(0xFF9db7d2);
-
     return _sectionContainer(
       context,
       child: Column(
@@ -186,225 +303,38 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
             'Profile Information',
             style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Manage your personal information and avatar',
-            style: TextStyle(color: subColor, fontSize: 15),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 16,
-            runSpacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Container(
-                width: 88,
-                height: 88,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  widget.userName.substring(0, 1).toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: isCompact ? double.infinity : 420,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        Text(
-                          widget.userName,
-                          style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w800),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF5B78D1),
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                          child: Text(
-                            widget.roleLabel,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      widget.userEmail,
-                      style: TextStyle(color: subColor),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('Edit Profile'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
           _buildInputGrid(context),
-          const SizedBox(height: 24),
-          const Divider(),
-          const SizedBox(height: 18),
-          const Text(
-            'Access Control',
-            style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'View your access permissions across the organization hierarchy',
-            style: TextStyle(color: subColor, fontSize: 15),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: const Color(0xFF27a36a).withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                  color: const Color(0xFF27a36a).withValues(alpha: 0.4)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.verified, color: Color(0xFF27a36a)),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Full Organization Access',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 16),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'You currently have unrestricted access to sites, zones, and sensors.',
-                ),
-                const SizedBox(height: 14),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final statWidth = constraints.maxWidth < 460
-                        ? constraints.maxWidth
-                        : 220.0;
-                    return Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        SizedBox(
-                          width: statWidth,
-                          child: const _AccessStatCard(
-                              label: 'All Sites', value: '1'),
-                        ),
-                        SizedBox(
-                          width: statWidth,
-                          child: const _AccessStatCard(
-                              label: 'All Zones', value: '1'),
-                        ),
-                        SizedBox(
-                          width: statWidth,
-                          child: const _AccessStatCard(
-                              label: 'All Sensors', value: '214'),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Divider(),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           const Text(
             'Change Password',
             style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 12),
-          const _LabeledPasswordField(label: 'Current Password'),
-          const SizedBox(height: 10),
-          const _LabeledPasswordField(label: 'New Password'),
-          const SizedBox(height: 10),
-          const _LabeledPasswordField(label: 'Confirm New Password'),
-          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () {},
+              onPressed: () => _showChangePasswordDialog(context),
               icon: const Icon(Icons.key),
-              label: const Text('Update Password'),
+              label: const Text('Change Password'),
             ),
           ),
-          const SizedBox(height: 18),
-          const Text(
-            'Two-Factor Authentication',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 10),
-          _actionTile(context,
-              title: 'Authentication App',
-              subtitle:
-                  'Use an authenticator app to generate verification codes'),
-          _actionTile(context,
-              title: 'SMS Authentication',
-              subtitle: 'Receive verification codes via text message'),
-          const SizedBox(height: 18),
-          Container(
+          const SizedBox(height: 12),
+          SizedBox(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              color: const Color(0xFFE54C4C).withValues(alpha: 0.08),
-              border: Border.all(
-                  color: const Color(0xFFE54C4C).withValues(alpha: 0.35)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Danger Zone',
-                  style: TextStyle(
-                    color: Color(0xFFE54C4C),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 20 * 0.9,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Permanently delete your account and associated data.',
-                ),
-                const SizedBox(height: 10),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFE54C4C),
-                  ),
-                  onPressed: () {},
-                  child: const Text('Delete Account'),
-                ),
-              ],
+            child: FilledButton(
+              onPressed: _profileSaving
+                  ? null
+                  : () async {
+                      await _saveProfileForm();
+                    },
+              child: _profileSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Update Profile'),
             ),
           ),
           const SizedBox(height: 18),
@@ -419,15 +349,6 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
     final themeProvider = context.watch<ThemeProvider>();
     final subColor =
         isLight ? const Color(0xFF4f6b82) : const Color(0xFF9db7d2);
-    final lightRatio = ThemeProvider.contrastRatio(
-      themeProvider.textLight,
-      themeProvider.backgroundLight,
-    );
-    final darkRatio = ThemeProvider.contrastRatio(
-      themeProvider.textDark,
-      themeProvider.backgroundDark,
-    );
-    final contrastOk = lightRatio >= 4.5 && darkRatio >= 4.5;
 
     return Container(
       width: double.infinity,
@@ -484,8 +405,6 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
             ],
           ),
           const SizedBox(height: 12),
-          Divider(height: 1, color: Theme.of(context).dividerColor),
-          const SizedBox(height: 12),
           Row(
             children: [
               const Expanded(
@@ -519,6 +438,35 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
             ],
           ),
           const SizedBox(height: 10),
+          const Text(
+            'Dark Mode',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: RadioListTile<bool>(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('On'),
+                  value: true,
+                  groupValue: themeProvider.isDarkMode,
+                  onChanged: (_) => themeProvider.setThemeMode(ThemeMode.dark),
+                ),
+              ),
+              Expanded(
+                child: RadioListTile<bool>(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('Off'),
+                  value: false,
+                  groupValue: themeProvider.isDarkMode,
+                  onChanged: (_) => themeProvider.setThemeMode(ThemeMode.light),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
           Text(
             'Text Size (${themeProvider.textScale.toStringAsFixed(2)}x)',
             style: const TextStyle(fontWeight: FontWeight.w700),
@@ -531,298 +479,90 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
             label: themeProvider.textScale.toStringAsFixed(2),
             onChanged: (v) => themeProvider.setTextScale(v),
           ),
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Auto-fix Contrast',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              Switch(
-                value: themeProvider.autoContrastFix,
-                onChanged: themeProvider.setAutoContrastFix,
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Contrast (Light ${lightRatio.toStringAsFixed(2)}:1, Dark ${darkRatio.toStringAsFixed(2)}:1) ${contrastOk ? 'PASS' : 'LOW'}',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: contrastOk
-                  ? Theme.of(context)
-                      .extension<CustomThemeTokens>()!
-                      .statusNormal
-                  : Theme.of(context)
-                      .extension<CustomThemeTokens>()!
-                      .statusWarning,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Theme Colors',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _presetButton(
-                context,
-                label: 'Default',
-                selected: themeProvider.isUsingPreset(ThemePreset.defaultBlue),
-                onTap: () => themeProvider.applyPreset(ThemePreset.defaultBlue),
-              ),
-              _presetButton(
-                context,
-                label: 'Ocean',
-                selected: themeProvider.isUsingPreset(ThemePreset.ocean),
-                onTap: () => themeProvider.applyPreset(ThemePreset.ocean),
-              ),
-              _presetButton(
-                context,
-                label: 'Forest',
-                selected: themeProvider.isUsingPreset(ThemePreset.forest),
-                onTap: () => themeProvider.applyPreset(ThemePreset.forest),
-              ),
-              _presetButton(
-                context,
-                label: 'Sunset',
-                selected: themeProvider.isUsingPreset(ThemePreset.sunset),
-                onTap: () => themeProvider.applyPreset(ThemePreset.sunset),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Advanced Colors',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          _colorLine(
-            context,
-            label: 'Primary',
-            light: themeProvider.primaryLight,
-            dark: themeProvider.primaryDark,
-            onSetLight: (c) => _updateThemeColors(
-              themeProvider,
-              primaryLight: c,
-            ),
-            onSetDark: (c) => _updateThemeColors(
-              themeProvider,
-              primaryDark: c,
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: () => _showAdvancedThemeDialog(context, themeProvider),
+              icon: const Icon(Icons.tune),
+              label: const Text('Advanced'),
             ),
           ),
-          _colorLine(
-            context,
-            label: 'Background',
-            light: themeProvider.backgroundLight,
-            dark: themeProvider.backgroundDark,
-            onSetLight: (c) => _updateThemeColors(
-              themeProvider,
-              backgroundLight: c,
-            ),
-            onSetDark: (c) => _updateThemeColors(
-              themeProvider,
-              backgroundDark: c,
-            ),
-          ),
-          _colorLine(
-            context,
-            label: 'Surface',
-            light: themeProvider.surfaceLight,
-            dark: themeProvider.surfaceDark,
-            onSetLight: (c) => _updateThemeColors(
-              themeProvider,
-              surfaceLight: c,
-            ),
-            onSetDark: (c) => _updateThemeColors(
-              themeProvider,
-              surfaceDark: c,
-            ),
-          ),
-          _colorLine(
-            context,
-            label: 'Text',
-            light: themeProvider.textLight,
-            dark: themeProvider.textDark,
-            onSetLight: (c) => _updateThemeColors(
-              themeProvider,
-              textLight: c,
-            ),
-            onSetDark: (c) => _updateThemeColors(
-              themeProvider,
-              textDark: c,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _colorDot(themeProvider.primaryLight),
-              const SizedBox(width: 6),
-              _colorDot(themeProvider.backgroundLight),
-              const SizedBox(width: 6),
-              _colorDot(themeProvider.textLight),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: themeProvider.resetCustomizations,
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Reset'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Divider(height: 1, color: Theme.of(context).dividerColor),
-          const SizedBox(height: 12),
-          const Text(
-            'Preset Management',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _presetNameController,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    labelText: 'Preset name',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: () async {
-                  await themeProvider
-                      .saveCurrentAsCustomPreset(_presetNameController.text);
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Preset saved')),
-                  );
-                },
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () => _showExportDialog(context, themeProvider),
-                icon: const Icon(Icons.ios_share, size: 16),
-                label: const Text('Export JSON'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => _showImportDialog(context, themeProvider),
-                icon: const Icon(Icons.upload_file, size: 16),
-                label: const Text('Import JSON'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (themeProvider.customPresetNames.isNotEmpty)
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: themeProvider.customPresetNames
-                  .map(
-                    (name) => InputChip(
-                      label: Text(name),
-                      onPressed: () => themeProvider.applyCustomPreset(name),
-                      onDeleted: () => themeProvider.deleteCustomPreset(name),
-                    ),
-                  )
-                  .toList(),
-            ),
         ],
       ),
     );
   }
 
-  Future<void> _showExportDialog(
+  Future<void> _showAdvancedThemeDialog(
     BuildContext context,
     ThemeProvider themeProvider,
   ) async {
-    final jsonText =
-        themeProvider.exportCurrentConfigJson(name: _presetNameController.text);
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Export Theme JSON'),
+        title: const Text('Advanced Theme Settings'),
         content: SizedBox(
           width: 520,
           child: SingleChildScrollView(
-            child: SelectableText(jsonText),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _colorLine(
+                  context,
+                  label: 'Primary',
+                  light: themeProvider.primaryLight,
+                  dark: themeProvider.primaryDark,
+                  onSetLight: (c) =>
+                      _updateThemeColors(themeProvider, primaryLight: c),
+                  onSetDark: (c) =>
+                      _updateThemeColors(themeProvider, primaryDark: c),
+                ),
+                _colorLine(
+                  context,
+                  label: 'Background',
+                  light: themeProvider.backgroundLight,
+                  dark: themeProvider.backgroundDark,
+                  onSetLight: (c) =>
+                      _updateThemeColors(themeProvider, backgroundLight: c),
+                  onSetDark: (c) =>
+                      _updateThemeColors(themeProvider, backgroundDark: c),
+                ),
+                _colorLine(
+                  context,
+                  label: 'Surface',
+                  light: themeProvider.surfaceLight,
+                  dark: themeProvider.surfaceDark,
+                  onSetLight: (c) =>
+                      _updateThemeColors(themeProvider, surfaceLight: c),
+                  onSetDark: (c) =>
+                      _updateThemeColors(themeProvider, surfaceDark: c),
+                ),
+                _colorLine(
+                  context,
+                  label: 'Text',
+                  light: themeProvider.textLight,
+                  dark: themeProvider.textDark,
+                  onSetLight: (c) =>
+                      _updateThemeColors(themeProvider, textLight: c),
+                  onSetDark: (c) =>
+                      _updateThemeColors(themeProvider, textDark: c),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: jsonText));
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Copied to clipboard')),
-              );
-            },
-            child: const Text('Copy'),
+            onPressed: themeProvider.resetCustomizations,
+            child: const Text('Reset'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Close'),
           ),
         ],
       ),
     );
-  }
-
-  Future<void> _showImportDialog(
-    BuildContext context,
-    ThemeProvider themeProvider,
-  ) async {
-    final controller = TextEditingController();
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Import Theme JSON'),
-        content: SizedBox(
-          width: 520,
-          child: TextField(
-            controller: controller,
-            minLines: 10,
-            maxLines: 16,
-            decoration: const InputDecoration(
-              hintText: 'Paste exported theme JSON here',
-              border: OutlineInputBorder(),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              final ok = await themeProvider.importConfigJson(controller.text);
-              if (!context.mounted) return;
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(ok ? 'Theme imported' : 'Invalid theme JSON'),
-                ),
-              );
-            },
-            child: const Text('Import'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
   }
 
   Future<void> _updateThemeColors(
@@ -1040,44 +780,6 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
     );
   }
 
-  Widget _presetButton(
-    BuildContext context, {
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    return OutlinedButton(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        side: BorderSide(
-          color: selected ? scheme.primary : Theme.of(context).dividerColor,
-          width: selected ? 1.4 : 1,
-        ),
-        backgroundColor: selected
-            ? scheme.primary.withValues(alpha: 0.16)
-            : Colors.transparent,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (selected) ...[
-            Icon(Icons.check_circle, size: 14, color: scheme.primary),
-            const SizedBox(width: 6),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              color: selected ? scheme.primary : null,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _colorDot(Color color) {
     return Container(
       width: 18,
@@ -1105,7 +807,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Customize app appearance and behavior',
+            'Theme mode, dark mode and text size',
             style: TextStyle(color: subColor, fontSize: 15),
           ),
           const SizedBox(height: 14),
@@ -1169,36 +871,43 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
   }
 
   Widget _buildInputGrid(BuildContext context) {
-    const fields = [
-      ('Full Name', 'suraj.tiwari'),
-      ('Email', 'suraj.tiwari@live.com'),
-      ('Phone Number', '+1 (555) 000-0000'),
-      ('Job Title', 'Senior Engineer'),
-      ('Department', 'Engineering'),
-      ('Timezone', 'UTC'),
-    ];
+    if (_profileLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
     final isWide = MediaQuery.of(context).size.width > 900;
     return Column(
       children: [
-        for (int i = 0; i < fields.length; i += isWide ? 2 : 1)
+        for (int i = 0; i < _profileFields.length; i += isWide ? 2 : 1)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Row(
               children: [
                 Expanded(
-                  child: _readOnlyField(
+                  child: _editableField(
                     context,
-                    label: fields[i].$1,
-                    value: fields[i].$2,
+                    label: _profileFields[i].$1,
+                    controller: _profileFields[i].$2,
+                    obscureText: _profileFields[i].$1 == 'password',
+                    keyboardType: _profileFields[i].$1 == 'maxUsersAllowed'
+                        ? TextInputType.number
+                        : TextInputType.text,
                   ),
                 ),
                 if (isWide) const SizedBox(width: 12),
-                if (isWide && i + 1 < fields.length)
+                if (isWide && i + 1 < _profileFields.length)
                   Expanded(
-                    child: _readOnlyField(
+                    child: _editableField(
                       context,
-                      label: fields[i + 1].$1,
-                      value: fields[i + 1].$2,
+                      label: _profileFields[i + 1].$1,
+                      controller: _profileFields[i + 1].$2,
+                      obscureText: _profileFields[i + 1].$1 == 'password',
+                      keyboardType:
+                          _profileFields[i + 1].$1 == 'maxUsersAllowed'
+                              ? TextInputType.number
+                              : TextInputType.text,
                     ),
                   ),
               ],
@@ -1208,8 +917,18 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
     );
   }
 
-  Widget _readOnlyField(BuildContext context,
-      {required String label, required String value}) {
+  List<(String, TextEditingController)> get _profileFields => [
+        ('name', _nameController),
+        ('email', _emailController),
+      ];
+
+  Widget _editableField(
+    BuildContext context, {
+    required String label,
+    required TextEditingController controller,
+    bool obscureText = false,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1217,7 +936,6 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
         const SizedBox(height: 6),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: Theme.of(context).dividerColor),
@@ -1225,7 +943,17 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
                 ? const Color(0xFFF6FAFC)
                 : const Color(0xFF203a54),
           ),
-          child: Text(value),
+          child: TextField(
+            controller: controller,
+            obscureText: obscureText,
+            keyboardType: keyboardType,
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          ),
         ),
       ],
     );
@@ -1238,127 +966,37 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Notification Preferences',
+            'Notification',
             style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Manage how you receive alerts and updates',
-            style: TextStyle(
-              color: Theme.of(context).brightness == Brightness.light
-                  ? const Color(0xFF4f6b82)
-                  : const Color(0xFF9db7d2),
-            ),
+          const SizedBox(height: 10),
+          RadioListTile<bool>(
+            title: const Text('On'),
+            value: true,
+            groupValue: _notificationsEnabled,
+            onChanged: (v) => setState(() => _notificationsEnabled = v ?? true),
           ),
-          const SizedBox(height: 14),
-          _toggleTile(context,
-              title: 'Email Notifications',
-              subtitle: 'Receive alerts via email',
-              value: _emailNotifications,
-              onChanged: (v) => setState(() => _emailNotifications = v)),
-          _toggleTile(context,
-              title: 'SMS Notifications',
-              subtitle: 'Receive alerts via text message',
-              value: _smsNotifications,
-              onChanged: (v) => setState(() => _smsNotifications = v)),
-          _toggleTile(context,
-              title: 'WhatsApp Notifications',
-              subtitle: 'Receive alerts via WhatsApp',
-              value: _whatsAppNotifications,
-              onChanged: (v) => setState(() => _whatsAppNotifications = v)),
-          _toggleTile(context,
-              title: 'Push Notifications',
-              subtitle: 'Receive in-app push notifications',
-              value: _pushNotifications,
-              onChanged: (v) => setState(() => _pushNotifications = v)),
-          const SizedBox(height: 8),
-          const Divider(),
-          const SizedBox(height: 8),
-          _toggleTile(context,
-              title: 'Critical Alerts',
-              subtitle: 'High priority alerts requiring immediate attention',
-              value: _criticalAlerts,
-              onChanged: (v) => setState(() => _criticalAlerts = v)),
-          _toggleTile(context,
-              title: 'Warning Alerts',
-              subtitle: 'Medium priority alerts for potential issues',
-              value: _warningAlerts,
-              onChanged: (v) => setState(() => _warningAlerts = v)),
-          _toggleTile(context,
-              title: 'Info Alerts',
-              subtitle: 'Low priority informational updates',
-              value: _infoAlerts,
-              onChanged: (v) => setState(() => _infoAlerts = v)),
-          const SizedBox(height: 8),
-          const Divider(),
-          const SizedBox(height: 8),
-          _toggleTile(context,
-              title: 'Device Updates',
-              subtitle: 'Get notified about device status changes',
-              value: _deviceUpdates,
-              onChanged: (v) => setState(() => _deviceUpdates = v)),
-          _toggleTile(context,
-              title: 'System Notifications',
-              subtitle: 'Receive system maintenance and update notifications',
-              value: _systemNotifications,
-              onChanged: (v) => setState(() => _systemNotifications = v)),
-          _toggleTile(context,
-              title: 'Daily Digest',
-              subtitle: 'Receive a daily summary of sensor activity',
-              value: _dailyDigest,
-              onChanged: (v) => setState(() => _dailyDigest = v)),
+          RadioListTile<bool>(
+            title: const Text('Off'),
+            value: false,
+            groupValue: _notificationsEnabled,
+            onChanged: (v) =>
+                setState(() => _notificationsEnabled = v ?? false),
+          ),
         ],
       ),
     );
   }
-
-  Widget _toggleTile(BuildContext context,
-      {required String title,
-      required String subtitle,
-      required bool value,
-      required ValueChanged<bool> onChanged}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 16)),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: Theme.of(context).brightness == Brightness.light
-                        ? const Color(0xFF4f6b82)
-                        : const Color(0xFF9db7d2),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Switch(value: value, onChanged: onChanged),
-        ],
-      ),
-    );
-  }
-
-
 
   Widget _buildThresholdsTab(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final subColor =
         isLight ? const Color(0xFF4f6b82) : const Color(0xFF9db7d2);
     final db = context.watch<SuperAdminBackendProvider>();
-    final thresholds = db.sortedThresholdRules;
+    final thresholds = db.thresholdValues;
+    final thresholdProfileNames = <String, String>{
+      for (final profile in db.thresholdProfiles) profile.id: profile.name,
+    };
 
     return _sectionContainer(
       context,
@@ -1424,7 +1062,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Add multiple thresholds with custom sound/color and choose where they appear.',
+            'Thresholds are loaded from API and saved using threshold endpoints.',
             style: TextStyle(color: subColor),
           ),
           const SizedBox(height: 14),
@@ -1441,7 +1079,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
             )
           else
             ...thresholds.map(
-              (rule) => Container(
+              (value) => Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -1456,37 +1094,23 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
                       runSpacing: 8,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: rule.color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
                         Text(
-                          '${rule.label} (${rule.value.toStringAsFixed(1)}°)',
+                          'Profile: ${thresholdProfileNames[value.thresholdProfileId] ?? value.thresholdProfileId}',
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 16,
                           ),
                         ),
-                        Text(
-                          rule.sound,
-                          style: TextStyle(
-                            color: subColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        Text('Sensor: ${value.sensorParameterId}',
+                            style: TextStyle(
+                              color: subColor,
+                              fontWeight: FontWeight.w600,
+                            )),
                         IconButton(
-                          onPressed: () => _showThresholdValueDialog(context, db),
+                          onPressed: () =>
+                              _showThresholdValueDialog(context, db),
                           icon: const Icon(Icons.edit_outlined, size: 18),
                           tooltip: 'Open threshold form',
-                        ),
-                        IconButton(
-                          onPressed: () => db.deleteThresholdRule(rule.id),
-                          icon: const Icon(Icons.delete_outline, size: 18),
-                          tooltip: 'Delete threshold',
                         ),
                       ],
                     ),
@@ -1494,37 +1118,47 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: rule.graphTargets
-                          .map(
-                            (target) => Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(99),
-                                color: rule.color.withValues(alpha: 0.12),
-                                border: Border.all(
-                                  color: rule.color.withValues(alpha: 0.4),
-                                ),
-                              ),
-                              child: Text(
-                                target.label,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: rule.color,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          )
-                          .toList(),
+                      children: [
+                        _pill(context, 'ID: ${value.id}'),
+                        _pill(
+                          context,
+                          'Min: ${value.minThreshold.toStringAsFixed(2)}',
+                        ),
+                        _pill(
+                          context,
+                          'Max: ${value.maxThreshold.toStringAsFixed(2)}',
+                        ),
+                        _pill(
+                          context,
+                          'Warning: ${value.warningLevel.toStringAsFixed(2)}',
+                        ),
+                        _pill(
+                          context,
+                          'Critical: ${value.criticalLevel.toStringAsFixed(2)}',
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _pill(BuildContext context, String text) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(99),
+        color: isLight ? const Color(0xFFEAF2F6) : const Color(0xFF2A465E),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -1632,13 +1266,12 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
     String minThresholdValue = '0';
     String sensorParameterId =
         sensorOptions.isNotEmpty ? sensorOptions.first['value']! : '';
-    String thresholdProfileId =
-        thresholdProfileOptions.isNotEmpty ? thresholdProfileOptions.first['value']! : '';
+    String thresholdProfileId = thresholdProfileOptions.isNotEmpty
+        ? thresholdProfileOptions.first['value']!
+        : '';
     String maxThresholdValue = '0';
     String warningLevel = '0';
     String criticalLevel = '0';
-    String warrningLevel = '0';
-    String sensorParamterId = sensorParameterId;
 
     if (!context.mounted) return;
     await showDialog(
@@ -1661,17 +1294,13 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
                 'value': sensorParameterId.isEmpty ? null : sensorParameterId,
                 'options': sensorOptions,
                 'onChanged': (String? value) => setDialogState(() {
-                  sensorParameterId = value ?? '';
-                  if (sensorParamterId.isEmpty) {
-                    sensorParamterId = sensorParameterId;
-                  }
-                }),
+                      sensorParameterId = value ?? '';
+                    }),
               },
               {
                 'label': 'thresholdProfileId',
                 'type': 'select',
-                'value':
-                    thresholdProfileId.isEmpty ? null : thresholdProfileId,
+                'value': thresholdProfileId.isEmpty ? null : thresholdProfileId,
                 'options': thresholdProfileOptions,
                 'onChanged': (String? value) =>
                     setDialogState(() => thresholdProfileId = value ?? ''),
@@ -1697,21 +1326,6 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
                     setDialogState(() => criticalLevel = value),
                 'keyboardType': TextInputType.number,
               },
-              {
-                'label': 'warrningLevel',
-                'value': warrningLevel,
-                'onChanged': (String value) =>
-                    setDialogState(() => warrningLevel = value),
-                'keyboardType': TextInputType.number,
-              },
-              {
-                'label': 'sensorParamterId',
-                'type': 'select',
-                'value': sensorParamterId.isEmpty ? null : sensorParamterId,
-                'options': sensorOptions,
-                'onChanged': (String? value) =>
-                    setDialogState(() => sensorParamterId = value ?? ''),
-              },
             ],
             onSave: () async {
               if (thresholdProfileId.trim().isEmpty ||
@@ -1730,12 +1344,10 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
               final maxValue = int.tryParse(maxThresholdValue.trim());
               final warning = int.tryParse(warningLevel.trim());
               final critical = int.tryParse(criticalLevel.trim());
-              final warrning = int.tryParse(warrningLevel.trim());
               if (minValue == null ||
                   maxValue == null ||
                   warning == null ||
-                  critical == null ||
-                  warrning == null) {
+                  critical == null) {
                 ScaffoldMessenger.of(dialogContext).showSnackBar(
                   const SnackBar(
                     content: Text('Threshold values must be integer numbers'),
@@ -1752,10 +1364,6 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
                   'maxThresholdValue': maxValue,
                   'warningLevel': warning,
                   'criticalLevel': critical,
-                  'warrningLevel': warrning,
-                  'sensorParamterId': sensorParamterId.trim().isEmpty
-                      ? sensorParameterId.trim()
-                      : sensorParamterId.trim(),
                 });
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
               } catch (e) {
@@ -1773,42 +1381,6 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
     );
   }
 
-  Widget _actionTile(BuildContext context,
-      {required String title, required String subtitle}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 16)),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: Theme.of(context).brightness == Brightness.light
-                        ? const Color(0xFF4f6b82)
-                        : const Color(0xFF9db7d2),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          OutlinedButton(onPressed: () {}, child: const Text('Enable')),
-        ],
-      ),
-    );
-  }
-
   Widget _sectionContainer(BuildContext context, {required Widget child}) {
     return Container(
       width: double.infinity,
@@ -1818,73 +1390,6 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
         border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: child,
-    );
-  }
-}
-
-class _AccessStatCard extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _AccessStatCard({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        border:
-            Border.all(color: const Color(0xFF27a36a).withValues(alpha: 0.4)),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: const TextStyle(
-                fontSize: 32 * 0.9, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 4),
-          Text(label),
-        ],
-      ),
-    );
-  }
-}
-
-class _LabeledPasswordField extends StatelessWidget {
-  final String label;
-
-  const _LabeledPasswordField({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 6),
-        TextField(
-          obscureText: true,
-          decoration: InputDecoration(
-            hintText: 'Enter $label',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Theme.of(context).dividerColor),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Theme.of(context).dividerColor),
-            ),
-            filled: true,
-            fillColor: Theme.of(context).brightness == Brightness.light
-                ? const Color(0xFFF6FAFC)
-                : const Color(0xFF203a54),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          ),
-        ),
-      ],
     );
   }
 }

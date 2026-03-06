@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../super_admin/api/api_client.dart';
+import '../api/api_client.dart' as user_api_client;
 import '../api/user_login_api.dart';
 import '../user_page.dart';
 import '../providers/user_riverpod_provider.dart';
@@ -36,6 +38,12 @@ class _UserLoginScreenState extends ConsumerState<UserLoginScreen> {
 
       if (!mounted) return;
       if (response.status.toUpperCase() == 'SUCCESS') {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'user_principal_id',
+          response.body.principalId.trim(),
+        );
+        await user_api_client.ApiClient.setAuthToken(response.body.token);
         await ApiClient.setAuthToken(response.body.token);
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
@@ -43,7 +51,7 @@ class _UserLoginScreenState extends ConsumerState<UserLoginScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.message)),
+          const SnackBar(content: Text('Login failed')),
         );
       }
     } catch (e) {

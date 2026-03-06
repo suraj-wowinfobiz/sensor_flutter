@@ -207,6 +207,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     } finally {
       _loadOrganizationsTask = null;
     }
+    notifyListeners();
   }
 
   Future<void> loadSites() async {
@@ -282,6 +283,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     } finally {
       _loadSitesTask = null;
     }
+    notifyListeners();
   }
 
   Future<void> loadZones(String siteId) async {
@@ -289,6 +291,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
       final res = await org_api.OrgServiceApi.getZonesBySite(siteId);
       if (res.body == null) {
         zones.removeWhere((z) => z.siteId == siteId);
+        notifyListeners();
         return;
       }
       final newZones = (res.body as List).map((json) {
@@ -304,6 +307,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     } catch (e) {
       print('Error loading zones: $e');
     }
+    notifyListeners();
   }
 
   Future<void> loadUsers() async {
@@ -323,6 +327,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
       print('Error loading users: $e');
       users = [];
     }
+    notifyListeners();
   }
 
   Future<void> loadDevices() async {
@@ -393,6 +398,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     } finally {
       _loadDevicesTask = null;
     }
+    notifyListeners();
   }
 
   Future<void> loadSensors() async {
@@ -434,6 +440,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     } finally {
       _loadSensorsTask = null;
     }
+    notifyListeners();
   }
 
   Future<void> loadSensorTypes() async {
@@ -459,6 +466,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
       print('Error loading sensor types: $e');
       sensorTypes = [];
     }
+    notifyListeners();
   }
 
   Future<void> loadThresholdProfiles() async {
@@ -481,6 +489,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
       print('Error loading threshold profiles: $e');
       thresholdProfiles = [];
     }
+    notifyListeners();
   }
 
   Future<void> loadThresholdValues() async {
@@ -492,7 +501,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
       thresholdValues = body.map((json) {
         return ThresholdValue(
           id: _asString(
-            json['thresholdId'] ?? json['id'],
+            json['thresholdValueId'] ?? json['thresholdId'] ?? json['id'],
             _uuid(),
           ),
           sensorParameterId: _asString(
@@ -523,6 +532,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
       print('Error loading threshold values: $e');
       thresholdValues = [];
     }
+    notifyListeners();
   }
 
   Future<void> create(String view, Map<String, dynamic> data) async {
@@ -623,7 +633,8 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         await loadThresholdValues();
         break;
       case 'users':
-        final role = _asString(data['role'], 'admin').toLowerCase();
+        final rawRole = _asString(data['role'], 'admin');
+        final role = rawRole.toLowerCase();
         final organizationId =
             _asString(data['organization_id'] ?? data['organizationId']);
         final name = data['name'] as String;
@@ -641,6 +652,20 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           await UsersApi.createAdminUser(
             name: name,
             email: email,
+            organizationId: organizationId,
+            password: password,
+            maxUsersAllowed: maxUsersAllowed,
+          );
+        } else if (role == 'engineer' ||
+            role == 'user' ||
+            role == 'vendor_engineer') {
+          final createRole = role == 'vendor_engineer'
+              ? 'Vendor_engineer'
+              : (role == 'user' ? 'user' : role);
+          await UsersApi.createUser(
+            name: name,
+            email: email,
+            role: createRole,
             organizationId: organizationId,
             password: password,
             maxUsersAllowed: maxUsersAllowed,
@@ -768,6 +793,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           name: data['name'] as String,
           email: data['email'] as String,
           role: _asString(data['role'], 'operator'),
+          password: _asString(data['password']),
         );
         await loadUsers();
         break;

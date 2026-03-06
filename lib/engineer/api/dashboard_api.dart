@@ -1,4 +1,4 @@
-import '../../super_admin/api/api_client.dart';
+import 'api_client.dart';
 
 class DashboardApi {
   static Future<Map<String, dynamic>> getStats() async {

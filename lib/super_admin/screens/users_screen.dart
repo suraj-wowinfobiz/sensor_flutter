@@ -6,7 +6,14 @@ import '../models/user.dart';
 import '../providers/super_admin_backend_provider.dart';
 
 class UsersScreen extends StatefulWidget {
-  const UsersScreen({super.key});
+  final String createDefaultRole;
+  final List<String> selectableRoles;
+
+  const UsersScreen({
+    super.key,
+    this.createDefaultRole = 'engineer',
+    this.selectableRoles = const ['engineer', 'admin', 'vendor'],
+  });
 
   @override
   State<UsersScreen> createState() => _UsersScreenState();
@@ -26,7 +33,7 @@ class _UsersScreenState extends State<UsersScreen> {
   String? _editingId;
   String _name = '';
   String _email = '';
-  String _role = 'admin';
+  String _role = 'engineer';
 
   @override
   void initState() {
@@ -35,6 +42,10 @@ class _UsersScreenState extends State<UsersScreen> {
       if (!mounted) return;
       final db = context.read<SuperAdminBackendProvider>();
       await db.loadOrganizations();
+      await db.loadSites();
+      for (final site in db.sites) {
+        await db.loadZones(site.id);
+      }
       await db.loadUsers();
     });
   }
@@ -55,7 +66,7 @@ class _UsersScreenState extends State<UsersScreen> {
       _editingId = null;
       _name = '';
       _email = '';
-      _role = 'admin';
+      _role = widget.createDefaultRole;
     }
 
     final nameController = TextEditingController(text: _name);
@@ -65,17 +76,6 @@ class _UsersScreenState extends State<UsersScreen> {
     final maxUsersAllowedController = TextEditingController(text: '20');
     final passwordController = TextEditingController();
 
-    const templates = <Map<String, String>>[
-      {
-        'title': 'User',
-        'name': 'New User',
-        'email': 'user@example.com',
-        'role': 'admin',
-        'organization': 'Default Organization',
-      },
-    ];
-    var useTemplateTab = user == null;
-    var selectedTemplate = 0;
     final parentContext = context;
     final db = parentContext.read<SuperAdminBackendProvider>();
     var selectedOrganizationId =
@@ -83,8 +83,42 @@ class _UsersScreenState extends State<UsersScreen> {
 
     String normalizeRole(String value) {
       final lower = value.trim().toLowerCase();
+      if (lower == 'vendor_engineer') return 'Vendor_engineer';
+      if (lower == 'engineer') return 'engineer';
       if (lower == 'vendor') return 'vendor';
-      return 'admin';
+      final fallback = widget.selectableRoles.isNotEmpty
+          ? widget.selectableRoles.first
+          : widget.createDefaultRole;
+      if (fallback.trim().toLowerCase() == 'vendor_engineer') {
+        return 'Vendor_engineer';
+      }
+      return fallback.trim().toLowerCase();
+    }
+
+    List<DropdownMenuItem<String>> roleItems() {
+      String labelFor(String role) {
+        switch (role) {
+          case 'vendor_engineer':
+            return 'Vendor Engineer';
+          case 'engineer':
+            return 'Engineer';
+          case 'admin':
+            return 'User Admin';
+          case 'vendor':
+            return 'Vendor';
+          default:
+            return role;
+        }
+      }
+
+      return widget.selectableRoles
+          .map(
+            (role) => DropdownMenuItem<String>(
+              value: role,
+              child: Text(labelFor(role)),
+            ),
+          )
+          .toList();
     }
 
     await showDialog(
@@ -144,6 +178,8 @@ class _UsersScreenState extends State<UsersScreen> {
               'role': role,
               'organization_id': selectedOrganizationId,
               if (_editingId == null) 'password': password,
+              if (_editingId != null && password.isNotEmpty)
+                'password': password,
               if (_editingId == null) 'maxUsersAllowed': maxUsersAllowed,
             };
             try {
@@ -224,7 +260,7 @@ class _UsersScreenState extends State<UsersScreen> {
                       ),
                       Text(
                         user == null
-                            ? 'Choose a template (optional) or enter details manually'
+                            ? 'Enter user details and access role'
                             : 'Update user details and access role',
                         style: TextStyle(
                           fontSize: 15,
@@ -234,171 +270,7 @@ class _UsersScreenState extends State<UsersScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      if (user == null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            color: isLight
-                                ? const Color(0xFFE7EFF3)
-                                : const Color(0xFF243E52),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _tabOption(
-                                  active: useTemplateTab,
-                                  icon: Icons.auto_awesome_outlined,
-                                  label: 'Theme',
-                                  onTap: () =>
-                                      setState(() => useTemplateTab = true),
-                                ),
-                              ),
-                              Expanded(
-                                child: _tabOption(
-                                  active: !useTemplateTab,
-                                  icon: Icons.build_outlined,
-                                  label: 'Manual',
-                                  onTap: () =>
-                                      setState(() => useTemplateTab = false),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        if (useTemplateTab) ...[
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: isLight
-                                  ? const Color(0xFFE9F5FB)
-                                  : const Color(0xFF1F3648),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: isLight
-                                    ? const Color(0xFFB8D9EA)
-                                    : const Color(0xFF35566D),
-                              ),
-                            ),
-                            child: Text(
-                              'Select a theme template to prefill fields.',
-                              style: TextStyle(
-                                color: isLight
-                                    ? const Color(0xFF2B5368)
-                                    : const Color(0xFFBBD0E0),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              final compact = constraints.maxWidth < 620;
-                              return Wrap(
-                                spacing: 10,
-                                runSpacing: 10,
-                                children: List.generate(templates.length, (i) {
-                                  final template = templates[i];
-                                  final active = i == selectedTemplate;
-                                  return InkWell(
-                                    onTap: () {
-                                      setState(() {
-                                        selectedTemplate = i;
-                                        nameController.text = template['name']!;
-                                        emailController.text =
-                                            template['email']!;
-                                        roleController.text = template['role']!;
-                                        organizationController.text =
-                                            template['organization']!;
-                                        if (db.organizations.isNotEmpty) {
-                                          selectedOrganizationId = db
-                                              .organizations
-                                              .firstWhere(
-                                                (o) =>
-                                                    o.name.toLowerCase() ==
-                                                    template['organization']!
-                                                        .toLowerCase(),
-                                                orElse: () =>
-                                                    db.organizations.first,
-                                              )
-                                              .id;
-                                        }
-                                        useTemplateTab = false;
-                                      });
-                                    },
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: Container(
-                                      width: compact
-                                          ? constraints.maxWidth
-                                          : (constraints.maxWidth - 10) / 2,
-                                      padding: const EdgeInsets.all(14),
-                                      decoration: BoxDecoration(
-                                        gradient: active
-                                            ? LinearGradient(
-                                                colors: [
-                                                  isLight
-                                                      ? const Color(0xFFEAF5FC)
-                                                      : const Color(0xFF26475F),
-                                                  isLight
-                                                      ? const Color(0xFFF2F8FC)
-                                                      : const Color(0xFF1F3A4E),
-                                                ],
-                                              )
-                                            : null,
-                                        color: active
-                                            ? null
-                                            : (isLight
-                                                ? const Color(0xFFF7FBFD)
-                                                : const Color(0xFF20384B)),
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(
-                                          color: active
-                                              ? (isLight
-                                                  ? const Color(0xFF88BFD9)
-                                                  : const Color(0xFF4A7594))
-                                              : (isLight
-                                                  ? const Color(0xFFD7E5EC)
-                                                  : const Color(0xFF35566D)),
-                                        ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            template['title']!,
-                                            style: TextStyle(
-                                              fontSize: 17,
-                                              fontWeight: FontWeight.w800,
-                                              color: isLight
-                                                  ? const Color(0xFF152A36)
-                                                  : const Color(0xFFE2EDF8),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'Prefill: ${template['role']}',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: isLight
-                                                  ? const Color(0xFF4E6775)
-                                                  : const Color(0xFFBBD0E0),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                }),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 14),
-                        ],
-                      ],
-                      if (!useTemplateTab || user != null) ...[
+                      ...[
                         const SizedBox(height: 2),
                         Text(
                           'Full Name',
@@ -464,14 +336,14 @@ class _UsersScreenState extends State<UsersScreen> {
                         _inputBox(
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
-                              value: normalizeRole(roleController.text),
+                              value: widget.selectableRoles.contains(
+                                      normalizeRole(roleController.text))
+                                  ? normalizeRole(roleController.text)
+                                  : (widget.selectableRoles.isNotEmpty
+                                      ? widget.selectableRoles.first
+                                      : normalizeRole(roleController.text)),
                               isExpanded: true,
-                              items: const [
-                                DropdownMenuItem(
-                                    value: 'admin', child: Text('User Admin')),
-                                DropdownMenuItem(
-                                    value: 'vendor', child: Text('Vendor')),
-                              ],
+                              items: roleItems(),
                               onChanged: (value) {
                                 if (value != null) {
                                   roleController.text = value;
@@ -519,10 +391,12 @@ class _UsersScreenState extends State<UsersScreen> {
                             ),
                           ),
                         ),
-                        if (_editingId == null) ...[
+                        ...[
                           const SizedBox(height: 10),
                           Text(
-                            'Password',
+                            _editingId == null
+                                ? 'Password'
+                                : 'Password (optional)',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -546,6 +420,8 @@ class _UsersScreenState extends State<UsersScreen> {
                               textAlignVertical: TextAlignVertical.center,
                             ),
                           ),
+                        ],
+                        if (_editingId == null) ...[
                           const SizedBox(height: 10),
                           Text(
                             'Max users allowed',
@@ -586,52 +462,6 @@ class _UsersScreenState extends State<UsersScreen> {
             ),
           );
         },
-      ),
-    );
-  }
-
-  Widget _tabOption({
-    required bool active,
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: active
-              ? (isLight ? Colors.white : const Color(0xFF2B4659))
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: active ? Theme.of(context).dividerColor : Colors.transparent,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color:
-                  isLight ? const Color(0xFF203845) : const Color(0xFFD7E8F6),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color:
-                    isLight ? const Color(0xFF203845) : const Color(0xFFD7E8F6),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -784,6 +614,8 @@ class _UsersScreenState extends State<UsersScreen> {
 
   String _principalTypeForRole(String role) {
     final normalized = role.trim().toLowerCase();
+    if (normalized == 'engineer') return 'USER';
+    if (normalized == 'user') return 'USER';
     if (normalized == 'vendor') return 'VENDOR';
     if (normalized == 'vendor_engineer') return 'VENDOR_ENGINEER';
     if (normalized == 'super_admin') return 'SUPER_ADMIN';
@@ -1706,6 +1538,11 @@ class _UsersScreenState extends State<UsersScreen> {
                             DropdownMenuItem(
                                 value: 'admin', child: Text('User Admin')),
                             DropdownMenuItem(
+                                value: 'engineer', child: Text('Engineer')),
+                            DropdownMenuItem(
+                                value: 'vendor_engineer',
+                                child: Text('Vendor Engineer')),
+                            DropdownMenuItem(
                                 value: 'vendor', child: Text('Vendor')),
                           ],
                           onChanged: (value) =>
@@ -1765,6 +1602,11 @@ class _UsersScreenState extends State<UsersScreen> {
                                     value: 'all', child: Text('All Roles')),
                                 DropdownMenuItem(
                                     value: 'admin', child: Text('User Admin')),
+                                DropdownMenuItem(
+                                    value: 'engineer', child: Text('Engineer')),
+                                DropdownMenuItem(
+                                    value: 'vendor_engineer',
+                                    child: Text('Vendor Engineer')),
                                 DropdownMenuItem(
                                     value: 'vendor', child: Text('Vendor')),
                               ],

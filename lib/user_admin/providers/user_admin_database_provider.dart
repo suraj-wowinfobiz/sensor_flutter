@@ -44,6 +44,7 @@ class UserAdminDatabaseProvider extends ChangeNotifier {
   Future<void>? _loadSitesTask;
   Future<void>? _loadDevicesTask;
   Future<void>? _loadSensorsTask;
+  Future<void>? _loadUsersTask;
   int _thresholdRuleSeed = 4;
   final List<ThresholdRule> _thresholdRules = [
     const ThresholdRule(
@@ -207,6 +208,7 @@ class UserAdminDatabaseProvider extends ChangeNotifier {
     } finally {
       _loadOrganizationsTask = null;
     }
+    notifyListeners();
   }
 
   Future<void> loadSites() async {
@@ -307,22 +309,37 @@ class UserAdminDatabaseProvider extends ChangeNotifier {
   }
 
   Future<void> loadUsers() async {
+    if (_loadUsersTask != null) return _loadUsersTask!;
+    final task = () async {
+      try {
+        final body = await UsersApi.getUsers();
+        final loaded = body.map((json) {
+          return User(
+            id: _asString(json['id'] ?? json['userId'], _uuid()),
+            name: _asString(json['name'], 'User'),
+            role: _asString(json['role'], 'user').toLowerCase(),
+            email: _asString(json['email']),
+            createdAt: _asDate(json['createdAt'] ?? json['created_at']),
+            updatedAt: _asDate(json['updatedAt'] ?? json['updated_at']),
+          );
+        }).toList();
+        final deduped = <String, User>{};
+        for (final user in loaded) {
+          deduped[user.id] = user;
+        }
+        users = deduped.values.toList();
+      } catch (e) {
+        print('Error loading users: $e');
+        users = [];
+      }
+    }();
+    _loadUsersTask = task;
     try {
-      final body = await UsersApi.getUsers();
-      users = body.map((json) {
-        return User(
-          id: _asString(json['id'] ?? json['userId'], _uuid()),
-          name: _asString(json['name'], 'User'),
-          role: _asString(json['role'], 'user').toLowerCase(),
-          email: _asString(json['email']),
-          createdAt: _asDate(json['createdAt'] ?? json['created_at']),
-          updatedAt: _asDate(json['updatedAt'] ?? json['updated_at']),
-        );
-      }).toList();
-    } catch (e) {
-      print('Error loading users: $e');
-      users = [];
+      await task;
+    } finally {
+      _loadUsersTask = null;
     }
+    notifyListeners();
   }
 
   Future<void> createOrganization({

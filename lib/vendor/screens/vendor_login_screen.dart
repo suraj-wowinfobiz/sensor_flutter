@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../super_admin/api/api_client.dart';
+import '../api/api_client.dart' as vendor_api_client;
 import '../api/vendor_login_api.dart';
 import '../providers/vendor_riverpod_provider.dart';
 import '../vendor_page.dart';
@@ -36,6 +38,12 @@ class _VendorLoginScreenState extends ConsumerState<VendorLoginScreen> {
 
       if (!mounted) return;
       if (response.status.toUpperCase() == 'SUCCESS') {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'vendor_principal_id',
+          response.body.principalId.trim(),
+        );
+        await vendor_api_client.ApiClient.setAuthToken(response.body.token);
         await ApiClient.setAuthToken(response.body.token);
         if (!mounted) return;
         Navigator.of(context).pushReplacement(

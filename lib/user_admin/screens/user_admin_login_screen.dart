@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
 import '../api/user_admin_login_api.dart';
@@ -38,6 +39,11 @@ class _UserAdminLoginScreenState extends ConsumerState<UserAdminLoginScreen> {
       if (!mounted) return;
       if (response.status.toUpperCase() == 'SUCCESS') {
         await ApiClient.setAuthToken(response.body.token);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'user_admin_principal_id',
+          response.body.principalId,
+        );
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const UserAdminPage()),

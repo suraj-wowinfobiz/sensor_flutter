@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../user/providers/user_database_provider.dart';
+import 'vendor_backend_provider.dart';
 
 final vendorDatabaseChangeNotifierProvider =
-    ChangeNotifierProvider<UserDatabaseProvider>(
-  (ref) => UserDatabaseProvider(),
+    ChangeNotifierProvider<VendorBackendProvider>(
+  (ref) => VendorBackendProvider(),
 );
 
 final vendorLoginLoadingStateProvider = StateProvider<bool>((ref) => false);

@@ -68,12 +68,12 @@ class _UserAdminScreenState extends ConsumerState<UserAdminScreen>
 
   void _setCurrentView(String view) {
     final normalized = _normalizeView(view);
+    if (_currentView == normalized) return;
     if (normalized == 'user') {
       final db = ref.read(userAdminDatabaseChangeNotifierProvider);
       db.loadOrganizations();
       db.loadUsers();
     }
-    if (_currentView == normalized) return;
     setState(() => _currentView = normalized);
   }
 

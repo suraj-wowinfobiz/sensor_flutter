@@ -1,21 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../super_admin/core/theme/custom_theme_tokens.dart';
 import '../../super_admin/providers/theme_provider.dart';
-import '../../super_admin/shared/models/threshold_rule.dart';
 import '../providers/engineer_database_provider.dart';
 import '../screens/engineer_login_screen.dart';
-
-enum _SettingsTab {
-  profile,
-  preferences,
-  notifications,
-  access,
-  security,
-  thresholds
-}
+import '../api/thresholds_api.dart';
+import '../api/users_api.dart';
+import '../../super_admin/widgets/crud_modal.dart';
 
 class EngineerAccountSettingsPanel extends StatefulWidget {
   final String roleLabel;
@@ -36,24 +28,213 @@ class EngineerAccountSettingsPanel extends StatefulWidget {
 
 class _EngineerAccountSettingsPanelState
     extends State<EngineerAccountSettingsPanel> {
-  final TextEditingController _presetNameController =
-      TextEditingController(text: 'My Preset');
-  _SettingsTab _activeTab = _SettingsTab.profile;
-  bool _emailNotifications = true;
-  bool _smsNotifications = false;
-  bool _whatsAppNotifications = false;
-  bool _pushNotifications = true;
-  bool _criticalAlerts = true;
-  bool _warningAlerts = true;
-  bool _infoAlerts = false;
-  bool _deviceUpdates = true;
-  bool _systemNotifications = true;
-  bool _dailyDigest = false;
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _currentPasswordController =
+      TextEditingController();
+  final TextEditingController _newPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
+  final TextEditingController _organizationIdController =
+      TextEditingController();
+  final TextEditingController _maxUsersAllowedController =
+      TextEditingController();
+  bool _notificationsEnabled = true;
+  String? _profileUserId;
+  bool _profileActive = true;
+  bool _profileLoading = false;
+  bool _profileSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.text = widget.userName;
+    _emailController.text = widget.userEmail;
+    _loadProfileForm();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _prepareThresholdsTab();
+    });
+  }
 
   @override
   void dispose() {
-    _presetNameController.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    _organizationIdController.dispose();
+    _maxUsersAllowedController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadProfileForm() async {
+    setState(() => _profileLoading = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('engineer_principal_id')?.trim() ?? '';
+      if (userId.isEmpty) {
+        throw Exception('User id not found. Please login again.');
+      }
+      final data = await UsersApi.getUserById(userId);
+      if (!mounted) return;
+      _profileUserId = userId;
+      _nameController.text = (data['name'] ?? widget.userName).toString();
+      _emailController.text = (data['email'] ?? widget.userEmail).toString();
+      _organizationIdController.text =
+          (data['organizationId'] ?? data['organization_id'] ?? '').toString();
+      _maxUsersAllowedController.text =
+          (data['maxUsersAllowed'] ?? data['max_users_allowed'] ?? '0')
+              .toString();
+      _profileActive = (data['active'] ?? true) == true;
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load profile: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _profileLoading = false);
+    }
+  }
+
+  Future<bool> _saveProfileForm() async {
+    if (_profileUserId == null || _profileUserId!.isEmpty) return false;
+
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final currentPassword = _currentPasswordController.text.trim();
+    final newPassword = _newPasswordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
+    final organizationId = _organizationIdController.text.trim();
+    final maxUsersAllowed =
+        int.tryParse(_maxUsersAllowedController.text.trim());
+    if (name.isEmpty ||
+        email.isEmpty ||
+        organizationId.isEmpty ||
+        maxUsersAllowed == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Fill name and email'),
+        ),
+      );
+      return false;
+    }
+    if (currentPassword.isNotEmpty ||
+        newPassword.isNotEmpty ||
+        confirmPassword.isNotEmpty) {
+      if (currentPassword.isEmpty ||
+          newPassword.isEmpty ||
+          confirmPassword.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Fill all password fields')),
+        );
+        return false;
+      }
+      if (newPassword != confirmPassword) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('New password and confirm password must match')),
+        );
+        return false;
+      }
+    }
+    final resolvedPassword =
+        newPassword.isNotEmpty ? newPassword : currentPassword;
+
+    setState(() => _profileSaving = true);
+    try {
+      await UsersApi.updateUserById(
+        userId: _profileUserId!,
+        name: name,
+        email: email,
+        password: resolvedPassword,
+        organizationId: organizationId,
+        maxUsersAllowed: maxUsersAllowed,
+        active: _profileActive,
+      );
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated')),
+      );
+      _currentPasswordController.clear();
+      _newPasswordController.clear();
+      _confirmPasswordController.clear();
+      await _loadProfileForm();
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update profile: $e')),
+      );
+      return false;
+    } finally {
+      if (mounted) setState(() => _profileSaving = false);
+    }
+  }
+
+  Future<void> _showChangePasswordDialog(BuildContext context) async {
+    _currentPasswordController.clear();
+    _newPasswordController.clear();
+    _confirmPasswordController.clear();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Change Password'),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _editableField(
+                dialogContext,
+                label: 'currentPassword',
+                controller: _currentPasswordController,
+                obscureText: true,
+              ),
+              const SizedBox(height: 10),
+              _editableField(
+                dialogContext,
+                label: 'newPassword',
+                controller: _newPasswordController,
+                obscureText: true,
+              ),
+              const SizedBox(height: 10),
+              _editableField(
+                dialogContext,
+                label: 'confirmNewPassword',
+                controller: _confirmPasswordController,
+                obscureText: true,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: _profileSaving
+                ? null
+                : () async {
+                    final ok = await _saveProfileForm();
+                    if (ok && dialogContext.mounted) {
+                      Navigator.pop(dialogContext);
+                    }
+                  },
+            child: const Text('Update Password'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _prepareThresholdsTab() async {
+    final db = context.read<EngineerDatabaseProvider>();
+    db.loadSensors();
+    db.loadThresholdProfiles();
+    db.loadThresholdValues();
   }
 
   @override
@@ -87,7 +268,7 @@ class _EngineerAccountSettingsPanelState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'User Profile',
+              'Settings',
               style: TextStyle(
                 fontSize: headlineSize,
                 fontWeight: FontWeight.w800,
@@ -96,92 +277,24 @@ class _EngineerAccountSettingsPanelState
             ),
             const SizedBox(height: 6),
             Text(
-              'Manage your account settings and preferences',
+              'Manage profile, preferences, notifications and thresholds',
               style: TextStyle(fontSize: 15, color: subColor),
             ),
             const SizedBox(height: 18),
-            _buildTabBar(context),
-            const SizedBox(height: 18),
-            if (_activeTab == _SettingsTab.profile) _buildProfileTab(context),
-            if (_activeTab == _SettingsTab.preferences)
-              _buildPreferencesTab(context),
-            if (_activeTab == _SettingsTab.notifications)
-              _buildNotificationsTab(context),
-            if (_activeTab == _SettingsTab.access) _buildAccessTab(context),
-            if (_activeTab == _SettingsTab.security) _buildSecurityTab(context),
-            if (_activeTab == _SettingsTab.thresholds)
-              _buildThresholdsTab(context),
+            _buildProfileTab(context),
+            const SizedBox(height: 16),
+            _buildPreferencesTab(context),
+            const SizedBox(height: 16),
+            _buildNotificationsTab(context),
+            const SizedBox(height: 16),
+            _buildThresholdsTab(context),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTabBar(BuildContext context) {
-    final tabs = [
-      (_SettingsTab.profile, Icons.person_outline, 'Profile'),
-      (_SettingsTab.preferences, Icons.palette_outlined, 'Preferences'),
-      (_SettingsTab.notifications, Icons.notifications_none, 'Notifications'),
-      (_SettingsTab.access, Icons.verified_user_outlined, 'Access'),
-      (_SettingsTab.security, Icons.lock_outline, 'Security'),
-      (_SettingsTab.thresholds, Icons.tune, 'Thresholds'),
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.light
-            ? const Color(0xFFdbe5ea)
-            : const Color(0xFF223d57),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: tabs.map((item) {
-            final isActive = _activeTab == item.$1;
-            return GestureDetector(
-              onTap: () => setState(() => _activeTab = item.$1),
-              child: Container(
-                width: 180,
-                margin: const EdgeInsets.all(3),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? Theme.of(context).cardColor
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  border: isActive
-                      ? Border.all(color: Theme.of(context).dividerColor)
-                      : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(item.$2, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      item.$3,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
   Widget _buildProfileTab(BuildContext context) {
-    final isCompact = MediaQuery.of(context).size.width < 900;
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final subColor =
-        isLight ? const Color(0xFF4f6b82) : const Color(0xFF9db7d2);
-
     return _sectionContainer(
       context,
       child: Column(
@@ -191,83 +304,42 @@ class _EngineerAccountSettingsPanelState
             'Profile Information',
             style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Manage your personal information and avatar',
-            style: TextStyle(color: subColor, fontSize: 15),
+          const SizedBox(height: 12),
+          _buildInputGrid(context),
+          const SizedBox(height: 14),
+          const Text(
+            'Change Password',
+            style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 16,
-            runSpacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Container(
-                width: 88,
-                height: 88,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  widget.userName.substring(0, 1).toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: isCompact ? double.infinity : 420,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        Text(
-                          widget.userName,
-                          style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w800),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF5B78D1),
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                          child: Text(
-                            widget.roleLabel,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      widget.userEmail,
-                      style: TextStyle(color: subColor),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('Edit Profile'),
-              ),
-            ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => _showChangePasswordDialog(context),
+              icon: const Icon(Icons.key),
+              label: const Text('Change Password'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _profileSaving
+                  ? null
+                  : () async {
+                      await _saveProfileForm();
+                    },
+              child: _profileSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Update Profile'),
+            ),
           ),
           const SizedBox(height: 18),
-          _buildInputGrid(context),
+          _buildProfileLogoutFooter(context),
         ],
       ),
     );
@@ -278,15 +350,6 @@ class _EngineerAccountSettingsPanelState
     final themeProvider = context.watch<ThemeProvider>();
     final subColor =
         isLight ? const Color(0xFF4f6b82) : const Color(0xFF9db7d2);
-    final lightRatio = ThemeProvider.contrastRatio(
-      themeProvider.textLight,
-      themeProvider.backgroundLight,
-    );
-    final darkRatio = ThemeProvider.contrastRatio(
-      themeProvider.textDark,
-      themeProvider.backgroundDark,
-    );
-    final contrastOk = lightRatio >= 4.5 && darkRatio >= 4.5;
 
     return Container(
       width: double.infinity,
@@ -343,8 +406,6 @@ class _EngineerAccountSettingsPanelState
             ],
           ),
           const SizedBox(height: 12),
-          Divider(height: 1, color: Theme.of(context).dividerColor),
-          const SizedBox(height: 12),
           Row(
             children: [
               const Expanded(
@@ -378,6 +439,35 @@ class _EngineerAccountSettingsPanelState
             ],
           ),
           const SizedBox(height: 10),
+          const Text(
+            'Dark Mode',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: RadioListTile<bool>(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('On'),
+                  value: true,
+                  groupValue: themeProvider.isDarkMode,
+                  onChanged: (_) => themeProvider.setThemeMode(ThemeMode.dark),
+                ),
+              ),
+              Expanded(
+                child: RadioListTile<bool>(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('Off'),
+                  value: false,
+                  groupValue: themeProvider.isDarkMode,
+                  onChanged: (_) => themeProvider.setThemeMode(ThemeMode.light),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
           Text(
             'Text Size (${themeProvider.textScale.toStringAsFixed(2)}x)',
             style: const TextStyle(fontWeight: FontWeight.w700),
@@ -390,298 +480,90 @@ class _EngineerAccountSettingsPanelState
             label: themeProvider.textScale.toStringAsFixed(2),
             onChanged: (v) => themeProvider.setTextScale(v),
           ),
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Auto-fix Contrast',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              Switch(
-                value: themeProvider.autoContrastFix,
-                onChanged: themeProvider.setAutoContrastFix,
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Contrast (Light ${lightRatio.toStringAsFixed(2)}:1, Dark ${darkRatio.toStringAsFixed(2)}:1) ${contrastOk ? 'PASS' : 'LOW'}',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: contrastOk
-                  ? Theme.of(context)
-                      .extension<CustomThemeTokens>()!
-                      .statusNormal
-                  : Theme.of(context)
-                      .extension<CustomThemeTokens>()!
-                      .statusWarning,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Theme Colors',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _presetButton(
-                context,
-                label: 'Default',
-                selected: themeProvider.isUsingPreset(ThemePreset.defaultBlue),
-                onTap: () => themeProvider.applyPreset(ThemePreset.defaultBlue),
-              ),
-              _presetButton(
-                context,
-                label: 'Ocean',
-                selected: themeProvider.isUsingPreset(ThemePreset.ocean),
-                onTap: () => themeProvider.applyPreset(ThemePreset.ocean),
-              ),
-              _presetButton(
-                context,
-                label: 'Forest',
-                selected: themeProvider.isUsingPreset(ThemePreset.forest),
-                onTap: () => themeProvider.applyPreset(ThemePreset.forest),
-              ),
-              _presetButton(
-                context,
-                label: 'Sunset',
-                selected: themeProvider.isUsingPreset(ThemePreset.sunset),
-                onTap: () => themeProvider.applyPreset(ThemePreset.sunset),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Advanced Colors',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          _colorLine(
-            context,
-            label: 'Primary',
-            light: themeProvider.primaryLight,
-            dark: themeProvider.primaryDark,
-            onSetLight: (c) => _updateThemeColors(
-              themeProvider,
-              primaryLight: c,
-            ),
-            onSetDark: (c) => _updateThemeColors(
-              themeProvider,
-              primaryDark: c,
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: () => _showAdvancedThemeDialog(context, themeProvider),
+              icon: const Icon(Icons.tune),
+              label: const Text('Advanced'),
             ),
           ),
-          _colorLine(
-            context,
-            label: 'Background',
-            light: themeProvider.backgroundLight,
-            dark: themeProvider.backgroundDark,
-            onSetLight: (c) => _updateThemeColors(
-              themeProvider,
-              backgroundLight: c,
-            ),
-            onSetDark: (c) => _updateThemeColors(
-              themeProvider,
-              backgroundDark: c,
-            ),
-          ),
-          _colorLine(
-            context,
-            label: 'Surface',
-            light: themeProvider.surfaceLight,
-            dark: themeProvider.surfaceDark,
-            onSetLight: (c) => _updateThemeColors(
-              themeProvider,
-              surfaceLight: c,
-            ),
-            onSetDark: (c) => _updateThemeColors(
-              themeProvider,
-              surfaceDark: c,
-            ),
-          ),
-          _colorLine(
-            context,
-            label: 'Text',
-            light: themeProvider.textLight,
-            dark: themeProvider.textDark,
-            onSetLight: (c) => _updateThemeColors(
-              themeProvider,
-              textLight: c,
-            ),
-            onSetDark: (c) => _updateThemeColors(
-              themeProvider,
-              textDark: c,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _colorDot(themeProvider.primaryLight),
-              const SizedBox(width: 6),
-              _colorDot(themeProvider.backgroundLight),
-              const SizedBox(width: 6),
-              _colorDot(themeProvider.textLight),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: themeProvider.resetCustomizations,
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Reset'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Divider(height: 1, color: Theme.of(context).dividerColor),
-          const SizedBox(height: 12),
-          const Text(
-            'Preset Management',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _presetNameController,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    labelText: 'Preset name',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: () async {
-                  await themeProvider
-                      .saveCurrentAsCustomPreset(_presetNameController.text);
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Preset saved')),
-                  );
-                },
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () => _showExportDialog(context, themeProvider),
-                icon: const Icon(Icons.ios_share, size: 16),
-                label: const Text('Export JSON'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => _showImportDialog(context, themeProvider),
-                icon: const Icon(Icons.upload_file, size: 16),
-                label: const Text('Import JSON'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (themeProvider.customPresetNames.isNotEmpty)
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: themeProvider.customPresetNames
-                  .map(
-                    (name) => InputChip(
-                      label: Text(name),
-                      onPressed: () => themeProvider.applyCustomPreset(name),
-                      onDeleted: () => themeProvider.deleteCustomPreset(name),
-                    ),
-                  )
-                  .toList(),
-            ),
         ],
       ),
     );
   }
 
-  Future<void> _showExportDialog(
+  Future<void> _showAdvancedThemeDialog(
     BuildContext context,
     ThemeProvider themeProvider,
   ) async {
-    final jsonText =
-        themeProvider.exportCurrentConfigJson(name: _presetNameController.text);
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Export Theme JSON'),
+        title: const Text('Advanced Theme Settings'),
         content: SizedBox(
           width: 520,
           child: SingleChildScrollView(
-            child: SelectableText(jsonText),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _colorLine(
+                  context,
+                  label: 'Primary',
+                  light: themeProvider.primaryLight,
+                  dark: themeProvider.primaryDark,
+                  onSetLight: (c) =>
+                      _updateThemeColors(themeProvider, primaryLight: c),
+                  onSetDark: (c) =>
+                      _updateThemeColors(themeProvider, primaryDark: c),
+                ),
+                _colorLine(
+                  context,
+                  label: 'Background',
+                  light: themeProvider.backgroundLight,
+                  dark: themeProvider.backgroundDark,
+                  onSetLight: (c) =>
+                      _updateThemeColors(themeProvider, backgroundLight: c),
+                  onSetDark: (c) =>
+                      _updateThemeColors(themeProvider, backgroundDark: c),
+                ),
+                _colorLine(
+                  context,
+                  label: 'Surface',
+                  light: themeProvider.surfaceLight,
+                  dark: themeProvider.surfaceDark,
+                  onSetLight: (c) =>
+                      _updateThemeColors(themeProvider, surfaceLight: c),
+                  onSetDark: (c) =>
+                      _updateThemeColors(themeProvider, surfaceDark: c),
+                ),
+                _colorLine(
+                  context,
+                  label: 'Text',
+                  light: themeProvider.textLight,
+                  dark: themeProvider.textDark,
+                  onSetLight: (c) =>
+                      _updateThemeColors(themeProvider, textLight: c),
+                  onSetDark: (c) =>
+                      _updateThemeColors(themeProvider, textDark: c),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: jsonText));
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Copied to clipboard')),
-              );
-            },
-            child: const Text('Copy'),
+            onPressed: themeProvider.resetCustomizations,
+            child: const Text('Reset'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Close'),
           ),
         ],
       ),
     );
-  }
-
-  Future<void> _showImportDialog(
-    BuildContext context,
-    ThemeProvider themeProvider,
-  ) async {
-    final controller = TextEditingController();
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Import Theme JSON'),
-        content: SizedBox(
-          width: 520,
-          child: TextField(
-            controller: controller,
-            minLines: 10,
-            maxLines: 16,
-            decoration: const InputDecoration(
-              hintText: 'Paste exported theme JSON here',
-              border: OutlineInputBorder(),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              final ok = await themeProvider.importConfigJson(controller.text);
-              if (!context.mounted) return;
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(ok ? 'Theme imported' : 'Invalid theme JSON'),
-                ),
-              );
-            },
-            child: const Text('Import'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
   }
 
   Future<void> _updateThemeColors(
@@ -899,44 +781,6 @@ class _EngineerAccountSettingsPanelState
     );
   }
 
-  Widget _presetButton(
-    BuildContext context, {
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    return OutlinedButton(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        side: BorderSide(
-          color: selected ? scheme.primary : Theme.of(context).dividerColor,
-          width: selected ? 1.4 : 1,
-        ),
-        backgroundColor: selected
-            ? scheme.primary.withValues(alpha: 0.16)
-            : Colors.transparent,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (selected) ...[
-            Icon(Icons.check_circle, size: 14, color: scheme.primary),
-            const SizedBox(width: 6),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              color: selected ? scheme.primary : null,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _colorDot(Color color) {
     return Container(
       width: 18,
@@ -964,7 +808,7 @@ class _EngineerAccountSettingsPanelState
           ),
           const SizedBox(height: 4),
           Text(
-            'Customize app appearance and behavior',
+            'Theme mode, dark mode and text size',
             style: TextStyle(color: subColor, fontSize: 15),
           ),
           const SizedBox(height: 14),
@@ -1028,36 +872,43 @@ class _EngineerAccountSettingsPanelState
   }
 
   Widget _buildInputGrid(BuildContext context) {
-    const fields = [
-      ('Full Name', 'suraj.tiwari'),
-      ('Email', 'suraj.tiwari@live.com'),
-      ('Phone Number', '+1 (555) 000-0000'),
-      ('Job Title', 'Senior Engineer'),
-      ('Department', 'Engineering'),
-      ('Timezone', 'UTC'),
-    ];
+    if (_profileLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
     final isWide = MediaQuery.of(context).size.width > 900;
     return Column(
       children: [
-        for (int i = 0; i < fields.length; i += isWide ? 2 : 1)
+        for (int i = 0; i < _profileFields.length; i += isWide ? 2 : 1)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Row(
               children: [
                 Expanded(
-                  child: _readOnlyField(
+                  child: _editableField(
                     context,
-                    label: fields[i].$1,
-                    value: fields[i].$2,
+                    label: _profileFields[i].$1,
+                    controller: _profileFields[i].$2,
+                    obscureText: _profileFields[i].$1 == 'password',
+                    keyboardType: _profileFields[i].$1 == 'maxUsersAllowed'
+                        ? TextInputType.number
+                        : TextInputType.text,
                   ),
                 ),
                 if (isWide) const SizedBox(width: 12),
-                if (isWide && i + 1 < fields.length)
+                if (isWide && i + 1 < _profileFields.length)
                   Expanded(
-                    child: _readOnlyField(
+                    child: _editableField(
                       context,
-                      label: fields[i + 1].$1,
-                      value: fields[i + 1].$2,
+                      label: _profileFields[i + 1].$1,
+                      controller: _profileFields[i + 1].$2,
+                      obscureText: _profileFields[i + 1].$1 == 'password',
+                      keyboardType:
+                          _profileFields[i + 1].$1 == 'maxUsersAllowed'
+                              ? TextInputType.number
+                              : TextInputType.text,
                     ),
                   ),
               ],
@@ -1067,8 +918,18 @@ class _EngineerAccountSettingsPanelState
     );
   }
 
-  Widget _readOnlyField(BuildContext context,
-      {required String label, required String value}) {
+  List<(String, TextEditingController)> get _profileFields => [
+        ('name', _nameController),
+        ('email', _emailController),
+      ];
+
+  Widget _editableField(
+    BuildContext context, {
+    required String label,
+    required TextEditingController controller,
+    bool obscureText = false,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1076,7 +937,6 @@ class _EngineerAccountSettingsPanelState
         const SizedBox(height: 6),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: Theme.of(context).dividerColor),
@@ -1084,7 +944,17 @@ class _EngineerAccountSettingsPanelState
                 ? const Color(0xFFF6FAFC)
                 : const Color(0xFF203a54),
           ),
-          child: Text(value),
+          child: TextField(
+            controller: controller,
+            obscureText: obscureText,
+            keyboardType: keyboardType,
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          ),
         ),
       ],
     );
@@ -1097,335 +967,22 @@ class _EngineerAccountSettingsPanelState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Notification Preferences',
+            'Notification',
             style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Manage how you receive alerts and updates',
-            style: TextStyle(
-              color: Theme.of(context).brightness == Brightness.light
-                  ? const Color(0xFF4f6b82)
-                  : const Color(0xFF9db7d2),
-            ),
-          ),
-          const SizedBox(height: 14),
-          _toggleTile(context,
-              title: 'Email Notifications',
-              subtitle: 'Receive alerts via email',
-              value: _emailNotifications,
-              onChanged: (v) => setState(() => _emailNotifications = v)),
-          _toggleTile(context,
-              title: 'SMS Notifications',
-              subtitle: 'Receive alerts via text message',
-              value: _smsNotifications,
-              onChanged: (v) => setState(() => _smsNotifications = v)),
-          _toggleTile(context,
-              title: 'WhatsApp Notifications',
-              subtitle: 'Receive alerts via WhatsApp',
-              value: _whatsAppNotifications,
-              onChanged: (v) => setState(() => _whatsAppNotifications = v)),
-          _toggleTile(context,
-              title: 'Push Notifications',
-              subtitle: 'Receive in-app push notifications',
-              value: _pushNotifications,
-              onChanged: (v) => setState(() => _pushNotifications = v)),
-          const SizedBox(height: 8),
-          const Divider(),
-          const SizedBox(height: 8),
-          _toggleTile(context,
-              title: 'Critical Alerts',
-              subtitle: 'High priority alerts requiring immediate attention',
-              value: _criticalAlerts,
-              onChanged: (v) => setState(() => _criticalAlerts = v)),
-          _toggleTile(context,
-              title: 'Warning Alerts',
-              subtitle: 'Medium priority alerts for potential issues',
-              value: _warningAlerts,
-              onChanged: (v) => setState(() => _warningAlerts = v)),
-          _toggleTile(context,
-              title: 'Info Alerts',
-              subtitle: 'Low priority informational updates',
-              value: _infoAlerts,
-              onChanged: (v) => setState(() => _infoAlerts = v)),
-          const SizedBox(height: 8),
-          const Divider(),
-          const SizedBox(height: 8),
-          _toggleTile(context,
-              title: 'Device Updates',
-              subtitle: 'Get notified about device status changes',
-              value: _deviceUpdates,
-              onChanged: (v) => setState(() => _deviceUpdates = v)),
-          _toggleTile(context,
-              title: 'System Notifications',
-              subtitle: 'Receive system maintenance and update notifications',
-              value: _systemNotifications,
-              onChanged: (v) => setState(() => _systemNotifications = v)),
-          _toggleTile(context,
-              title: 'Daily Digest',
-              subtitle: 'Receive a daily summary of sensor activity',
-              value: _dailyDigest,
-              onChanged: (v) => setState(() => _dailyDigest = v)),
-        ],
-      ),
-    );
-  }
-
-  Widget _toggleTile(BuildContext context,
-      {required String title,
-      required String subtitle,
-      required bool value,
-      required ValueChanged<bool> onChanged}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 16)),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: Theme.of(context).brightness == Brightness.light
-                        ? const Color(0xFF4f6b82)
-                        : const Color(0xFF9db7d2),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Switch(value: value, onChanged: onChanged),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAccessTab(BuildContext context) {
-    return _sectionContainer(
-      context,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Access Control',
-            style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'View your access permissions across the organization hierarchy',
-            style: TextStyle(
-              color: Theme.of(context).brightness == Brightness.light
-                  ? const Color(0xFF4f6b82)
-                  : const Color(0xFF9db7d2),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: const Color(0xFF27a36a).withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                  color: const Color(0xFF27a36a).withValues(alpha: 0.4)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.verified, color: Color(0xFF27a36a)),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Full Organization Access',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 16),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'You currently have unrestricted access to sites, zones, and sensors.',
-                ),
-                const SizedBox(height: 14),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final statWidth = constraints.maxWidth < 460
-                        ? constraints.maxWidth
-                        : 220.0;
-                    return Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        SizedBox(
-                          width: statWidth,
-                          child: const _AccessStatCard(
-                              label: 'All Sites', value: '1'),
-                        ),
-                        SizedBox(
-                          width: statWidth,
-                          child: const _AccessStatCard(
-                              label: 'All Zones', value: '1'),
-                        ),
-                        SizedBox(
-                          width: statWidth,
-                          child: const _AccessStatCard(
-                              label: 'All Sensors', value: '214'),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSecurityTab(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 1100;
-    return _sectionContainer(
-      context,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Change Password',
-            style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 12),
-          const _LabeledPasswordField(label: 'Current Password'),
           const SizedBox(height: 10),
-          const _LabeledPasswordField(label: 'New Password'),
-          const SizedBox(height: 10),
-          const _LabeledPasswordField(label: 'Confirm New Password'),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.key),
-              label: const Text('Update Password'),
-            ),
+          RadioListTile<bool>(
+            title: const Text('On'),
+            value: true,
+            groupValue: _notificationsEnabled,
+            onChanged: (v) => setState(() => _notificationsEnabled = v ?? true),
           ),
-          const SizedBox(height: 18),
-          const Text(
-            'Two-Factor Authentication',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 10),
-          _actionTile(context,
-              title: 'Authentication App',
-              subtitle:
-                  'Use an authenticator app to generate verification codes'),
-          _actionTile(context,
-              title: 'SMS Authentication',
-              subtitle: 'Receive verification codes via text message'),
-          const SizedBox(height: 18),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              color: const Color(0xFFE54C4C).withValues(alpha: 0.08),
-              border: Border.all(
-                  color: const Color(0xFFE54C4C).withValues(alpha: 0.35)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Danger Zone',
-                  style: TextStyle(
-                    color: Color(0xFFE54C4C),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 20 * 0.9,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Permanently delete your account and associated data.',
-                ),
-                const SizedBox(height: 10),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFE54C4C),
-                  ),
-                  onPressed: () {},
-                  child: const Text('Delete Account'),
-                ),
-              ],
-            ),
-          ),
-          if (isMobile) ...[
-            const SizedBox(height: 18),
-            _buildMobileLogoutSection(context),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMobileLogoutSection(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        color: isLight ? const Color(0xFFF8EDED) : const Color(0xFF3A2327),
-        border:
-            Border.all(color: const Color(0xFFE54C4C).withValues(alpha: 0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Session',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: Color(0xFFE54C4C),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Sign out from this device.',
-            style: TextStyle(
-              color:
-                  isLight ? const Color(0xFF37434C) : const Color(0xFFC5D5E3),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(
-                    builder: (_) => const EngineerLoginScreen(),
-                  ),
-                  (route) => false,
-                );
-              },
-              icon: const Icon(Icons.logout, color: Color(0xFFE54C4C)),
-              label: const Text(
-                'Logout',
-                style: TextStyle(color: Color(0xFFE54C4C)),
-              ),
-            ),
+          RadioListTile<bool>(
+            title: const Text('Off'),
+            value: false,
+            groupValue: _notificationsEnabled,
+            onChanged: (v) =>
+                setState(() => _notificationsEnabled = v ?? false),
           ),
         ],
       ),
@@ -1437,7 +994,10 @@ class _EngineerAccountSettingsPanelState
     final subColor =
         isLight ? const Color(0xFF4f6b82) : const Color(0xFF9db7d2);
     final db = context.watch<EngineerDatabaseProvider>();
-    final thresholds = db.sortedThresholdRules;
+    final thresholds = db.thresholdValues;
+    final thresholdProfileNames = <String, String>{
+      for (final profile in db.thresholdProfiles) profile.id: profile.name,
+    };
 
     return _sectionContainer(
       context,
@@ -1456,8 +1016,15 @@ class _EngineerAccountSettingsPanelState
                           TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                     ),
                     const Spacer(),
+                    OutlinedButton.icon(
+                      onPressed: () =>
+                          _showCreateThresholdProfileDialog(context, db),
+                      icon: const Icon(Icons.playlist_add),
+                      label: const Text('Add Threshold Profile'),
+                    ),
+                    const SizedBox(width: 8),
                     FilledButton.icon(
-                      onPressed: () => _showThresholdDialog(context, db: db),
+                      onPressed: () => _showThresholdValueDialog(context, db),
                       icon: const Icon(Icons.add),
                       label: const Text('Add Threshold'),
                     ),
@@ -1474,8 +1041,18 @@ class _EngineerAccountSettingsPanelState
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () =>
+                          _showCreateThresholdProfileDialog(context, db),
+                      icon: const Icon(Icons.playlist_add),
+                      label: const Text('Add Threshold Profile'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: () => _showThresholdDialog(context, db: db),
+                      onPressed: () => _showThresholdValueDialog(context, db),
                       icon: const Icon(Icons.add),
                       label: const Text('Add Threshold'),
                     ),
@@ -1486,7 +1063,7 @@ class _EngineerAccountSettingsPanelState
           ),
           const SizedBox(height: 4),
           Text(
-            'Add multiple thresholds with custom sound/color and choose where they appear.',
+            'Thresholds are loaded from API and saved using threshold endpoints.',
             style: TextStyle(color: subColor),
           ),
           const SizedBox(height: 14),
@@ -1503,7 +1080,7 @@ class _EngineerAccountSettingsPanelState
             )
           else
             ...thresholds.map(
-              (rule) => Container(
+              (value) => Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -1518,38 +1095,23 @@ class _EngineerAccountSettingsPanelState
                       runSpacing: 8,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: rule.color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
                         Text(
-                          '${rule.label} (${rule.value.toStringAsFixed(1)}°)',
+                          'Profile: ${thresholdProfileNames[value.thresholdProfileId] ?? value.thresholdProfileId}',
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 16,
                           ),
                         ),
-                        Text(
-                          rule.sound,
-                          style: TextStyle(
-                            color: subColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        Text('Sensor: ${value.sensorParameterId}',
+                            style: TextStyle(
+                              color: subColor,
+                              fontWeight: FontWeight.w600,
+                            )),
                         IconButton(
-                          onPressed: () => _showThresholdDialog(context,
-                              db: db, existing: rule),
+                          onPressed: () =>
+                              _showThresholdValueDialog(context, db),
                           icon: const Icon(Icons.edit_outlined, size: 18),
-                          tooltip: 'Edit threshold',
-                        ),
-                        IconButton(
-                          onPressed: () => db.deleteThresholdRule(rule.id),
-                          icon: const Icon(Icons.delete_outline, size: 18),
-                          tooltip: 'Delete threshold',
+                          tooltip: 'Open threshold form',
                         ),
                       ],
                     ),
@@ -1557,31 +1119,25 @@ class _EngineerAccountSettingsPanelState
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: rule.graphTargets
-                          .map(
-                            (target) => Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(99),
-                                color: rule.color.withValues(alpha: 0.12),
-                                border: Border.all(
-                                  color: rule.color.withValues(alpha: 0.4),
-                                ),
-                              ),
-                              child: Text(
-                                target.label,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: rule.color,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          )
-                          .toList(),
+                      children: [
+                        _pill(context, 'ID: ${value.id}'),
+                        _pill(
+                          context,
+                          'Min: ${value.minThreshold.toStringAsFixed(2)}',
+                        ),
+                        _pill(
+                          context,
+                          'Max: ${value.maxThreshold.toStringAsFixed(2)}',
+                        ),
+                        _pill(
+                          context,
+                          'Warning: ${value.warningLevel.toStringAsFixed(2)}',
+                        ),
+                        _pill(
+                          context,
+                          'Critical: ${value.criticalLevel.toStringAsFixed(2)}',
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1592,373 +1148,236 @@ class _EngineerAccountSettingsPanelState
     );
   }
 
-  void _showThresholdDialog(
-    BuildContext context, {
-    required EngineerDatabaseProvider db,
-    ThresholdRule? existing,
-  }) {
-    final labelController = TextEditingController(text: existing?.label ?? '');
-    final valueController = TextEditingController(
-      text: existing != null ? existing.value.toStringAsFixed(1) : '',
-    );
-    final soundController = TextEditingController(text: existing?.sound ?? '');
-    final colorHexController = TextEditingController(
-      text: existing != null ? _toHexColor(existing.color) : '#4C8BF5',
-    );
-    final selectedTargets = <ThresholdGraphTarget>{
-      ...(existing?.graphTargets ?? const <ThresholdGraphTarget>{}),
-    };
-    if (selectedTargets.isEmpty) {
-      selectedTargets.add(ThresholdGraphTarget.analyticsMain);
-    }
-
-    final presetColors = <String, Color>{
-      'Amber': const Color(0xFFD39A00),
-      'Red': const Color(0xFFE54C4C),
-      'Purple': const Color(0xFF7A4FD6),
-      'Blue': const Color(0xFF4C8BF5),
-      'Green': const Color(0xFF17A56F),
-      'Orange': const Color(0xFFF08A24),
-      'Custom': _parseHexColor(colorHexController.text) ??
-          (existing?.color ?? const Color(0xFF4C8BF5)),
-    };
-
-    String selectedColorName = existing == null
-        ? 'Blue'
-        : (presetColors.entries
-            .firstWhere(
-              (entry) => entry.value.value == existing.color.value,
-              orElse: () => const MapEntry('Custom', Color(0xFF4C8BF5)),
-            )
-            .key);
-
-    Color selectedColor = selectedColorName == 'Custom'
-        ? (existing?.color ?? const Color(0xFF4C8BF5))
-        : presetColors[selectedColorName]!;
-    String? errorText;
-
-    showDialog<void>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final isLight = Theme.of(context).brightness == Brightness.light;
-            InputDecoration themedInput({
-              required String labelText,
-              String? hintText,
-            }) {
-              return InputDecoration(
-                labelText: labelText,
-                hintText: hintText,
-                labelStyle: TextStyle(
-                  color: isLight
-                      ? const Color(0xFF3D5C6E)
-                      : const Color(0xFFB9CDDD),
-                ),
-                hintStyle: TextStyle(
-                  color: isLight
-                      ? const Color(0xFF7A96A8)
-                      : const Color(0xFF89A2B6),
-                ),
-                filled: true,
-                fillColor:
-                    isLight ? const Color(0xFFF8FBFD) : const Color(0xFF2A465A),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(
-                    color: isLight
-                        ? const Color(0xFFC7D9E4)
-                        : const Color(0xFF4A6B80),
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(
-                    color: isLight
-                        ? const Color(0xFF7FA8BF)
-                        : const Color(0xFF6E96AE),
-                  ),
-                ),
-              );
-            }
-
-            return AlertDialog(
-              backgroundColor:
-                  isLight ? const Color(0xFFF1F7FB) : const Color(0xFF243E52),
-              title:
-                  Text(existing == null ? 'Add Threshold' : 'Edit Threshold'),
-              content: SingleChildScrollView(
-                child: SizedBox(
-                  width: 380,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextField(
-                        controller: labelController,
-                        style: TextStyle(
-                          color: isLight
-                              ? const Color(0xFF1D3949)
-                              : const Color(0xFFE7F3FF),
-                        ),
-                        decoration: themedInput(
-                          labelText: 'Label',
-                          hintText: 'Example: Warning',
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: valueController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        style: TextStyle(
-                          color: isLight
-                              ? const Color(0xFF1D3949)
-                              : const Color(0xFFE7F3FF),
-                        ),
-                        decoration:
-                            themedInput(labelText: 'Threshold Value (°)'),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: soundController,
-                        style: TextStyle(
-                          color: isLight
-                              ? const Color(0xFF1D3949)
-                              : const Color(0xFFE7F3FF),
-                        ),
-                        decoration: themedInput(
-                          labelText: 'Alert Sound',
-                          hintText: 'Example: Siren',
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      DropdownButtonFormField<String>(
-                        value: selectedColorName,
-                        dropdownColor: isLight
-                            ? const Color(0xFFFFFFFF)
-                            : const Color(0xFF2A465A),
-                        style: TextStyle(
-                          color: isLight
-                              ? const Color(0xFF1D3949)
-                              : const Color(0xFFE7F3FF),
-                        ),
-                        decoration: themedInput(labelText: 'Threshold Color'),
-                        items: presetColors.keys
-                            .map(
-                              (name) => DropdownMenuItem<String>(
-                                value: name,
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 12,
-                                      height: 12,
-                                      decoration: BoxDecoration(
-                                        color: presetColors[name],
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(name),
-                                  ],
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setDialogState(() {
-                            selectedColorName = value;
-                            if (value != 'Custom') {
-                              selectedColor = presetColors[value]!;
-                              colorHexController.text =
-                                  _toHexColor(selectedColor);
-                            }
-                          });
-                        },
-                      ),
-                      if (selectedColorName == 'Custom') ...[
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: colorHexController,
-                          style: TextStyle(
-                            color: isLight
-                                ? const Color(0xFF1D3949)
-                                : const Color(0xFFE7F3FF),
-                          ),
-                          decoration: themedInput(
-                            labelText: 'Custom Hex Color',
-                            hintText: '#RRGGBB',
-                          ),
-                          onChanged: (value) {
-                            setDialogState(() {
-                              final parsed = _parseHexColor(value);
-                              if (parsed != null) selectedColor = parsed;
-                            });
-                          },
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      Text(
-                        'Show This Threshold On',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: isLight
-                              ? const Color(0xFF1F3948)
-                              : const Color(0xFFDDEBFA),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      ...ThresholdGraphTarget.values.map(
-                        (target) => CheckboxListTile(
-                          dense: true,
-                          visualDensity: VisualDensity.compact,
-                          activeColor: isLight
-                              ? const Color(0xFF2E5E77)
-                              : const Color(0xFF6E96AE),
-                          checkColor: isLight
-                              ? const Color(0xFFFFFFFF)
-                              : const Color(0xFF10202C),
-                          value: selectedTargets.contains(target),
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            target.label,
-                            style: TextStyle(
-                              color: isLight
-                                  ? const Color(0xFF2B4A5C)
-                                  : const Color(0xFFBCD0E0),
-                            ),
-                          ),
-                          onChanged: (checked) {
-                            setDialogState(() {
-                              if (checked == true) {
-                                selectedTargets.add(target);
-                              } else {
-                                selectedTargets.remove(target);
-                              }
-                            });
-                          },
-                        ),
-                      ),
-                      if (errorText != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          errorText!,
-                          style: const TextStyle(color: Color(0xFFB33A3A)),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    final label = labelController.text.trim();
-                    final value = double.tryParse(valueController.text.trim());
-                    final sound = soundController.text.trim();
-                    final resolvedColor = selectedColorName == 'Custom'
-                        ? _parseHexColor(colorHexController.text)
-                        : selectedColor;
-
-                    if (label.isEmpty) {
-                      setDialogState(() => errorText = 'Label is required.');
-                      return;
-                    }
-                    if (value == null) {
-                      setDialogState(
-                          () => errorText = 'Value must be numeric.');
-                      return;
-                    }
-                    if (sound.isEmpty) {
-                      setDialogState(() => errorText = 'Sound is required.');
-                      return;
-                    }
-                    if (resolvedColor == null) {
-                      setDialogState(() => errorText = 'Invalid color hex.');
-                      return;
-                    }
-                    if (selectedTargets.isEmpty) {
-                      setDialogState(
-                        () => errorText = 'Choose at least one graph target.',
-                      );
-                      return;
-                    }
-
-                    db.saveThresholdRule(
-                      ThresholdRule(
-                        id: existing?.id ?? db.nextThresholdRuleId(),
-                        label: label,
-                        value: value,
-                        sound: sound,
-                        color: resolvedColor,
-                        graphTargets: Set<ThresholdGraphTarget>.from(
-                          selectedTargets,
-                        ),
-                      ),
-                    );
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Color? _parseHexColor(String input) {
-    final cleaned = input.trim().replaceAll('#', '');
-    if (cleaned.length != 6) return null;
-    final value = int.tryParse(cleaned, radix: 16);
-    if (value == null) return null;
-    return Color(0xFF000000 | value);
-  }
-
-  String _toHexColor(Color color) {
-    final rgb = color.value & 0x00FFFFFF;
-    return '#${rgb.toRadixString(16).padLeft(6, '0').toUpperCase()}';
-  }
-
-  Widget _actionTile(BuildContext context,
-      {required String title, required String subtitle}) {
+  Widget _pill(BuildContext context, String text) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(99),
+        color: isLight ? const Color(0xFFEAF2F6) : const Color(0xFF2A465E),
         border: Border.all(color: Theme.of(context).dividerColor),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 16)),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: Theme.of(context).brightness == Brightness.light
-                        ? const Color(0xFF4f6b82)
-                        : const Color(0xFF9db7d2),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  Future<void> _showCreateThresholdProfileDialog(
+    BuildContext context,
+    EngineerDatabaseProvider db,
+  ) async {
+    String name = '';
+    String description = '';
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return CrudModal(
+            title: 'Add Threshold Profile',
+            fields: [
+              {
+                'label': 'name',
+                'value': name,
+                'onChanged': (String value) =>
+                    setDialogState(() => name = value),
+                'keyboardType': TextInputType.text,
+              },
+              {
+                'label': 'description',
+                'value': description,
+                'onChanged': (String value) =>
+                    setDialogState(() => description = value),
+                'keyboardType': TextInputType.text,
+              },
+            ],
+            onSave: () async {
+              final normalizedName = name.trim();
+              final normalizedDescription = description.trim();
+              if (normalizedName.isEmpty || normalizedDescription.isEmpty) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(
+                    content: Text('Name and description are required'),
                   ),
-                ),
-              ],
-            ),
-          ),
-          OutlinedButton(onPressed: () {}, child: const Text('Enable')),
-        ],
+                );
+                return;
+              }
+              try {
+                await ThresholdsApi.createProfile(
+                  name: normalizedName,
+                  description: normalizedDescription,
+                );
+                await db.loadThresholdProfiles();
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              } catch (e) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to create threshold profile: $e'),
+                    ),
+                  );
+                }
+              }
+            },
+            onCancel: () => Navigator.pop(dialogContext),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _showThresholdValueDialog(
+    BuildContext context,
+    EngineerDatabaseProvider db,
+  ) async {
+    // Do not block dialog open on slow network calls.
+    db.loadSensors();
+    db.loadThresholdProfiles();
+
+    final sensorOptions = db.sensors
+        .where((sensor) => sensor.id.trim().isNotEmpty)
+        .map((sensor) => {
+              'value': sensor.id,
+              'label':
+                  sensor.serialNumber.isEmpty ? sensor.id : sensor.serialNumber,
+            })
+        .toList();
+    if (sensorOptions.isEmpty) {
+      sensorOptions.addAll(
+        db.sensorParameters
+            .where((param) => param.id.trim().isNotEmpty)
+            .map((param) => {
+                  'value': param.id,
+                  'label': param.name.isEmpty ? param.id : param.name,
+                }),
+      );
+    }
+
+    final thresholdProfileOptions = db.thresholdProfiles
+        .where((profile) => profile.id.trim().isNotEmpty)
+        .map((profile) => {
+              'value': profile.id,
+              'label': profile.name.isEmpty
+                  ? profile.id
+                  : '${profile.name} - ${profile.description}',
+            })
+        .toList();
+
+    String minThresholdValue = '0';
+    String sensorParameterId =
+        sensorOptions.isNotEmpty ? sensorOptions.first['value']! : '';
+    String thresholdProfileId = thresholdProfileOptions.isNotEmpty
+        ? thresholdProfileOptions.first['value']!
+        : '';
+    String maxThresholdValue = '0';
+    String warningLevel = '0';
+    String criticalLevel = '0';
+
+    if (!context.mounted) return;
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return CrudModal(
+            title: 'Add Threshold',
+            fields: [
+              {
+                'label': 'minThresholdValue',
+                'value': minThresholdValue,
+                'onChanged': (String value) =>
+                    setDialogState(() => minThresholdValue = value),
+                'keyboardType': TextInputType.number,
+              },
+              {
+                'label': 'sensorParameterId',
+                'type': 'select',
+                'value': sensorParameterId.isEmpty ? null : sensorParameterId,
+                'options': sensorOptions,
+                'onChanged': (String? value) => setDialogState(() {
+                      sensorParameterId = value ?? '';
+                    }),
+              },
+              {
+                'label': 'thresholdProfileId',
+                'type': 'select',
+                'value': thresholdProfileId.isEmpty ? null : thresholdProfileId,
+                'options': thresholdProfileOptions,
+                'onChanged': (String? value) =>
+                    setDialogState(() => thresholdProfileId = value ?? ''),
+              },
+              {
+                'label': 'maxThresholdValue',
+                'value': maxThresholdValue,
+                'onChanged': (String value) =>
+                    setDialogState(() => maxThresholdValue = value),
+                'keyboardType': TextInputType.number,
+              },
+              {
+                'label': 'warningLevel',
+                'value': warningLevel,
+                'onChanged': (String value) =>
+                    setDialogState(() => warningLevel = value),
+                'keyboardType': TextInputType.number,
+              },
+              {
+                'label': 'criticalLevel',
+                'value': criticalLevel,
+                'onChanged': (String value) =>
+                    setDialogState(() => criticalLevel = value),
+                'keyboardType': TextInputType.number,
+              },
+            ],
+            onSave: () async {
+              if (thresholdProfileId.trim().isEmpty ||
+                  sensorParameterId.trim().isEmpty) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Threshold profile and sensor parameter are required',
+                    ),
+                  ),
+                );
+                return;
+              }
+
+              final minValue = int.tryParse(minThresholdValue.trim());
+              final maxValue = int.tryParse(maxThresholdValue.trim());
+              final warning = int.tryParse(warningLevel.trim());
+              final critical = int.tryParse(criticalLevel.trim());
+              if (minValue == null ||
+                  maxValue == null ||
+                  warning == null ||
+                  critical == null) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(
+                    content: Text('Threshold values must be integer numbers'),
+                  ),
+                );
+                return;
+              }
+
+              try {
+                await db.create('threshold_values', {
+                  'minThresholdValue': minValue,
+                  'sensorParameterId': sensorParameterId.trim(),
+                  'thresholdProfileId': thresholdProfileId.trim(),
+                  'maxThresholdValue': maxValue,
+                  'warningLevel': warning,
+                  'criticalLevel': critical,
+                });
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              } catch (e) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content: Text('Failed to save threshold: $e')),
+                  );
+                }
+              }
+            },
+            onCancel: () => Navigator.pop(dialogContext),
+          );
+        },
       ),
     );
   }
@@ -1972,73 +1391,6 @@ class _EngineerAccountSettingsPanelState
         border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: child,
-    );
-  }
-}
-
-class _AccessStatCard extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _AccessStatCard({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        border:
-            Border.all(color: const Color(0xFF27a36a).withValues(alpha: 0.4)),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: const TextStyle(
-                fontSize: 32 * 0.9, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 4),
-          Text(label),
-        ],
-      ),
-    );
-  }
-}
-
-class _LabeledPasswordField extends StatelessWidget {
-  final String label;
-
-  const _LabeledPasswordField({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 6),
-        TextField(
-          obscureText: true,
-          decoration: InputDecoration(
-            hintText: 'Enter $label',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Theme.of(context).dividerColor),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Theme.of(context).dividerColor),
-            ),
-            filled: true,
-            fillColor: Theme.of(context).brightness == Brightness.light
-                ? const Color(0xFFF6FAFC)
-                : const Color(0xFF203a54),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          ),
-        ),
-      ],
     );
   }
 }
