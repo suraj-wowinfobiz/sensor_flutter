@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../main_page.dart';
+import '../api/thresholds_api.dart';
 import '../core/theme/custom_theme_tokens.dart';
 import '../providers/theme_provider.dart';
 import '../shared/models/threshold_rule.dart';
 import '../providers/super_admin_backend_provider.dart';
+import 'crud_modal.dart';
 
 enum _SettingsTab {
   profile,
@@ -1375,8 +1377,15 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
                           TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                     ),
                     const Spacer(),
+                    OutlinedButton.icon(
+                      onPressed: () =>
+                          _showCreateThresholdProfileDialog(context, db),
+                      icon: const Icon(Icons.playlist_add),
+                      label: const Text('Add Threshold Profile'),
+                    ),
+                    const SizedBox(width: 8),
                     FilledButton.icon(
-                      onPressed: () => _showThresholdDialog(context, db: db),
+                      onPressed: () => _showThresholdValueDialog(context, db),
                       icon: const Icon(Icons.add),
                       label: const Text('Add Threshold'),
                     ),
@@ -1393,8 +1402,18 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () =>
+                          _showCreateThresholdProfileDialog(context, db),
+                      icon: const Icon(Icons.playlist_add),
+                      label: const Text('Add Threshold Profile'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: () => _showThresholdDialog(context, db: db),
+                      onPressed: () => _showThresholdValueDialog(context, db),
                       icon: const Icon(Icons.add),
                       label: const Text('Add Threshold'),
                     ),
@@ -1460,10 +1479,9 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
                           ),
                         ),
                         IconButton(
-                          onPressed: () => _showThresholdDialog(context,
-                              db: db, existing: rule),
+                          onPressed: () => _showThresholdValueDialog(context, db),
                           icon: const Icon(Icons.edit_outlined, size: 18),
-                          tooltip: 'Edit threshold',
+                          tooltip: 'Open threshold form',
                         ),
                         IconButton(
                           onPressed: () => db.deleteThresholdRule(rule.id),
@@ -1511,342 +1529,248 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
     );
   }
 
-  void _showThresholdDialog(
-    BuildContext context, {
-    required SuperAdminBackendProvider db,
-    ThresholdRule? existing,
-  }) {
-    final labelController = TextEditingController(text: existing?.label ?? '');
-    final valueController = TextEditingController(
-      text: existing != null ? existing.value.toStringAsFixed(1) : '',
+  Future<void> _showCreateThresholdProfileDialog(
+    BuildContext context,
+    SuperAdminBackendProvider db,
+  ) async {
+    String name = '';
+    String description = '';
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return CrudModal(
+            title: 'Add Threshold Profile',
+            fields: [
+              {
+                'label': 'name',
+                'value': name,
+                'onChanged': (String value) =>
+                    setDialogState(() => name = value),
+                'keyboardType': TextInputType.text,
+              },
+              {
+                'label': 'description',
+                'value': description,
+                'onChanged': (String value) =>
+                    setDialogState(() => description = value),
+                'keyboardType': TextInputType.text,
+              },
+            ],
+            onSave: () async {
+              final normalizedName = name.trim();
+              final normalizedDescription = description.trim();
+              if (normalizedName.isEmpty || normalizedDescription.isEmpty) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(
+                    content: Text('Name and description are required'),
+                  ),
+                );
+                return;
+              }
+              try {
+                await ThresholdsApi.createProfile(
+                  name: normalizedName,
+                  description: normalizedDescription,
+                );
+                await db.loadThresholdProfiles();
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              } catch (e) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to create threshold profile: $e'),
+                    ),
+                  );
+                }
+              }
+            },
+            onCancel: () => Navigator.pop(dialogContext),
+          );
+        },
+      ),
     );
-    final soundController = TextEditingController(text: existing?.sound ?? '');
-    final colorHexController = TextEditingController(
-      text: existing != null ? _toHexColor(existing.color) : '#4C8BF5',
-    );
-    final selectedTargets = <ThresholdGraphTarget>{
-      ...(existing?.graphTargets ?? const <ThresholdGraphTarget>{}),
-    };
-    if (selectedTargets.isEmpty) {
-      selectedTargets.add(ThresholdGraphTarget.analyticsMain);
+  }
+
+  Future<void> _showThresholdValueDialog(
+    BuildContext context,
+    SuperAdminBackendProvider db,
+  ) async {
+    // Do not block dialog open on slow network calls.
+    db.loadSensors();
+    db.loadThresholdProfiles();
+
+    final sensorOptions = db.sensors
+        .where((sensor) => sensor.id.trim().isNotEmpty)
+        .map((sensor) => {
+              'value': sensor.id,
+              'label':
+                  sensor.serialNumber.isEmpty ? sensor.id : sensor.serialNumber,
+            })
+        .toList();
+    if (sensorOptions.isEmpty) {
+      sensorOptions.addAll(
+        db.sensorParameters
+            .where((param) => param.id.trim().isNotEmpty)
+            .map((param) => {
+                  'value': param.id,
+                  'label': param.name.isEmpty ? param.id : param.name,
+                }),
+      );
     }
 
-    final presetColors = <String, Color>{
-      'Amber': const Color(0xFFD39A00),
-      'Red': const Color(0xFFE54C4C),
-      'Purple': const Color(0xFF7A4FD6),
-      'Blue': const Color(0xFF4C8BF5),
-      'Green': const Color(0xFF17A56F),
-      'Orange': const Color(0xFFF08A24),
-      'Custom': _parseHexColor(colorHexController.text) ??
-          (existing?.color ?? const Color(0xFF4C8BF5)),
-    };
+    final thresholdProfileOptions = db.thresholdProfiles
+        .where((profile) => profile.id.trim().isNotEmpty)
+        .map((profile) => {
+              'value': profile.id,
+              'label': profile.name.isEmpty
+                  ? profile.id
+                  : '${profile.name} - ${profile.description}',
+            })
+        .toList();
 
-    String selectedColorName = existing == null
-        ? 'Blue'
-        : (presetColors.entries
-            .firstWhere(
-              (entry) => entry.value.value == existing.color.value,
-              orElse: () => const MapEntry('Custom', Color(0xFF4C8BF5)),
-            )
-            .key);
+    String minThresholdValue = '0';
+    String sensorParameterId =
+        sensorOptions.isNotEmpty ? sensorOptions.first['value']! : '';
+    String thresholdProfileId =
+        thresholdProfileOptions.isNotEmpty ? thresholdProfileOptions.first['value']! : '';
+    String maxThresholdValue = '0';
+    String warningLevel = '0';
+    String criticalLevel = '0';
+    String warrningLevel = '0';
+    String sensorParamterId = sensorParameterId;
 
-    Color selectedColor = selectedColorName == 'Custom'
-        ? (existing?.color ?? const Color(0xFF4C8BF5))
-        : presetColors[selectedColorName]!;
-    String? errorText;
-
-    showDialog<void>(
+    if (!context.mounted) return;
+    await showDialog(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final isLight = Theme.of(context).brightness == Brightness.light;
-            InputDecoration themedInput({
-              required String labelText,
-              String? hintText,
-            }) {
-              return InputDecoration(
-                labelText: labelText,
-                hintText: hintText,
-                labelStyle: TextStyle(
-                  color: isLight
-                      ? const Color(0xFF3D5C6E)
-                      : const Color(0xFFB9CDDD),
-                ),
-                hintStyle: TextStyle(
-                  color: isLight
-                      ? const Color(0xFF7A96A8)
-                      : const Color(0xFF89A2B6),
-                ),
-                filled: true,
-                fillColor:
-                    isLight ? const Color(0xFFF8FBFD) : const Color(0xFF2A465A),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(
-                    color: isLight
-                        ? const Color(0xFFC7D9E4)
-                        : const Color(0xFF4A6B80),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return CrudModal(
+            title: 'Add Threshold',
+            fields: [
+              {
+                'label': 'minThresholdValue',
+                'value': minThresholdValue,
+                'onChanged': (String value) =>
+                    setDialogState(() => minThresholdValue = value),
+                'keyboardType': TextInputType.number,
+              },
+              {
+                'label': 'sensorParameterId',
+                'type': 'select',
+                'value': sensorParameterId.isEmpty ? null : sensorParameterId,
+                'options': sensorOptions,
+                'onChanged': (String? value) => setDialogState(() {
+                  sensorParameterId = value ?? '';
+                  if (sensorParamterId.isEmpty) {
+                    sensorParamterId = sensorParameterId;
+                  }
+                }),
+              },
+              {
+                'label': 'thresholdProfileId',
+                'type': 'select',
+                'value':
+                    thresholdProfileId.isEmpty ? null : thresholdProfileId,
+                'options': thresholdProfileOptions,
+                'onChanged': (String? value) =>
+                    setDialogState(() => thresholdProfileId = value ?? ''),
+              },
+              {
+                'label': 'maxThresholdValue',
+                'value': maxThresholdValue,
+                'onChanged': (String value) =>
+                    setDialogState(() => maxThresholdValue = value),
+                'keyboardType': TextInputType.number,
+              },
+              {
+                'label': 'warningLevel',
+                'value': warningLevel,
+                'onChanged': (String value) =>
+                    setDialogState(() => warningLevel = value),
+                'keyboardType': TextInputType.number,
+              },
+              {
+                'label': 'criticalLevel',
+                'value': criticalLevel,
+                'onChanged': (String value) =>
+                    setDialogState(() => criticalLevel = value),
+                'keyboardType': TextInputType.number,
+              },
+              {
+                'label': 'warrningLevel',
+                'value': warrningLevel,
+                'onChanged': (String value) =>
+                    setDialogState(() => warrningLevel = value),
+                'keyboardType': TextInputType.number,
+              },
+              {
+                'label': 'sensorParamterId',
+                'type': 'select',
+                'value': sensorParamterId.isEmpty ? null : sensorParamterId,
+                'options': sensorOptions,
+                'onChanged': (String? value) =>
+                    setDialogState(() => sensorParamterId = value ?? ''),
+              },
+            ],
+            onSave: () async {
+              if (thresholdProfileId.trim().isEmpty ||
+                  sensorParameterId.trim().isEmpty) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Threshold profile and sensor parameter are required',
+                    ),
                   ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(
-                    color: isLight
-                        ? const Color(0xFF7FA8BF)
-                        : const Color(0xFF6E96AE),
+                );
+                return;
+              }
+
+              final minValue = int.tryParse(minThresholdValue.trim());
+              final maxValue = int.tryParse(maxThresholdValue.trim());
+              final warning = int.tryParse(warningLevel.trim());
+              final critical = int.tryParse(criticalLevel.trim());
+              final warrning = int.tryParse(warrningLevel.trim());
+              if (minValue == null ||
+                  maxValue == null ||
+                  warning == null ||
+                  critical == null ||
+                  warrning == null) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(
+                    content: Text('Threshold values must be integer numbers'),
                   ),
-                ),
-              );
-            }
+                );
+                return;
+              }
 
-            return AlertDialog(
-              backgroundColor:
-                  isLight ? const Color(0xFFF1F7FB) : const Color(0xFF243E52),
-              title:
-                  Text(existing == null ? 'Add Threshold' : 'Edit Threshold'),
-              content: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 600),
-                child: SingleChildScrollView(
-                  child: SizedBox(
-                    width: 380,
-                    child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextField(
-                        controller: labelController,
-                        style: TextStyle(
-                          color: isLight
-                              ? const Color(0xFF1D3949)
-                              : const Color(0xFFE7F3FF),
-                        ),
-                        decoration: themedInput(
-                          labelText: 'Label',
-                          hintText: 'Example: Warning',
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: valueController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        style: TextStyle(
-                          color: isLight
-                              ? const Color(0xFF1D3949)
-                              : const Color(0xFFE7F3FF),
-                        ),
-                        decoration:
-                            themedInput(labelText: 'Threshold Value (°)'),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: soundController,
-                        style: TextStyle(
-                          color: isLight
-                              ? const Color(0xFF1D3949)
-                              : const Color(0xFFE7F3FF),
-                        ),
-                        decoration: themedInput(
-                          labelText: 'Alert Sound',
-                          hintText: 'Example: Siren',
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      DropdownButtonFormField<String>(
-                        value: selectedColorName,
-                        dropdownColor: isLight
-                            ? const Color(0xFFFFFFFF)
-                            : const Color(0xFF2A465A),
-                        style: TextStyle(
-                          color: isLight
-                              ? const Color(0xFF1D3949)
-                              : const Color(0xFFE7F3FF),
-                        ),
-                        decoration: themedInput(labelText: 'Threshold Color'),
-                        items: presetColors.keys
-                            .map(
-                              (name) => DropdownMenuItem<String>(
-                                value: name,
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 12,
-                                      height: 12,
-                                      decoration: BoxDecoration(
-                                        color: presetColors[name],
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(name),
-                                  ],
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setDialogState(() {
-                            selectedColorName = value;
-                            if (value != 'Custom') {
-                              selectedColor = presetColors[value]!;
-                              colorHexController.text =
-                                  _toHexColor(selectedColor);
-                            }
-                          });
-                        },
-                      ),
-                      if (selectedColorName == 'Custom') ...[
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: colorHexController,
-                          style: TextStyle(
-                            color: isLight
-                                ? const Color(0xFF1D3949)
-                                : const Color(0xFFE7F3FF),
-                          ),
-                          decoration: themedInput(
-                            labelText: 'Custom Hex Color',
-                            hintText: '#RRGGBB',
-                          ),
-                          onChanged: (value) {
-                            setDialogState(() {
-                              final parsed = _parseHexColor(value);
-                              if (parsed != null) selectedColor = parsed;
-                            });
-                          },
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      Text(
-                        'Show This Threshold On',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: isLight
-                              ? const Color(0xFF1F3948)
-                              : const Color(0xFFDDEBFA),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      ...ThresholdGraphTarget.values.map(
-                        (target) => CheckboxListTile(
-                          dense: true,
-                          visualDensity: VisualDensity.compact,
-                          activeColor: isLight
-                              ? const Color(0xFF2E5E77)
-                              : const Color(0xFF6E96AE),
-                          checkColor: isLight
-                              ? const Color(0xFFFFFFFF)
-                              : const Color(0xFF10202C),
-                          value: selectedTargets.contains(target),
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            target.label,
-                            style: TextStyle(
-                              color: isLight
-                                  ? const Color(0xFF2B4A5C)
-                                  : const Color(0xFFBCD0E0),
-                            ),
-                          ),
-                          onChanged: (checked) {
-                            setDialogState(() {
-                              if (checked == true) {
-                                selectedTargets.add(target);
-                              } else {
-                                selectedTargets.remove(target);
-                              }
-                            });
-                          },
-                        ),
-                      ),
-                      if (errorText != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          errorText!,
-                          style: const TextStyle(color: Color(0xFFB33A3A)),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    final label = labelController.text.trim();
-                    final value = double.tryParse(valueController.text.trim());
-                    final sound = soundController.text.trim();
-                    final resolvedColor = selectedColorName == 'Custom'
-                        ? _parseHexColor(colorHexController.text)
-                        : selectedColor;
-
-                    if (label.isEmpty) {
-                      setDialogState(() => errorText = 'Label is required.');
-                      return;
-                    }
-                    if (value == null) {
-                      setDialogState(
-                          () => errorText = 'Value must be numeric.');
-                      return;
-                    }
-                    if (sound.isEmpty) {
-                      setDialogState(() => errorText = 'Sound is required.');
-                      return;
-                    }
-                    if (resolvedColor == null) {
-                      setDialogState(() => errorText = 'Invalid color hex.');
-                      return;
-                    }
-                    if (selectedTargets.isEmpty) {
-                      setDialogState(
-                        () => errorText = 'Choose at least one graph target.',
-                      );
-                      return;
-                    }
-
-                    db.saveThresholdRule(
-                      ThresholdRule(
-                        id: existing?.id ?? db.nextThresholdRuleId(),
-                        label: label,
-                        value: value,
-                        sound: sound,
-                        color: resolvedColor,
-                        graphTargets: Set<ThresholdGraphTarget>.from(
-                          selectedTargets,
-                        ),
-                      ),
-                    );
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+              try {
+                await db.create('threshold_values', {
+                  'minThresholdValue': minValue,
+                  'sensorParameterId': sensorParameterId.trim(),
+                  'thresholdProfileId': thresholdProfileId.trim(),
+                  'maxThresholdValue': maxValue,
+                  'warningLevel': warning,
+                  'criticalLevel': critical,
+                  'warrningLevel': warrning,
+                  'sensorParamterId': sensorParamterId.trim().isEmpty
+                      ? sensorParameterId.trim()
+                      : sensorParamterId.trim(),
+                });
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              } catch (e) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content: Text('Failed to save threshold: $e')),
+                  );
+                }
+              }
+            },
+            onCancel: () => Navigator.pop(dialogContext),
+          );
+        },
+      ),
     );
-  }
-
-  Color? _parseHexColor(String input) {
-    final cleaned = input.trim().replaceAll('#', '');
-    if (cleaned.length != 6) return null;
-    final value = int.tryParse(cleaned, radix: 16);
-    if (value == null) return null;
-    return Color(0xFF000000 | value);
-  }
-
-  String _toHexColor(Color color) {
-    final rgb = color.value & 0x00FFFFFF;
-    return '#${rgb.toRadixString(16).padLeft(6, '0').toUpperCase()}';
   }
 
   Widget _actionTile(BuildContext context,

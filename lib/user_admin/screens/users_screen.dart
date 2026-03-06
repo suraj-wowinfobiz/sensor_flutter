@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../super_admin/api/users_api.dart';
+import '../api/users_api.dart';
 import '../models/user.dart';
 import '../providers/user_admin_database_provider.dart';
 
@@ -26,7 +26,6 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
   String? _editingId;
   String _name = '';
   String _email = '';
-  String _role = 'operator';
 
   @override
   void initState() {
@@ -50,17 +49,14 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
       _editingId = user.id;
       _name = user.name;
       _email = user.email;
-      _role = user.role;
     } else {
       _editingId = null;
       _name = '';
       _email = '';
-      _role = 'operator';
     }
 
     final nameController = TextEditingController(text: _name);
     final emailController = TextEditingController(text: _email);
-    final roleController = TextEditingController(text: _role);
     final organizationController = TextEditingController();
     final maxUsersAllowedController = TextEditingController(text: '20');
     final passwordController = TextEditingController();
@@ -69,13 +65,6 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     final db = parentContext.read<UserAdminDatabaseProvider>();
     var selectedOrganizationId =
         db.organizations.isNotEmpty ? db.organizations.first.id : '';
-
-    String normalizeRole(String value) {
-      final lower = value.trim().toLowerCase();
-      if (lower == 'admin') return 'admin';
-      if (lower == 'engineer') return 'engineer';
-      return 'operator';
-    }
 
     await showDialog(
       context: parentContext,
@@ -88,7 +77,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
           Future<void> saveUser() async {
             final name = nameController.text.trim();
             final email = emailController.text.trim();
-            final role = normalizeRole(roleController.text);
+            const role = 'user';
             final maxUsersAllowed =
                 int.tryParse(maxUsersAllowedController.text.trim());
             final password = passwordController.text.trim();
@@ -144,10 +133,11 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
               }
               if (dialogContext.mounted) Navigator.pop(dialogContext);
             } catch (e) {
-              if (!parentContext.mounted) return;
-              ScaffoldMessenger.of(parentContext).showSnackBar(
-                SnackBar(content: Text('Failed to save user: $e')),
-              );
+              if (parentContext.mounted) {
+                ScaffoldMessenger.of(parentContext).showSnackBar(
+                  SnackBar(content: Text('Failed to save user: $e')),
+                );
+              }
             }
           }
 
@@ -214,7 +204,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                       Text(
                         user == null
                             ? 'Enter details to create a user'
-                            : 'Update user details and access role',
+                            : 'Update user details',
                         style: TextStyle(
                           fontSize: 15,
                           color: isLight
@@ -287,23 +277,11 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                         ),
                         const SizedBox(height: 6),
                         _inputBox(
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: normalizeRole(roleController.text),
-                              isExpanded: true,
-                              items: const [
-                                DropdownMenuItem(
-                                    value: 'admin', child: Text('Admin')),
-                                DropdownMenuItem(
-                                    value: 'engineer', child: Text('Engineer')),
-                                DropdownMenuItem(
-                                    value: 'operator', child: Text('Operator')),
-                              ],
-                              onChanged: (value) {
-                                if (value != null) {
-                                  roleController.text = value;
-                                }
-                              },
+                          child: const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'User',
+                              style: TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),
                         ),
@@ -415,13 +393,6 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
         },
       ),
     );
-
-    nameController.dispose();
-    emailController.dispose();
-    roleController.dispose();
-    organizationController.dispose();
-    maxUsersAllowedController.dispose();
-    passwordController.dispose();
   }
 
   Widget _dialogActions({
@@ -530,38 +501,27 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     UserAdminDatabaseProvider db,
   ) {
     final index = db.users.indexOf(user).clamp(0, 9999);
-    final isAdmin = user.role == 'admin';
-    final isEngineer = user.role == 'engineer';
-
-    final organizationIds = isAdmin
-        ? db.organizations.map((o) => o.id).toSet()
-        : <String>{
-            if (db.organizations.isNotEmpty)
-              db.organizations[index % db.organizations.length].id,
-            if (isEngineer && db.organizations.length > 1)
-              db.organizations[(index + 1) % db.organizations.length].id,
-          };
+    final organizationIds = <String>{
+      if (db.organizations.isNotEmpty)
+        db.organizations[index % db.organizations.length].id,
+    };
 
     final scopedSites = db.sites
         .where((s) => organizationIds.contains(s.organizationId))
         .toList();
-    final siteIds = isAdmin
-        ? scopedSites.map((s) => s.id).toSet()
-        : scopedSites
-            .skip(index % (scopedSites.isEmpty ? 1 : scopedSites.length))
-            .take(isEngineer ? 2 : 1)
-            .map((s) => s.id)
-            .toSet();
+    final siteIds = scopedSites
+        .skip(index % (scopedSites.isEmpty ? 1 : scopedSites.length))
+        .take(1)
+        .map((s) => s.id)
+        .toSet();
 
     final scopedZones =
         db.zones.where((z) => siteIds.contains(z.siteId)).toList();
-    final zoneIds = isAdmin
-        ? scopedZones.map((z) => z.id).toSet()
-        : scopedZones
-            .skip(index % (scopedZones.isEmpty ? 1 : scopedZones.length))
-            .take(isEngineer ? 3 : 2)
-            .map((z) => z.id)
-            .toSet();
+    final zoneIds = scopedZones
+        .skip(index % (scopedZones.isEmpty ? 1 : scopedZones.length))
+        .take(2)
+        .map((z) => z.id)
+        .toSet();
 
     return {
       'organizations': organizationIds,
@@ -571,11 +531,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
   }
 
   String _principalTypeForRole(String role) {
-    final normalized = role.trim().toLowerCase();
-    if (normalized == 'vendor') return 'VENDOR';
-    if (normalized == 'vendor_engineer') return 'VENDOR_ENGINEER';
-    if (normalized == 'super_admin') return 'SUPER_ADMIN';
-    return 'ADMIN';
+    return 'USER';
   }
 
   Set<String> _assignmentKeysFromSelection({
@@ -1492,11 +1448,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                             DropdownMenuItem(
                                 value: 'all', child: Text('All Roles')),
                             DropdownMenuItem(
-                                value: 'admin', child: Text('Admin')),
-                            DropdownMenuItem(
-                                value: 'engineer', child: Text('Engineer')),
-                            DropdownMenuItem(
-                                value: 'operator', child: Text('Operator')),
+                                value: 'user', child: Text('User')),
                           ],
                           onChanged: (value) =>
                               setState(() => _roleFilter = value!),
@@ -1554,11 +1506,7 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                                 DropdownMenuItem(
                                     value: 'all', child: Text('All Roles')),
                                 DropdownMenuItem(
-                                    value: 'admin', child: Text('Admin')),
-                                DropdownMenuItem(
-                                    value: 'engineer', child: Text('Engineer')),
-                                DropdownMenuItem(
-                                    value: 'operator', child: Text('Operator')),
+                                    value: 'user', child: Text('User')),
                               ],
                               onChanged: (value) =>
                                   setState(() => _roleFilter = value!),
@@ -1593,19 +1541,22 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                 ...users.map((user) {
                   final restricted = _restrictedUsers.contains(user.id);
                   final userIndex = db.users.indexOf(user);
+                  final safeUserIndex = userIndex < 0 ? 0 : userIndex;
                   final site = db.sites.isNotEmpty
-                      ? db.sites[userIndex % db.sites.length].name
+                      ? db.sites[safeUserIndex % db.sites.length].name
                       : 'No Site';
                   final zone = db.zones.isNotEmpty
-                      ? db.zones[userIndex % db.zones.length].name
+                      ? db.zones[safeUserIndex % db.zones.length].name
                       : 'No Zone';
-                  final sensorCodes = db.sensors
-                      .where((s) =>
-                          s.deviceId ==
-                          db.devices[userIndex % db.devices.length].id)
-                      .take(2)
-                      .map((s) => s.serialNumber)
-                      .toList();
+                  final sensorCodes = db.devices.isEmpty
+                      ? <String>[]
+                      : db.sensors
+                          .where((s) =>
+                              s.deviceId ==
+                              db.devices[safeUserIndex % db.devices.length].id)
+                          .take(2)
+                          .map((s) => s.serialNumber)
+                          .toList();
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
@@ -1685,21 +1636,21 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                               ),
                               const SizedBox(height: 10),
                               _accessBlock(
-                                title: 'Sites (1)',
+                                title: 'Organization (0)',
                                 icon: Icons.business,
                                 color: const Color(0xFFE2F0F8),
                                 chips: [site],
                               ),
                               const SizedBox(height: 8),
                               _accessBlock(
-                                title: 'Zones (1)',
+                                title: 'Site (1)',
                                 icon: Icons.location_on_outlined,
                                 color: const Color(0xFFE8EBF9),
                                 chips: [zone],
                               ),
                               const SizedBox(height: 8),
                               _accessBlock(
-                                title: 'Sensors (${sensorCodes.length})',
+                                title: 'Zone (0)',
                                 icon: Icons.sensors,
                                 color: const Color(0xFFE6F4EA),
                                 chips: sensorCodes.isEmpty
@@ -1745,12 +1696,14 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                                 try {
                                   await db.delete('users', user.id);
                                 } catch (e) {
-                                  if (!context.mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
                                         content:
-                                            Text('Failed to delete user: $e')),
-                                  );
+                                            Text('Failed to delete user: $e'),
+                                      ),
+                                    );
+                                  }
                                 }
                               },
                             ),
@@ -1838,18 +1791,22 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
         children: users.map((user) {
           final restricted = _restrictedUsers.contains(user.id);
           final userIndex = db.users.indexOf(user);
+          final safeUserIndex = userIndex < 0 ? 0 : userIndex;
           final site = db.sites.isNotEmpty
-              ? db.sites[userIndex % db.sites.length].name
+              ? db.sites[safeUserIndex % db.sites.length].name
               : 'No Site';
           final zone = db.zones.isNotEmpty
-              ? db.zones[userIndex % db.zones.length].name
+              ? db.zones[safeUserIndex % db.zones.length].name
               : 'No Zone';
-          final sensorCodes = db.sensors
-              .where((s) =>
-                  s.deviceId == db.devices[userIndex % db.devices.length].id)
-              .take(3)
-              .map((s) => s.serialNumber)
-              .toList();
+          final sensorCodes = db.devices.isEmpty
+              ? <String>[]
+              : db.sensors
+                  .where((s) =>
+                      s.deviceId ==
+                      db.devices[safeUserIndex % db.devices.length].id)
+                  .take(3)
+                  .map((s) => s.serialNumber)
+                  .toList();
           final details = <String>[
             user.role,
             restricted ? 'restricted' : 'active',
@@ -1985,11 +1942,13 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                         try {
                           await db.delete('users', user.id);
                         } catch (e) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text('Failed to delete user: $e')),
-                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to delete user: $e'),
+                              ),
+                            );
+                          }
                         }
                       },
                     ),

@@ -22,6 +22,34 @@ class ThresholdsApi {
     return _asMap(response.body);
   }
 
+  static Future<Map<String, dynamic>> createThreshold({
+    required double minThresholdValue,
+    required String sensorParameterId,
+    required String thresholdProfileId,
+    required double maxThresholdValue,
+    required double warningLevel,
+    required double criticalLevel,
+    double? warrningLevel,
+    String? sensorParamterId,
+  }) async {
+    final legacyWarningLevel = warrningLevel ?? warningLevel;
+    final legacySensorParamterId = sensorParamterId ?? sensorParameterId;
+    final response = await ApiClient.post(
+      '/api/v1/thresholds',
+      data: {
+        'minThresholdValue': minThresholdValue,
+        'sensorParameterId': sensorParameterId,
+        'thresholdProfileId': thresholdProfileId,
+        'maxThresholdValue': maxThresholdValue,
+        'warningLevel': warningLevel,
+        'criticalLevel': criticalLevel,
+        'warrningLevel': legacyWarningLevel,
+        'sensorParamterId': legacySensorParamterId,
+      },
+    );
+    return _asMap(response.body);
+  }
+
   static Future<Map<String, dynamic>> updateProfile({
     required String id,
     required String name,

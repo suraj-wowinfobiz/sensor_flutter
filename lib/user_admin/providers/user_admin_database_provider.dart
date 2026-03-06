@@ -1,9 +1,14 @@
 import 'dart:math';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
-import '../../super_admin/api/organization_api.dart' as org_api;
-import '../../super_admin/api/users_api.dart';
+import '../../super_admin/api/device_api.dart';
+import '../api/organization_api.dart' as org_api;
+import '../../super_admin/api/sensor_api.dart';
+import '../../super_admin/api/sensor_type_api.dart';
+import '../../super_admin/api/thresholds_api.dart';
+import '../api/users_api.dart';
 import '../models/alert.dart';
 import '../models/audit_log.dart';
 import '../models/config.dart';
@@ -35,6 +40,10 @@ class UserAdminDatabaseProvider extends ChangeNotifier {
   late Config config;
 
   String currentView = 'dashboard';
+  Future<void>? _loadOrganizationsTask;
+  Future<void>? _loadSitesTask;
+  Future<void>? _loadDevicesTask;
+  Future<void>? _loadSensorsTask;
   int _thresholdRuleSeed = 4;
   final List<ThresholdRule> _thresholdRules = [
     const ThresholdRule(
@@ -109,74 +118,50 @@ class UserAdminDatabaseProvider extends ChangeNotifier {
     return DateTime.now();
   }
 
+  double _asDouble(dynamic value, [double fallback = 0.0]) {
+    if (value == null) return fallback;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString()) ?? fallback;
+  }
+
+  Map<String, dynamic> _devicePayloadFrom(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return raw.cast<String, dynamic>();
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is Map) return decoded.cast<String, dynamic>();
+      } catch (_) {
+        // Ignore malformed JSON string and fallback to empty map.
+      }
+    }
+    return const <String, dynamic>{};
+  }
+
   void _initializeData() {
     organizations = [];
     sites = [];
     zones = [];
+
     devices = [];
 
-    sensorTypes = const [
-      SensorType(
-        id: 'type_tilt',
-        name: 'Tilt X/Y',
-        category: 'inclinometer',
-        description: 'Biaxial tilt sensor',
-      ),
-      SensorType(
-        id: 'type_temp',
-        name: 'Temperature',
-        category: 'thermal',
-        description: 'Temperature sensor',
-      ),
-    ];
+    sensorTypes = [];
 
     sensors = [];
-
-    sensorParameters = [
-      SensorParameter(
+    sensorParameters = [];
+    thresholdProfiles = [];
+    thresholdValues = [];
+    users = [
+      User(
         id: _uuid(),
-        sensorTypeId: sensorTypes[0].id,
-        name: 'tilt_x',
-        unit: 'degrees',
-        minValue: -15,
-        maxValue: 15,
-      ),
-      SensorParameter(
-        id: _uuid(),
-        sensorTypeId: sensorTypes[0].id,
-        name: 'tilt_y',
-        unit: 'degrees',
-        minValue: -15,
-        maxValue: 15,
+        name: 'Admin User',
+        role: 'admin',
+        email: 'admin@example.com',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       ),
     ];
-
-    thresholdProfiles = [
-      ThresholdProfile(
-        id: _uuid(),
-        name: 'Standard Tilt',
-        description: 'Default tilt thresholds',
-      ),
-      ThresholdProfile(
-        id: _uuid(),
-        name: 'High Sensitivity',
-        description: 'Stricter thresholds',
-      ),
-    ];
-
-    thresholdValues = [
-      ThresholdValue(
-        id: _uuid(),
-        sensorParameterId: sensorParameters[0].id,
-        thresholdProfileId: thresholdProfiles[0].id,
-        minThreshold: -4,
-        maxThreshold: 4,
-        warningLevel: 2.5,
-        criticalLevel: 4.0,
-      ),
-    ];
-
-    users = [];
     alerts = [];
     auditLogs = [];
 
@@ -193,124 +178,151 @@ class UserAdminDatabaseProvider extends ChangeNotifier {
   }
 
   Future<void> loadOrganizations() async {
-    final res = await org_api.OrgServiceApi.getAllOrganizations();
-    final body = res.body;
-    if (body is! List) {
-      organizations = [];
-      notifyListeners();
-      return;
+    if (_loadOrganizationsTask != null) return _loadOrganizationsTask!;
+    final task = () async {
+      try {
+        final res = await org_api.OrgServiceApi.getAllOrganizations();
+        if (res.body == null) {
+          organizations = [];
+          return;
+        }
+        organizations = (res.body as List)
+            .map((json) => Organization(
+                  id: json['organizationId'],
+                  name: json['name'],
+                  email: json['email'],
+                  status: json['status']?.toLowerCase() ?? 'active',
+                  ownerUserId: '',
+                  createdAt: DateTime.parse(json['createdAt']),
+                ))
+            .toList();
+      } catch (e) {
+        print('Error loading organizations: $e');
+        organizations = [];
+      }
+    }();
+    _loadOrganizationsTask = task;
+    try {
+      await task;
+    } finally {
+      _loadOrganizationsTask = null;
     }
-
-    organizations = body.map((json) {
-      final item = json as Map;
-      return Organization(
-        id: _asString(item['organizationId']),
-        name: _asString(item['name'], 'Organization'),
-        email: _asString(item['email']),
-        status: _asString(item['status'], 'active').toLowerCase(),
-        ownerUserId: _asString(item['ownerUserId']),
-        createdAt: _asDate(item['createdAt']),
-      );
-    }).toList();
-    notifyListeners();
   }
 
   Future<void> loadSites() async {
-    final res = await org_api.OrgServiceApi.getAllSites();
-    final body = res.body;
-    if (body is! List) {
-      sites = [];
-      notifyListeners();
-      return;
-    }
-
-    final mappedSites = <String, Site>{};
-    for (final raw in body) {
-      if (raw is! Map) continue;
-      final org = raw['organization'];
-      final id = _asString(raw['sitesID']);
-      if (id.isEmpty) continue;
-      mappedSites[id] = Site(
-        id: id,
-        organizationId: org is Map ? _asString(org['organizationId']) : '',
-        name: _asString(raw['name']),
-        location: _asString(raw['location']),
-        createdAt: _asDate(raw['createdAt']),
-      );
-    }
-
-    final hasMissingOrganization = mappedSites.values.any(
-      (s) => s.organizationId.trim().isEmpty,
-    );
-    if (hasMissingOrganization && organizations.isNotEmpty) {
-      for (final org in organizations) {
-        try {
-          final orgSitesRes =
-              await org_api.OrgServiceApi.getOrganizationSites(org.id);
-          final orgBody = orgSitesRes.body;
-          if (orgBody is! Map) continue;
-          final rawSites = orgBody['sites'];
-          if (rawSites is! List) continue;
-          for (final raw in rawSites) {
-            if (raw is! Map) continue;
-            final id = _asString(raw['sitesID']);
-            if (id.isEmpty) continue;
-            final existing = mappedSites[id];
-            mappedSites[id] = Site(
-              id: id,
-              organizationId: org.id,
-              name: _asString(raw['name'], existing?.name ?? ''),
-              location: _asString(raw['location'], existing?.location ?? ''),
-              createdAt: _asDate(raw['createdAt'] ?? existing?.createdAt),
-            );
-          }
-        } catch (_) {
-          // Keep base site list when enrichment endpoint fails for one org.
+    if (_loadSitesTask != null) return _loadSitesTask!;
+    final task = () async {
+      try {
+        final res = await org_api.OrgServiceApi.getAllSites();
+        if (res.body == null) {
+          sites = [];
+          return;
         }
-      }
-    }
+        final mappedSites = <String, Site>{};
+        for (final json in (res.body as List)) {
+          final org = json['organization'];
+          final site = Site(
+            id: json['sitesID'],
+            organizationId:
+                org != null && org is Map ? org['organizationId'] : '',
+            name: json['name'],
+            location: json['location'],
+            createdAt: DateTime.parse(json['createdAt']),
+          );
+          mappedSites[site.id] = site;
+        }
 
-    sites = mappedSites.values.toList();
-    notifyListeners();
+        // Some backend responses from /site/ do not include organization relation.
+        // Enrich missing organizationId by querying sites scoped per organization.
+        final hasMissingOrganization = mappedSites.values.any(
+          (s) => s.organizationId.trim().isEmpty,
+        );
+        if (hasMissingOrganization && organizations.isNotEmpty) {
+          for (final org in organizations) {
+            try {
+              final orgSitesRes =
+                  await org_api.OrgServiceApi.getOrganizationSites(org.id);
+              final body = orgSitesRes.body;
+              if (body is! Map) continue;
+              final rawSites = body['sites'];
+              if (rawSites is! List) continue;
+              for (final raw in rawSites) {
+                if (raw is! Map) continue;
+                final id = _asString(raw['sitesID']);
+                if (id.isEmpty) continue;
+                final existing = mappedSites[id];
+                final createdAtRaw = raw['createdAt'];
+                final createdAt = createdAtRaw is String
+                    ? (DateTime.tryParse(createdAtRaw) ?? DateTime.now())
+                    : (existing?.createdAt ?? DateTime.now());
+                mappedSites[id] = Site(
+                  id: id,
+                  organizationId: org.id,
+                  name: _asString(raw['name'], existing?.name ?? ''),
+                  location:
+                      _asString(raw['location'], existing?.location ?? ''),
+                  createdAt: createdAt,
+                );
+              }
+            } catch (_) {
+              // Ignore per-org enrichment failures and keep base list.
+            }
+          }
+        }
+
+        sites = mappedSites.values.toList();
+      } catch (e) {
+        print('Error loading sites: $e');
+        sites = [];
+      }
+    }();
+    _loadSitesTask = task;
+    try {
+      await task;
+    } finally {
+      _loadSitesTask = null;
+    }
   }
 
   Future<void> loadZones(String siteId) async {
-    final res = await org_api.OrgServiceApi.getZonesBySite(siteId);
-    final body = res.body;
-    if (body is! List) {
+    try {
+      final res = await org_api.OrgServiceApi.getZonesBySite(siteId);
+      if (res.body == null) {
+        zones.removeWhere((z) => z.siteId == siteId);
+        return;
+      }
+      final newZones = (res.body as List).map((json) {
+        final site = json['site'];
+        return Zone(
+          id: json['zoneId'],
+          siteId: site != null && site is Map ? site['sitesID'] : siteId,
+          name: json['name'],
+        );
+      }).toList();
       zones.removeWhere((z) => z.siteId == siteId);
-      notifyListeners();
-      return;
+      zones.addAll(newZones);
+    } catch (e) {
+      print('Error loading zones: $e');
     }
-
-    final newZones = body.map((json) {
-      final item = json as Map;
-      final site = item['site'];
-      return Zone(
-        id: _asString(item['zoneId']),
-        siteId: site is Map ? _asString(site['sitesID'], siteId) : siteId,
-        name: _asString(item['name']),
-      );
-    }).toList();
-
-    zones.removeWhere((z) => z.siteId == siteId);
-    zones.addAll(newZones);
-    notifyListeners();
   }
 
   Future<void> loadUsers() async {
-    final body = await UsersApi.getUsers();
-    users = body.map((json) {
-      return User(
-        id: _asString(json['id'] ?? json['userId'], _uuid()),
-        name: _asString(json['name'], 'User'),
-        role: _asString(json['role'], 'operator').toLowerCase(),
-        email: _asString(json['email']),
-        createdAt: _asDate(json['createdAt'] ?? json['created_at']),
-        updatedAt: _asDate(json['updatedAt'] ?? json['updated_at']),
-      );
-    }).toList();
-    notifyListeners();
+    try {
+      final body = await UsersApi.getUsers();
+      users = body.map((json) {
+        return User(
+          id: _asString(json['id'] ?? json['userId'], _uuid()),
+          name: _asString(json['name'], 'User'),
+          role: _asString(json['role'], 'user').toLowerCase(),
+          email: _asString(json['email']),
+          createdAt: _asDate(json['createdAt'] ?? json['created_at']),
+          updatedAt: _asDate(json['updatedAt'] ?? json['updated_at']),
+        );
+      }).toList();
+    } catch (e) {
+      print('Error loading users: $e');
+      users = [];
+    }
   }
 
   Future<void> createOrganization({
@@ -395,6 +407,185 @@ class UserAdminDatabaseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loadDevices() async {
+    if (_loadDevicesTask != null) return _loadDevicesTask!;
+    final task = () async {
+      try {
+        final body = await DeviceApi.getAllDevices();
+        final loadedDevices = body.map((json) {
+          // Backend returns {data: {...}, id: ..., organizationId: ...}
+          // Also handles `data` as JSON string.
+          final nested = _devicePayloadFrom(json['data']);
+          final data = nested.isNotEmpty ? nested : json;
+          final rawSite = data['site'];
+          final rawZone = data['zone'];
+          final resolvedSiteId = _asString(
+            data['siteId'] ?? data['site_id'] ?? data['sitesID'],
+            rawSite is Map ? _asString(rawSite['sitesID']) : '',
+          );
+          final resolvedZoneId = _asString(
+            data['zoneId'] ?? data['zone_id'],
+            rawZone is Map ? _asString(rawZone['zoneId']) : '',
+          );
+          return Device(
+            id: _asString(
+                data['id'] ?? data['deviceId'] ?? json['id'], _uuid()),
+            siteId: resolvedSiteId,
+            zoneId: resolvedZoneId,
+            deviceCode: _asString(
+              data['serialNumber'] ?? data['device_code'] ?? data['name'],
+              'DEV-${_uuid().substring(0, 8)}',
+            ),
+            status: _asString(data['status'], 'active').toLowerCase(),
+            installedAt: _asDate(
+              data['lastHeartBeat'] ??
+                  data['installed_at'] ??
+                  data['createdAt'],
+            ),
+          );
+        }).toList();
+        final deduped = <String, Device>{};
+        for (final device in loadedDevices) {
+          deduped[device.id] = device;
+        }
+        devices = deduped.values.toList();
+      } catch (e) {
+        print('Error loading devices: $e');
+        devices = [];
+      }
+    }();
+    _loadDevicesTask = task;
+    try {
+      await task;
+    } finally {
+      _loadDevicesTask = null;
+    }
+  }
+
+  Future<void> loadSensors() async {
+    if (_loadSensorsTask != null) return _loadSensorsTask!;
+    final task = () async {
+      try {
+        final body = await SensorApi.getAllSensors();
+        final loadedSensors = body.map((json) {
+          final rawType = json['sensorType'];
+          return Sensor(
+            id: _asString(json['sensorId'] ?? json['id'], _uuid()),
+            deviceId: _asString(json['deviceId'] ?? json['device_id']),
+            sensorTypeId: _asString(
+              json['sensorTypeId'] ??
+                  json['sensor_type_id'] ??
+                  (rawType is Map ? rawType['sensorTypeId'] : null),
+            ),
+            serialNumber: _asString(
+              json['name'] ?? json['serial_number'],
+              'SEN-${_uuid().substring(0, 8)}',
+            ),
+            installedAt: _asDate(json['createdAt'] ?? json['installed_at']),
+            lastReading: (json['last_reading'] as num?)?.toDouble() ?? 0,
+          );
+        }).toList();
+        final deduped = <String, Sensor>{};
+        for (final sensor in loadedSensors) {
+          deduped[sensor.id] = sensor;
+        }
+        sensors = deduped.values.toList();
+      } catch (e) {
+        print('Error loading sensors: $e');
+        sensors = [];
+      }
+    }();
+    _loadSensorsTask = task;
+    try {
+      await task;
+    } finally {
+      _loadSensorsTask = null;
+    }
+  }
+
+  Future<void> loadSensorTypes() async {
+    try {
+      final body = await SensorTypeApi.getAllSensorTypes();
+      final loaded = body.map((json) {
+        return SensorType(
+          id: _asString(
+            json['sensorTypeId'] ?? json['id'],
+            _uuid(),
+          ),
+          name: _asString(json['name'], 'Sensor Type'),
+          category: _asString(json['category'], 'general'),
+          description: _asString(json['description']),
+        );
+      }).toList();
+      final deduped = <String, SensorType>{};
+      for (final item in loaded) {
+        deduped[item.id] = item;
+      }
+      sensorTypes = deduped.values.toList();
+    } catch (e) {
+      print('Error loading sensor types: $e');
+      sensorTypes = [];
+    }
+  }
+
+  Future<void> loadThresholdProfiles() async {
+    try {
+      final body = await ThresholdsApi.getProfiles();
+      thresholdProfiles = body.map((json) {
+        return ThresholdProfile(
+          id: _asString(
+            json['thresholdProfileId'] ?? json['id'],
+            _uuid(),
+          ),
+          name: _asString(json['name'], 'Profile'),
+          description: _asString(json['description']),
+        );
+      }).toList();
+    } catch (e) {
+      print('Error loading threshold profiles: $e');
+      thresholdProfiles = [];
+    }
+  }
+
+  Future<void> loadThresholdValues() async {
+    try {
+      final body = await ThresholdsApi.getThresholds();
+      thresholdValues = body.map((json) {
+        return ThresholdValue(
+          id: _asString(
+            json['thresholdId'] ?? json['id'],
+            _uuid(),
+          ),
+          sensorParameterId: _asString(
+            json['sensorParameterId'] ??
+                json['sensorParamterId'] ??
+                json['sensor_parameter_id'],
+          ),
+          thresholdProfileId: _asString(
+            json['thresholdProfileId'] ?? json['threshold_profile_id'],
+          ),
+          minThreshold: _asDouble(
+            json['minThresholdValue'] ?? json['min_threshold'],
+          ),
+          maxThreshold: _asDouble(
+            json['maxThresholdValue'] ?? json['max_threshold'],
+          ),
+          warningLevel: _asDouble(
+            json['warningLevel'] ??
+                json['warrningLevel'] ??
+                json['warning_level'],
+          ),
+          criticalLevel: _asDouble(
+            json['criticalLevel'] ?? json['critical_level'],
+          ),
+        );
+      }).toList();
+    } catch (e) {
+      print('Error loading threshold values: $e');
+      thresholdValues = [];
+    }
+  }
+
   Future<void> create(String view, Map<String, dynamic> data) async {
     switch (view) {
       case 'organizations':
@@ -405,8 +596,9 @@ class UserAdminDatabaseProvider extends ChangeNotifier {
         await loadOrganizations();
         break;
       case 'sites':
+        final organizationId = data['organization_id'] as String;
         await org_api.OrgServiceApi.createSiteForOrganization(
-          data['organization_id'] as String,
+          organizationId,
           data['name'] as String,
           data['location'] as String,
         );
@@ -421,41 +613,119 @@ class UserAdminDatabaseProvider extends ChangeNotifier {
         await loadZones(siteId);
         break;
       case 'devices':
-        devices.add(Device(
-          id: _uuid(),
-          deviceCode: data['device_code'] as String,
-          siteId: data['site_id'] as String,
-          zoneId: data['zone_id'] as String,
-          status: data['status'] as String,
-          installedAt: DateTime.now(),
-        ));
+        final siteId = data['site_id'] as String;
+        final site = sites.where((s) => s.id == siteId).firstOrNull;
+        await DeviceApi.createDevice(
+          deviceId: '',
+          organizationId:
+              _asString(data['organization_id'], site?.organizationId ?? ''),
+          siteId: siteId,
+          zoneId: _asString(data['zone_id']),
+          serialNumber: _asString(data['serial_number']),
+          firmwareVersion: _asString(data['firmware_version']),
+          macAddress: _asString(data['mac_address']),
+          ipAddress: _asString(data['ip_address']),
+          numberOfChannels:
+              int.tryParse(_asString(data['number_of_channels'])) ?? 0,
+          webHookUrl: _asString(data['web_hook_url']),
+          lat: double.tryParse(_asString(data['lat'])) ?? 0,
+          log: double.tryParse(_asString(data['log'])) ?? 0,
+          lastHeartBeat: _asString(data['last_heart_beat']),
+          status: _asString(data['status'], 'active'),
+        );
+        await loadDevices();
         break;
       case 'sensors':
-        sensors.add(Sensor(
-          id: _uuid(),
-          serialNumber: data['serial_number'] as String,
+        final sensorId = _asString(data['sensor_id'] ?? data['sensorId']);
+        await SensorApi.createSensor(
+          sensorId: sensorId.isEmpty ? null : sensorId,
           deviceId: data['device_id'] as String,
           sensorTypeId: data['sensor_type_id'] as String,
-          installedAt: DateTime.now(),
-          lastReading: 0,
-        ));
+          name: _asString(data['name'] ?? data['serial_number'], 'Sensor'),
+          serialNumber: _asString(data['serial_number']),
+          macAddress: _asString(data['mac_address']),
+          channelNumber: int.tryParse(_asString(data['channel_number'])),
+          lat: double.tryParse(_asString(data['lat'])),
+          log: double.tryParse(_asString(data['log'])),
+          status: _asString(data['status'], 'ACTIVE'),
+          unit: _asString(data['unit'], ''),
+        );
+        await loadSensors();
+        break;
+      case 'sensor_types':
+        await SensorTypeApi.createSensorType(
+          name: _asString(data['name'], 'Sensor Type'),
+          category: _asString(data['category'], 'general'),
+          description: _asString(data['description']),
+        );
+        await loadSensorTypes();
         break;
       case 'thresholds':
-        thresholdProfiles.add(ThresholdProfile(
-          id: _uuid(),
+        await ThresholdsApi.createProfile(
           name: data['name'] as String,
           description: data['description'] as String,
-        ));
+        );
+        await loadThresholdProfiles();
+        break;
+      case 'threshold_values':
+        await ThresholdsApi.createThreshold(
+          minThresholdValue: _asDouble(data['minThresholdValue']),
+          sensorParameterId: _asString(
+            data['sensorParameterId'] ?? data['sensorParamterId'],
+          ),
+          thresholdProfileId: _asString(data['thresholdProfileId']),
+          maxThresholdValue: _asDouble(data['maxThresholdValue']),
+          warningLevel:
+              _asDouble(data['warningLevel'] ?? data['warrningLevel']),
+          criticalLevel: _asDouble(data['criticalLevel']),
+          warrningLevel: _asDouble(data['warrningLevel']),
+          sensorParamterId: _asString(data['sensorParamterId']),
+        );
+        await loadThresholdValues();
         break;
       case 'users':
-        await UsersApi.createUser(
-          name: data['name'] as String,
-          email: data['email'] as String,
-          role: _asString(data['role'], 'operator'),
-          organizationId: data['organization_id'] as String,
-          password: _asString(data['password'], 'Temp@12345'),
-          maxUsersAllowed: data['maxUsersAllowed'] as int?,
+        final role = _asString(data['role'], 'user').toLowerCase();
+        final organizationId =
+            _asString(data['organization_id'] ?? data['organizationId']);
+        final name = data['name'] as String;
+        final email = data['email'] as String;
+        final password = _asString(data['password'], 'Temp@12345');
+        final maxUsersAllowed = int.tryParse(
+          _asString(data['maxUsersAllowed'] ?? data['max_users_allowed'], '20'),
         );
+
+        if (organizationId.isEmpty) {
+          throw ArgumentError('organization_id is required to create user');
+        }
+
+        if (role == 'admin') {
+          await UsersApi.createAdminUser(
+            name: name,
+            email: email,
+            organizationId: organizationId,
+            password: password,
+            maxUsersAllowed: maxUsersAllowed,
+          );
+        } else if (role == 'vendor') {
+          await UsersApi.createVendor(
+            name: name,
+            email: email,
+            organizationId: organizationId,
+            password: password,
+            maxUsersAllowed: maxUsersAllowed,
+          );
+        } else if (role == 'user') {
+          await UsersApi.createUser(
+            name: name,
+            email: email,
+            role: 'user',
+            organizationId: organizationId,
+            password: password,
+            maxUsersAllowed: maxUsersAllowed,
+          );
+        } else {
+          throw ArgumentError('Unsupported user role: $role');
+        }
         await loadUsers();
         break;
       case 'audit':
@@ -515,41 +785,59 @@ class UserAdminDatabaseProvider extends ChangeNotifier {
         await loadZones(data['site_id'] as String);
         break;
       case 'devices':
-        final index = devices.indexWhere((item) => item.id == id);
-        if (index != -1) {
-          devices[index] = devices[index].copyWith(
-            deviceCode: data['device_code'] as String,
-            siteId: data['site_id'] as String,
-            zoneId: data['zone_id'] as String,
-            status: data['status'] as String,
-          );
-        }
+        final siteId = data['site_id'] as String;
+        final site = sites.where((s) => s.id == siteId).firstOrNull;
+        await DeviceApi.updateDevice(
+          deviceId: id,
+          organizationId:
+              _asString(data['organization_id'], site?.organizationId ?? ''),
+          siteId: siteId,
+          zoneId: _asString(data['zone_id']),
+          serialNumber: _asString(data['serial_number'] ?? data['device_code']),
+          firmwareVersion: _asString(data['firmware_version'], '1.0.0'),
+          macAddress: _asString(data['mac_address']),
+          ipAddress: _asString(data['ip_address']),
+          numberOfChannels:
+              int.tryParse(_asString(data['number_of_channels'], '0')) ?? 0,
+          webHookUrl: _asString(data['web_hook_url']),
+          lat: double.tryParse(_asString(data['lat'], '0')) ?? 0,
+          log: double.tryParse(_asString(data['log'], '0')) ?? 0,
+          lastHeartBeat: _asString(
+              data['last_heart_beat'], DateTime.now().toIso8601String()),
+          status: _asString(data['status'], 'active'),
+        );
+        await loadDevices();
         break;
       case 'sensors':
-        final index = sensors.indexWhere((item) => item.id == id);
-        if (index != -1) {
-          sensors[index] = sensors[index].copyWith(
-            serialNumber: data['serial_number'] as String,
-            deviceId: data['device_id'] as String,
-            sensorTypeId: data['sensor_type_id'] as String,
-          );
-        }
+        await SensorApi.updateSensor(
+          sensorId: id,
+          deviceId: data['device_id'] as String,
+          sensorTypeId: data['sensor_type_id'] as String,
+          name: _asString(data['name'] ?? data['serial_number'], 'Sensor'),
+          serialNumber: _asString(data['serial_number']),
+          macAddress: _asString(data['mac_address']),
+          channelNumber: int.tryParse(_asString(data['channel_number'])),
+          lat: double.tryParse(_asString(data['lat'])),
+          log: double.tryParse(_asString(data['log'])),
+          status: _asString(data['status'], 'ACTIVE'),
+          unit: _asString(data['unit'], ''),
+        );
+        await loadSensors();
         break;
       case 'thresholds':
-        final index = thresholdProfiles.indexWhere((item) => item.id == id);
-        if (index != -1) {
-          thresholdProfiles[index] = thresholdProfiles[index].copyWith(
-            name: data['name'] as String,
-            description: data['description'] as String,
-          );
-        }
+        await ThresholdsApi.updateProfile(
+          id: id,
+          name: data['name'] as String,
+          description: data['description'] as String,
+        );
+        await loadThresholdProfiles();
         break;
       case 'users':
         await UsersApi.updateUser(
           id: id,
           name: data['name'] as String,
           email: data['email'] as String,
-          role: _asString(data['role'], 'operator'),
+          role: _asString(data['role'], 'user'),
         );
         await loadUsers();
         break;
@@ -572,19 +860,21 @@ class UserAdminDatabaseProvider extends ChangeNotifier {
       case 'zones':
         await org_api.OrgServiceApi.deleteZone(id);
         zones.removeWhere((item) => item.id == id);
-        devices.removeWhere((d) => d.zoneId == id);
         break;
       case 'devices':
-        devices.removeWhere((item) => item.id == id);
+        await DeviceApi.deleteDevice(id);
+        await loadDevices();
         break;
       case 'sensors':
-        sensors.removeWhere((item) => item.id == id);
+        await SensorApi.deleteSensor(id);
+        await loadSensors();
         break;
       case 'alerts':
         alerts.removeWhere((item) => item.id == id);
         break;
       case 'thresholds':
-        thresholdProfiles.removeWhere((item) => item.id == id);
+        await ThresholdsApi.deleteProfile(id);
+        await loadThresholdProfiles();
         break;
       case 'users':
         await UsersApi.deleteUser(id);

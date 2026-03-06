@@ -121,14 +121,26 @@ class CrudModal extends StatelessWidget {
                                       as ValueChanged<String?>?;
                                   onChanged?.call(value);
                                 },
-                                items: (field['options']
-                                        as List<Map<String, String>>)
+                                items: (field['options'] as List? ?? const [])
+                                    .whereType<Map>()
                                     .map((option) {
-                                  return DropdownMenuItem<String>(
-                                    value: option['value'],
-                                    child: Text(option['label']!),
-                                  );
-                                }).toList(),
+                                      final mapped =
+                                          option.cast<String, dynamic>();
+                                      final value = mapped['value']?.toString();
+                                      final label =
+                                          mapped['label']?.toString() ??
+                                              value ??
+                                              '';
+                                      if (value == null || value.isEmpty) {
+                                        return null;
+                                      }
+                                      return DropdownMenuItem<String>(
+                                        value: value,
+                                        child: Text(label),
+                                      );
+                                    })
+                                    .whereType<DropdownMenuItem<String>>()
+                                    .toList(),
                                 style: TextStyle(
                                   color: scheme.onSurface,
                                 ),

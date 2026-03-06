@@ -67,18 +67,11 @@ class _UsersScreenState extends State<UsersScreen> {
 
     const templates = <Map<String, String>>[
       {
-        'title': 'Full Organization Admin',
-        'name': 'New Org Admin',
-        'email': 'admin@example.com',
+        'title': 'User',
+        'name': 'New User',
+        'email': 'user@example.com',
         'role': 'admin',
         'organization': 'Default Organization',
-      },
-      {
-        'title': 'Vendor Account',
-        'name': 'New Vendor',
-        'email': 'vendor@example.com',
-        'role': 'vendor',
-        'organization': 'Vendor Organization',
       },
     ];
     var useTemplateTab = user == null;
@@ -1903,21 +1896,21 @@ class _UsersScreenState extends State<UsersScreen> {
                               ),
                               const SizedBox(height: 10),
                               _accessBlock(
-                                title: 'Sites (1)',
+                                title: 'Organization (0)',
                                 icon: Icons.business,
                                 color: const Color(0xFFE2F0F8),
                                 chips: [site],
                               ),
                               const SizedBox(height: 8),
                               _accessBlock(
-                                title: 'Zones (1)',
+                                title: 'Site (1)',
                                 icon: Icons.location_on_outlined,
                                 color: const Color(0xFFE8EBF9),
                                 chips: [zone],
                               ),
                               const SizedBox(height: 8),
                               _accessBlock(
-                                title: 'Sensors (${sensorCodes.length})',
+                                title: 'Zone (0)',
                                 icon: Icons.sensors,
                                 color: const Color(0xFFE6F4EA),
                                 chips: sensorCodes.isEmpty

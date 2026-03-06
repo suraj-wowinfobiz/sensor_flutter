@@ -37,6 +37,16 @@ class _UserScreenState extends ConsumerState<UserScreen>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final db = ref.read(userDatabaseChangeNotifierProvider);
+      try {
+        await db.loadDevices();
+        await db.loadSensors();
+      } catch (_) {
+        // Keep UI responsive even if one endpoint fails during bootstrap.
+      }
+    });
   }
 
   void toggleMenu() {

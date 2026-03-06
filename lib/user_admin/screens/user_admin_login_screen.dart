@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../super_admin/api/api_client.dart';
+import '../api/api_client.dart';
 import '../api/user_admin_login_api.dart';
 import '../user_admin_page.dart';
 import '../providers/user_admin_riverpod_provider.dart';

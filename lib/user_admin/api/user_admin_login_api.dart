@@ -1,4 +1,4 @@
-import '../../super_admin/core/api/auth_api.dart';
+import 'auth_api.dart';
 import 'user_admin_api_config.dart';
 
 class UserAdminLoginApi {

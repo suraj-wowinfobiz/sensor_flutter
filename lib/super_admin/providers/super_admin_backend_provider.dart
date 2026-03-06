@@ -118,6 +118,12 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     return DateTime.now();
   }
 
+  double _asDouble(dynamic value, [double fallback = 0.0]) {
+    if (value == null) return fallback;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString()) ?? fallback;
+  }
+
   Map<String, dynamic> _devicePayloadFrom(dynamic raw) {
     if (raw is Map<String, dynamic>) return raw;
     if (raw is Map) return raw.cast<String, dynamic>();
@@ -457,7 +463,10 @@ class SuperAdminBackendProvider extends ChangeNotifier {
 
   Future<void> loadThresholdProfiles() async {
     try {
-      final body = await ThresholdsApi.getProfiles();
+      final body = await ThresholdsApi.getProfiles().timeout(
+        const Duration(seconds: 6),
+        onTimeout: () => const <Map<String, dynamic>>[],
+      );
       thresholdProfiles = body.map((json) {
         return ThresholdProfile(
           id: _asString(
@@ -471,6 +480,48 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     } catch (e) {
       print('Error loading threshold profiles: $e');
       thresholdProfiles = [];
+    }
+  }
+
+  Future<void> loadThresholdValues() async {
+    try {
+      final body = await ThresholdsApi.getThresholds().timeout(
+        const Duration(seconds: 6),
+        onTimeout: () => const <Map<String, dynamic>>[],
+      );
+      thresholdValues = body.map((json) {
+        return ThresholdValue(
+          id: _asString(
+            json['thresholdId'] ?? json['id'],
+            _uuid(),
+          ),
+          sensorParameterId: _asString(
+            json['sensorParameterId'] ??
+                json['sensorParamterId'] ??
+                json['sensor_parameter_id'],
+          ),
+          thresholdProfileId: _asString(
+            json['thresholdProfileId'] ?? json['threshold_profile_id'],
+          ),
+          minThreshold: _asDouble(
+            json['minThresholdValue'] ?? json['min_threshold'],
+          ),
+          maxThreshold: _asDouble(
+            json['maxThresholdValue'] ?? json['max_threshold'],
+          ),
+          warningLevel: _asDouble(
+            json['warningLevel'] ??
+                json['warrningLevel'] ??
+                json['warning_level'],
+          ),
+          criticalLevel: _asDouble(
+            json['criticalLevel'] ?? json['critical_level'],
+          ),
+        );
+      }).toList();
+    } catch (e) {
+      print('Error loading threshold values: $e');
+      thresholdValues = [];
     }
   }
 
@@ -554,6 +605,22 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           description: data['description'] as String,
         );
         await loadThresholdProfiles();
+        break;
+      case 'threshold_values':
+        await ThresholdsApi.createThreshold(
+          minThresholdValue: _asDouble(data['minThresholdValue']),
+          sensorParameterId: _asString(
+            data['sensorParameterId'] ?? data['sensorParamterId'],
+          ),
+          thresholdProfileId: _asString(data['thresholdProfileId']),
+          maxThresholdValue: _asDouble(data['maxThresholdValue']),
+          warningLevel:
+              _asDouble(data['warningLevel'] ?? data['warrningLevel']),
+          criticalLevel: _asDouble(data['criticalLevel']),
+          warrningLevel: _asDouble(data['warrningLevel']),
+          sensorParamterId: _asString(data['sensorParamterId']),
+        );
+        await loadThresholdValues();
         break;
       case 'users':
         final role = _asString(data['role'], 'admin').toLowerCase();
