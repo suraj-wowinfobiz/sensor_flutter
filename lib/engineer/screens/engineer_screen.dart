@@ -41,8 +41,12 @@ class _EngineerScreenState extends ConsumerState<EngineerScreen>
       if (!mounted) return;
       final db = ref.read(engineerDatabaseChangeNotifierProvider);
       try {
-        await db.loadDevices();
-        await db.loadSensors();
+        await db.loadOrganizations();
+        await db.loadSites();
+        await Future.wait([
+          db.loadDevices(),
+          db.loadSensors(),
+        ]);
       } catch (_) {
         // Keep UI usable even if one API endpoint fails.
       }
@@ -80,9 +84,14 @@ class _EngineerScreenState extends ConsumerState<EngineerScreen>
     final normalized = _normalizeView(view);
     if (_currentView == normalized) return;
     if (normalized == 'devices') {
-      ref.read(engineerDatabaseChangeNotifierProvider).loadDevices();
+      final db = ref.read(engineerDatabaseChangeNotifierProvider);
+      db.loadOrganizations();
+      db.loadSites();
+      db.loadDevices();
     } else if (normalized == 'sensors') {
-      ref.read(engineerDatabaseChangeNotifierProvider).loadSensors();
+      final db = ref.read(engineerDatabaseChangeNotifierProvider);
+      db.loadDevices();
+      db.loadSensors();
     } else if (normalized == 'alerts') {
       ref.read(engineerDatabaseChangeNotifierProvider).loadAlerts();
     }

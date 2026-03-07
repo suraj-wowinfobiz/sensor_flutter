@@ -62,6 +62,10 @@ class ThresholdsApi {
     await ApiClient.delete('/api/v1/thresholds/profiles/$id');
   }
 
+  static Future<void> deleteThresholdValue(String id) async {
+    await ApiClient.delete('/api/v1/thresholds/$id');
+  }
+
   static List<Map<String, dynamic>> _asListMap(dynamic body) {
     if (body is List) {
       return body

@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'dart:math';
 
@@ -40,6 +41,8 @@ class EngineerDatabaseProvider extends ChangeNotifier {
   late Config config;
 
   String currentView = 'dashboard';
+  Future<void>? _loadOrganizationsTask;
+  Future<void>? _loadSitesTask;
   Future<void>? _loadDevicesTask;
   Future<void>? _loadSensorsTask;
   int _thresholdRuleSeed = 4;
@@ -122,12 +125,6 @@ class EngineerDatabaseProvider extends ChangeNotifier {
     return double.tryParse(value.toString()) ?? fallback;
   }
 
-  int _asInt(dynamic value, [int fallback = 0]) {
-    if (value == null) return fallback;
-    if (value is num) return value.toInt();
-    return int.tryParse(value.toString()) ?? fallback;
-  }
-
   Map<String, dynamic> _asMap(dynamic raw) {
     if (raw is Map<String, dynamic>) return raw;
     if (raw is Map) return raw.cast<String, dynamic>();
@@ -170,12 +167,15 @@ class EngineerDatabaseProvider extends ChangeNotifier {
   }
 
   Future<void> loadOrganizations() async {
-    try {
-      final res = await org_api.OrgServiceApi.getAllOrganizations();
-      final body = res.body;
-      if (body is! List) {
-        organizations = [];
-      } else {
+    if (_loadOrganizationsTask != null) return _loadOrganizationsTask!;
+    final task = () async {
+      try {
+        final res = await org_api.OrgServiceApi.getAllOrganizations();
+        final body = res.body;
+        if (body is! List) {
+          organizations = [];
+          return;
+        }
         organizations = body.map((json) {
           final item = json as Map;
           return Organization(
@@ -187,20 +187,29 @@ class EngineerDatabaseProvider extends ChangeNotifier {
             createdAt: _asDate(item['createdAt']),
           );
         }).toList();
+      } catch (_) {
+        organizations = [];
       }
-    } catch (_) {
-      organizations = [];
+    }();
+    _loadOrganizationsTask = task;
+    try {
+      await task;
+    } finally {
+      _loadOrganizationsTask = null;
     }
     notifyListeners();
   }
 
   Future<void> loadSites() async {
-    try {
-      final res = await org_api.OrgServiceApi.getAllSites();
-      final body = res.body;
-      if (body is! List) {
-        sites = [];
-      } else {
+    if (_loadSitesTask != null) return _loadSitesTask!;
+    final task = () async {
+      try {
+        final res = await org_api.OrgServiceApi.getAllSites();
+        final body = res.body;
+        if (body is! List) {
+          sites = [];
+          return;
+        }
         final mappedSites = <String, Site>{};
         for (final raw in body) {
           if (raw is! Map) continue;
@@ -215,10 +224,51 @@ class EngineerDatabaseProvider extends ChangeNotifier {
             createdAt: _asDate(raw['createdAt']),
           );
         }
+
+        // Some /site responses do not include organization relation.
+        // Enrich missing organizationId by querying each organization's sites.
+        final hasMissingOrganization = mappedSites.values.any(
+          (s) => s.organizationId.trim().isEmpty,
+        );
+        if (hasMissingOrganization && organizations.isNotEmpty) {
+          for (final org in organizations) {
+            try {
+              final orgSitesRes =
+                  await org_api.OrgServiceApi.getOrganizationSites(org.id);
+              final orgSitesBody = orgSitesRes.body;
+              if (orgSitesBody is! Map) continue;
+              final rawSites = orgSitesBody['sites'];
+              if (rawSites is! List) continue;
+              for (final raw in rawSites) {
+                if (raw is! Map) continue;
+                final id = _asString(raw['sitesID']);
+                if (id.isEmpty) continue;
+                final existing = mappedSites[id];
+                mappedSites[id] = Site(
+                  id: id,
+                  organizationId: org.id,
+                  name: _asString(raw['name'], existing?.name ?? ''),
+                  location:
+                      _asString(raw['location'], existing?.location ?? ''),
+                  createdAt: _asDate(raw['createdAt'] ?? existing?.createdAt),
+                );
+              }
+            } catch (_) {
+              // Keep base list even if one org-scoped fetch fails.
+            }
+          }
+        }
+
         sites = mappedSites.values.toList();
+      } catch (_) {
+        sites = [];
       }
-    } catch (_) {
-      sites = [];
+    }();
+    _loadSitesTask = task;
+    try {
+      await task;
+    } finally {
+      _loadSitesTask = null;
     }
     notifyListeners();
   }
@@ -487,33 +537,30 @@ class EngineerDatabaseProvider extends ChangeNotifier {
   Future<void> create(String view, Map<String, dynamic> data) async {
     switch (view) {
       case 'organizations':
-        organizations.add(Organization(
-          id: _uuid(),
-          name: data['name'] as String,
-          email: data['email'] as String,
-          status: data['status'] as String,
-          ownerUserId: data['owner_user_id'] as String,
-          createdAt: DateTime.now(),
-        ));
+        await org_api.OrgServiceApi.createOrganization(
+          data['name'] as String,
+          data['email'] as String,
+        );
+        await loadOrganizations();
         break;
       case 'sites':
-        sites.add(Site(
-          id: _uuid(),
-          name: data['name'] as String,
-          location: data['location'] as String,
-          organizationId: data['organization_id'] as String,
-          createdAt: DateTime.now(),
-        ));
+        await org_api.OrgServiceApi.createSiteForOrganization(
+          data['organization_id'] as String,
+          data['name'] as String,
+          data['location'] as String,
+        );
+        await loadSites();
         break;
       case 'zones':
-        zones.add(Zone(
-          id: _uuid(),
-          name: data['name'] as String,
-          siteId: data['site_id'] as String,
-        ));
+        final siteId = data['site_id'] as String;
+        await org_api.OrgServiceApi.createZone(
+          siteId,
+          data['name'] as String,
+        );
+        await loadZones(siteId);
         break;
       case 'devices':
-        final siteId = _asString(data['site_id']);
+        final siteId = data['site_id'] as String;
         final site = sites.where((s) => s.id == siteId).firstOrNull;
         await DeviceApi.createDevice(
           deviceId: '',
@@ -521,18 +568,16 @@ class EngineerDatabaseProvider extends ChangeNotifier {
               _asString(data['organization_id'], site?.organizationId ?? ''),
           siteId: siteId,
           zoneId: _asString(data['zone_id']),
-          serialNumber: _asString(data['serial_number'] ?? data['device_code']),
-          firmwareVersion: _asString(data['firmware_version'], '1.0.0'),
+          serialNumber: _asString(data['serial_number']),
+          firmwareVersion: _asString(data['firmware_version']),
           macAddress: _asString(data['mac_address']),
           ipAddress: _asString(data['ip_address']),
-          numberOfChannels: _asInt(data['number_of_channels'], 1),
+          numberOfChannels:
+              int.tryParse(_asString(data['number_of_channels'])) ?? 0,
           webHookUrl: _asString(data['web_hook_url']),
-          lat: _asDouble(data['lat']),
-          log: _asDouble(data['log']),
-          lastHeartBeat: _asString(
-            data['last_heart_beat'],
-            DateTime.now().toIso8601String(),
-          ),
+          lat: double.tryParse(_asString(data['lat'])) ?? 0,
+          log: double.tryParse(_asString(data['log'])) ?? 0,
+          lastHeartBeat: _asString(data['last_heart_beat']),
           status: _asString(data['status'], 'active'),
         );
         await loadDevices();
@@ -552,7 +597,7 @@ class EngineerDatabaseProvider extends ChangeNotifier {
           status: _asString(data['status'], 'ACTIVE'),
           unit: _asString(data['unit']),
         );
-        await loadSensors();
+        unawaited(loadSensors());
         break;
       case 'sensor_types':
         await SensorTypeApi.createSensorType(
@@ -624,37 +669,32 @@ class EngineerDatabaseProvider extends ChangeNotifier {
 
     switch (view) {
       case 'organizations':
-        final index = organizations.indexWhere((item) => item.id == id);
-        if (index != -1) {
-          organizations[index] = organizations[index].copyWith(
-            name: data['name'] as String,
-            email: data['email'] as String,
-            status: data['status'] as String,
-          );
-        }
+        await org_api.OrgServiceApi.updateOrganization(
+          id,
+          data['name'] as String,
+          data['email'] as String,
+        );
+        await loadOrganizations();
         break;
       case 'sites':
-        final index = sites.indexWhere((item) => item.id == id);
-        if (index != -1) {
-          sites[index] = sites[index].copyWith(
-            name: data['name'] as String,
-            location: data['location'] as String,
-            organizationId: data['organization_id'] as String,
-          );
-        }
+        await org_api.OrgServiceApi.updateSite(
+          id,
+          data['name'] as String,
+          data['location'] as String,
+          orgId: data['organization_id'] as String,
+        );
+        await loadSites();
         break;
       case 'zones':
-        final index = zones.indexWhere((item) => item.id == id);
-        if (index != -1) {
-          zones[index] = zones[index].copyWith(
-            name: data['name'] as String,
-            siteId: data['site_id'] as String,
-          );
-        }
+        await org_api.OrgServiceApi.updateZone(
+          id,
+          data['name'] as String,
+          siteId: data['site_id'] as String,
+        );
+        await loadZones(data['site_id'] as String);
         break;
       case 'devices':
-        final existing = devices.where((item) => item.id == id).firstOrNull;
-        final siteId = _asString(data['site_id'], existing?.siteId ?? '');
+        final siteId = data['site_id'] as String;
         final site = sites.where((s) => s.id == siteId).firstOrNull;
         await DeviceApi.updateDevice(
           deviceId: id,
@@ -663,27 +703,21 @@ class EngineerDatabaseProvider extends ChangeNotifier {
             site?.organizationId ?? '',
           ),
           siteId: siteId,
-          zoneId: _asString(data['zone_id'], existing?.zoneId ?? ''),
-          serialNumber: _asString(
-            data['serial_number'] ??
-                data['device_code'] ??
-                existing?.deviceCode,
-          ),
+          zoneId: _asString(data['zone_id']),
+          serialNumber: _asString(data['serial_number'] ?? data['device_code']),
           firmwareVersion: _asString(data['firmware_version'], '1.0.0'),
           macAddress: _asString(data['mac_address']),
           ipAddress: _asString(data['ip_address']),
-          numberOfChannels: _asInt(
-            data['number_of_channels'],
-            1,
-          ),
+          numberOfChannels:
+              int.tryParse(_asString(data['number_of_channels'], '0')) ?? 0,
           webHookUrl: _asString(data['web_hook_url']),
-          lat: _asDouble(data['lat'], 0),
-          log: _asDouble(data['log'], 0),
+          lat: double.tryParse(_asString(data['lat'], '0')) ?? 0,
+          log: double.tryParse(_asString(data['log'], '0')) ?? 0,
           lastHeartBeat: _asString(
             data['last_heart_beat'],
             DateTime.now().toIso8601String(),
           ),
-          status: _asString(data['status'], existing?.status ?? 'active'),
+          status: _asString(data['status'], 'active'),
         );
         await loadDevices();
         break;
@@ -704,7 +738,7 @@ class EngineerDatabaseProvider extends ChangeNotifier {
           status: _asString(data['status'], 'ACTIVE'),
           unit: _asString(data['unit']),
         );
-        await loadSensors();
+        unawaited(loadSensors());
         break;
       case 'thresholds':
         final index = thresholdProfiles.indexWhere((item) => item.id == id);
@@ -746,14 +780,17 @@ class EngineerDatabaseProvider extends ChangeNotifier {
   Future<void> delete(String view, String id) async {
     switch (view) {
       case 'organizations':
-        organizations.removeWhere((item) => item.id == id);
-        sites.removeWhere((s) => s.organizationId == id);
+        await org_api.OrgServiceApi.deleteOrganization(id);
+        await loadOrganizations();
+        await loadSites();
         break;
       case 'sites':
-        sites.removeWhere((item) => item.id == id);
+        await org_api.OrgServiceApi.deleteSite(id);
+        await loadSites();
         zones.removeWhere((z) => z.siteId == id);
         break;
       case 'zones':
+        await org_api.OrgServiceApi.deleteZone(id);
         zones.removeWhere((item) => item.id == id);
         devices.removeWhere((d) => d.zoneId == id);
         break;
@@ -763,7 +800,7 @@ class EngineerDatabaseProvider extends ChangeNotifier {
         break;
       case 'sensors':
         await SensorApi.deleteSensor(id);
-        await loadSensors();
+        unawaited(loadSensors());
         break;
       case 'alerts':
         await AlertsApi.deleteAlert(id);

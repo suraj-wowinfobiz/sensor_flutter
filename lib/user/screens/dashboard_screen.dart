@@ -661,6 +661,9 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     final maxY = hasData ? allSpots.map((e) => e.y).reduce(max) + 1 : 10.0;
     final minX = hasData ? allSpots.map((e) => e.x).reduce(min) : 0.0;
     final maxX = hasData ? allSpots.map((e) => e.x).reduce(max) : 65.0;
+    final safeXData = xData.isEmpty ? const [FlSpot(0, 0)] : xData;
+    final safeYData = yData.isEmpty ? const [FlSpot(0, 0)] : yData;
+    final safeZData = zData.isEmpty ? const [FlSpot(0, 0)] : zData;
 
     return _DashboardPanel(
       child: Column(
@@ -757,21 +760,21 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
                 ),
                 lineBarsData: [
                   LineChartBarData(
-                    spots: xData,
+                    spots: safeXData,
                     isCurved: true,
                     color: const Color(0xFF2E8BFF),
                     barWidth: 2.5,
                     dotData: const FlDotData(show: false),
                   ),
                   LineChartBarData(
-                    spots: yData,
+                    spots: safeYData,
                     isCurved: true,
                     color: const Color(0xFF11A95D),
                     barWidth: 2.5,
                     dotData: const FlDotData(show: false),
                   ),
                   LineChartBarData(
-                    spots: zData,
+                    spots: safeZData,
                     isCurved: true,
                     color: const Color(0xFFE58500),
                     barWidth: 2.5,

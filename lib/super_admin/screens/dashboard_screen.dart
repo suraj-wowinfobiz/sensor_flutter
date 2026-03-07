@@ -65,6 +65,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(superAdminBackendChangeNotifierProvider).loadThresholdValues();
+    });
     _connectToStreams();
   }
 
@@ -660,6 +664,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final maxY = hasData ? allSpots.map((e) => e.y).reduce(max) + 1 : 10.0;
     final minX = hasData ? allSpots.map((e) => e.x).reduce(min) : 0.0;
     final maxX = hasData ? allSpots.map((e) => e.x).reduce(max) : 65.0;
+    final safeXData = xData.isEmpty ? const [FlSpot(0, 0)] : xData;
+    final safeYData = yData.isEmpty ? const [FlSpot(0, 0)] : yData;
+    final safeZData = zData.isEmpty ? const [FlSpot(0, 0)] : zData;
 
     return _DashboardPanel(
       child: Column(
@@ -756,21 +763,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
                 lineBarsData: [
                   LineChartBarData(
-                    spots: xData,
+                    spots: safeXData,
                     isCurved: true,
                     color: const Color(0xFF2E8BFF),
                     barWidth: 2.5,
                     dotData: const FlDotData(show: false),
                   ),
                   LineChartBarData(
-                    spots: yData,
+                    spots: safeYData,
                     isCurved: true,
                     color: const Color(0xFF11A95D),
                     barWidth: 2.5,
                     dotData: const FlDotData(show: false),
                   ),
                   LineChartBarData(
-                    spots: zData,
+                    spots: safeZData,
                     isCurved: true,
                     color: const Color(0xFFE58500),
                     barWidth: 2.5,
@@ -947,6 +954,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildVelocityCard(BuildContext context) {
+    final db = ref.watch(superAdminBackendChangeNotifierProvider);
     final velocityAll = [
       ..._analyzedAngularVelocityData,
       ..._processedAngularVelocityData,
@@ -989,6 +997,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           top: BorderSide.none,
                           right: BorderSide.none,
                         ),
+                      ),
+                      extraLinesData: ExtraLinesData(
+                        horizontalLines: _apiThresholdLines(db),
                       ),
                       titlesData: FlTitlesData(
                         topTitles: const AxisTitles(
@@ -1079,6 +1090,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildAccelerationTrendCard(BuildContext context) {
+    final db = ref.watch(superAdminBackendChangeNotifierProvider);
     final accelerationAll = [
       ..._analyzedAccelerationData,
       ..._processedAccelerationData,
@@ -1134,6 +1146,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             strokeWidth: 1,
                             dashArray: [6, 4],
                           ),
+                          ..._apiThresholdLines(db),
                         ],
                       ),
                       titlesData: FlTitlesData(
@@ -1400,6 +1413,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _historicalTrendCard(BuildContext context) {
+    final db = ref.watch(superAdminBackendChangeNotifierProvider);
     final hasData = _processedMagnitudeData.isNotEmpty;
     final minY = hasData
         ? (_processedMagnitudeData.map((e) => e.y).reduce(min) - 0.3)
@@ -1454,6 +1468,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           top: BorderSide(color: Color(0xFF111111), width: 1),
                           right: BorderSide(color: Color(0xFF111111), width: 1),
                         ),
+                      ),
+                      extraLinesData: ExtraLinesData(
+                        horizontalLines: _apiThresholdLines(db),
                       ),
                       titlesData: FlTitlesData(
                         topTitles: const AxisTitles(
@@ -2911,15 +2928,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   (double, double) _dashboardThresholds(dynamic db) {
-    final rules = db
-        .thresholdRulesForGraph(
-            ThresholdGraphTarget.dashboardThresholdMonitoring)
-        .map((rule) => rule.value)
+    final apiWarnings = db.thresholdValues
+        .where((value) =>
+            value.sensorParameterId.trim().isNotEmpty &&
+            value.thresholdProfileId.trim().isNotEmpty &&
+            value.warningLevel.isFinite &&
+            value.warningLevel > 0)
+        .map((value) => value.warningLevel)
         .toList()
       ..sort();
-    final warning = rules.isNotEmpty ? rules.first : 2.8;
-    final critical = rules.length > 1 ? rules[1] : warning + 1.2;
-    return (warning, critical);
+    final apiCriticals = db.thresholdValues
+        .where((value) =>
+            value.sensorParameterId.trim().isNotEmpty &&
+            value.thresholdProfileId.trim().isNotEmpty &&
+            value.criticalLevel.isFinite &&
+            value.criticalLevel > 0)
+        .map((value) => value.criticalLevel)
+        .toList()
+      ..sort();
+    if (apiWarnings.isNotEmpty && apiCriticals.isNotEmpty) {
+      final warning = apiWarnings.first;
+      final critical =
+          apiCriticals.first > warning ? apiCriticals.first : warning + 1.2;
+      return (warning, critical);
+    }
+    // No API threshold available: disable threshold-triggered states.
+    return (double.infinity, double.infinity);
   }
 
   String _levelForTilt(double value, (double, double) thresholds) {
@@ -2928,30 +2962,57 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return 'normal';
   }
 
+  List<HorizontalLine> _apiThresholdLines(dynamic db) {
+    final seen = <String>{};
+    final lines = <HorizontalLine>[];
+    for (final value in db.thresholdValues) {
+      if (value.sensorParameterId.trim().isEmpty ||
+          value.thresholdProfileId.trim().isEmpty) {
+        continue;
+      }
+      final candidates = <MapEntry<String, double>>[
+        MapEntry('Min', value.minThreshold),
+        MapEntry('Max', value.maxThreshold),
+        MapEntry('Warning', value.warningLevel),
+        MapEntry('Critical', value.criticalLevel),
+      ].where((entry) => entry.value.isFinite && entry.value > 0);
+
+      for (final candidate in candidates) {
+        final key = '${candidate.key}|${candidate.value.toStringAsFixed(3)}';
+        if (!seen.add(key)) continue;
+        final color = switch (candidate.key) {
+          'Min' => const Color(0xFF2563EB),
+          'Max' => const Color(0xFF9333EA),
+          'Warning' => const Color(0xFFD39A00),
+          'Critical' => const Color(0xFFE54C4C),
+          _ => const Color(0xFF4B5563),
+        };
+        lines.add(
+          HorizontalLine(
+            y: candidate.value,
+            color: color,
+            strokeWidth: 1.3,
+            dashArray: [6, 4],
+            label: HorizontalLineLabel(
+              show: true,
+              alignment: Alignment.topRight,
+              style: TextStyle(color: color, fontWeight: FontWeight.w600),
+              labelResolver: (_) =>
+                  '${candidate.key}: ${candidate.value.toStringAsFixed(1)}',
+            ),
+          ),
+        );
+      }
+    }
+    return lines;
+  }
+
   List<HorizontalLine> _thresholdLinesForGraph(
     BuildContext context,
     ThresholdGraphTarget target,
   ) {
     final db = ref.watch(superAdminBackendChangeNotifierProvider);
-    final rules = db.thresholdRulesForGraph(target);
-
-    return rules
-        .map(
-          (rule) => HorizontalLine(
-            y: rule.value,
-            color: rule.color,
-            strokeWidth: 1.5,
-            dashArray: [6, 4],
-            label: HorizontalLineLabel(
-              show: true,
-              alignment: Alignment.topRight,
-              style: TextStyle(color: rule.color, fontWeight: FontWeight.w600),
-              labelResolver: (_) =>
-                  '${rule.label}: ${rule.value.toStringAsFixed(1)}°',
-            ),
-          ),
-        )
-        .toList();
+    return _apiThresholdLines(db);
   }
 }
 

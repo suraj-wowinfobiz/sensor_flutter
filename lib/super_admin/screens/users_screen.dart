@@ -346,7 +346,9 @@ class _UsersScreenState extends State<UsersScreen> {
                               items: roleItems(),
                               onChanged: (value) {
                                 if (value != null) {
-                                  roleController.text = value;
+                                  setState(() {
+                                    roleController.text = value;
+                                  });
                                 }
                               },
                             ),
@@ -382,10 +384,12 @@ class _UsersScreenState extends State<UsersScreen> {
                                   .toList(),
                               onChanged: (value) {
                                 if (value != null) {
-                                  selectedOrganizationId = value;
-                                  final org = db.organizations
-                                      .firstWhere((o) => o.id == value);
-                                  organizationController.text = org.name;
+                                  setState(() {
+                                    selectedOrganizationId = value;
+                                    final org = db.organizations
+                                        .firstWhere((o) => o.id == value);
+                                    organizationController.text = org.name;
+                                  });
                                 }
                               },
                             ),
@@ -622,26 +626,6 @@ class _UsersScreenState extends State<UsersScreen> {
     return 'ADMIN';
   }
 
-  Set<String> _assignmentKeysFromSelection({
-    required Set<String> siteIds,
-    required Set<String> zoneIds,
-  }) {
-    final assignmentKeys = <String>{};
-    for (final siteId in siteIds) {
-      final normalizedSiteId = siteId.trim();
-      if (normalizedSiteId.isNotEmpty) {
-        assignmentKeys.add('site|$normalizedSiteId');
-      }
-    }
-    for (final zoneId in zoneIds) {
-      final normalizedZoneId = zoneId.trim();
-      if (normalizedZoneId.isNotEmpty) {
-        assignmentKeys.add('zone|$normalizedZoneId');
-      }
-    }
-    return assignmentKeys;
-  }
-
   Map<String, String> _parseAssignmentKey(String key) {
     final parts = key.split('|');
     return {
@@ -650,59 +634,212 @@ class _UsersScreenState extends State<UsersScreen> {
     };
   }
 
-  Future<void> _syncAccessAssignments({
-    required String principalType,
-    required String principalId,
-    required Set<String> beforeKeys,
-    required Set<String> afterKeys,
-  }) async {
-    final keysToAssign = afterKeys.difference(beforeKeys);
-    final keysToRevoke = beforeKeys.difference(afterKeys);
-
-    if (keysToAssign.isNotEmpty) {
-      await Future.wait(
-        keysToAssign.map((key) {
-          final item = _parseAssignmentKey(key);
-          return UsersApi.assignAccess(
-            principalType: principalType,
-            principalId: principalId,
-            siteId: item['type'] == 'site' ? item['id'] : null,
-            zoneId: item['type'] == 'zone' ? item['id'] : null,
-          );
-        }),
-      );
-    }
-
-    if (keysToRevoke.isNotEmpty) {
-      await Future.wait(
-        keysToRevoke.map((key) {
-          final item = _parseAssignmentKey(key);
-          return UsersApi.revokeAccess(
-            principalType: principalType,
-            principalId: principalId,
-            siteId: item['type'] == 'site' ? item['id'] : null,
-            zoneId: item['type'] == 'zone' ? item['id'] : null,
-          );
-        }),
-      );
-    }
+  String _asTrimmedString(dynamic value) {
+    if (value == null) return '';
+    return value.toString().trim();
   }
 
-  void _showAccessDialog(
-      BuildContext context, User user, SuperAdminBackendProvider db) {
+  String? _assignmentKeyFromScope({
+    String? organizationId,
+    String? siteId,
+    String? zoneId,
+  }) {
+    final normalizedOrganizationId = _asTrimmedString(organizationId);
+    final normalizedSiteId = _asTrimmedString(siteId);
+    final normalizedZoneId = _asTrimmedString(zoneId);
+    if (normalizedOrganizationId.isNotEmpty) {
+      return 'organization|$normalizedOrganizationId';
+    }
+    if (normalizedSiteId.isNotEmpty) return 'site|$normalizedSiteId';
+    if (normalizedZoneId.isNotEmpty) return 'zone|$normalizedZoneId';
+    return null;
+  }
+
+  List<Map<String, dynamic>> _scopesFromAccess(Map<String, dynamic> access) {
+    final scopes = <Map<String, dynamic>>[];
+    final rawScopes = access['scopes'];
+    if (rawScopes is List) {
+      for (final raw in rawScopes) {
+        if (raw is Map<String, dynamic>) {
+          scopes.add(raw);
+        } else if (raw is Map) {
+          scopes.add(raw.cast<String, dynamic>());
+        }
+      }
+    }
+
+    final rawScope = access['scope'];
+    if (rawScope is Map<String, dynamic>) {
+      scopes.add(rawScope);
+    } else if (rawScope is Map) {
+      scopes.add(rawScope.cast<String, dynamic>());
+    }
+
+    final organizationId = _asTrimmedString(
+      access['organizationId'] ??
+          access['organization_id'] ??
+          (access['organization'] is Map
+              ? (access['organization'] as Map)['organizationId']
+              : null),
+    );
+    final siteId = _asTrimmedString(
+      access['siteId'] ?? access['site_id'] ?? access['sitesID'],
+    );
+    final zoneId = _asTrimmedString(
+      access['zoneId'] ?? access['zone_id'] ?? access['zonesID'],
+    );
+    if (organizationId.isNotEmpty || siteId.isNotEmpty || zoneId.isNotEmpty) {
+      scopes.add({
+        if (organizationId.isNotEmpty) 'organizationId': organizationId,
+        if (siteId.isNotEmpty) 'siteId': siteId,
+        if (zoneId.isNotEmpty) 'zoneId': zoneId,
+      });
+    }
+    return scopes;
+  }
+
+  Future<Map<String, String>> _fetchAccessIdsByKey({
+    required String principalType,
+    required String principalId,
+  }) async {
+    final rawList = await UsersApi.getAccessList();
+    final byKey = <String, String>{};
+    for (final item in rawList) {
+      final itemPrincipalType =
+          _asTrimmedString(item['principalType']).toUpperCase();
+      final itemPrincipalId = _asTrimmedString(item['principalId']);
+      if (itemPrincipalType != principalType.toUpperCase() ||
+          itemPrincipalId != principalId) {
+        continue;
+      }
+      final accessId = _asTrimmedString(item['id']);
+      if (accessId.isEmpty) continue;
+      final scopes = _scopesFromAccess(item);
+      for (final scope in scopes) {
+        final key = _assignmentKeyFromScope(
+          organizationId: scope['organizationId'] ?? scope['organization_id'],
+          siteId: scope['siteId'] ?? scope['site_id'] ?? scope['sitesID'],
+          zoneId: scope['zoneId'] ?? scope['zone_id'] ?? scope['zonesID'],
+        );
+        if (key != null && key.isNotEmpty) {
+          byKey[key] = accessId;
+        }
+      }
+    }
+    return byKey;
+  }
+
+  List<Map<String, String>> _buildAccessScopes({
+    required Set<String> siteIds,
+    required Set<String> zoneIds,
+    required SuperAdminBackendProvider db,
+  }) {
+    final scopes = <Map<String, String>>[];
+    final siteIdsWithZone = <String>{};
+
+    for (final zone in db.zones.where((z) => zoneIds.contains(z.id))) {
+      final siteId = zone.siteId.trim();
+      final zoneId = zone.id.trim();
+      if (siteId.isEmpty || zoneId.isEmpty) continue;
+      scopes.add({'siteId': siteId, 'zoneId': zoneId});
+      siteIdsWithZone.add(siteId);
+    }
+
+    for (final siteId in siteIds) {
+      final normalizedSiteId = siteId.trim();
+      if (normalizedSiteId.isEmpty) continue;
+      if (siteIdsWithZone.contains(normalizedSiteId)) continue;
+      scopes.add({'siteId': normalizedSiteId});
+    }
+    return scopes;
+  }
+
+  Future<void> _showAccessDialog(
+      BuildContext context, User user, SuperAdminBackendProvider db) async {
+    final principalType = _principalTypeForRole(user.role);
     final defaultAccess = _defaultAccessForUser(user, db);
     final defaultOrganizations = defaultAccess['organizations'] ?? <String>{};
     final defaultSites = defaultAccess['sites'] ?? <String>{};
     final defaultZones = defaultAccess['zones'] ?? <String>{};
-    Set<String> organizationIds = Set<String>.from(
-        _userOrganizationAccess[user.id] ?? defaultOrganizations);
-    Set<String> siteIds =
-        Set<String>.from(_userSiteAccess[user.id] ?? defaultSites);
-    Set<String> zoneIds =
-        Set<String>.from(_userZoneAccess[user.id] ?? defaultZones);
-    var editMode = false;
 
-    showDialog<void>(
+    Set<String> scopedSitesFromKeys(Set<String> keys) {
+      final scoped = <String>{};
+      for (final key in keys) {
+        final parsed = _parseAssignmentKey(key);
+        final type = parsed['type'] ?? '';
+        final id = parsed['id'] ?? '';
+        if (type == 'site' && id.isNotEmpty) {
+          scoped.add(id);
+        } else if (type == 'zone' && id.isNotEmpty) {
+          final zoneSite = db.zones
+              .where((zone) => zone.id == id)
+              .map((zone) => zone.siteId)
+              .firstOrNull;
+          if (zoneSite != null && zoneSite.trim().isNotEmpty) {
+            scoped.add(zoneSite);
+          }
+        }
+      }
+      return scoped;
+    }
+
+    Set<String> scopedOrganizationsFromSites(Set<String> scopedSiteIds) {
+      return db.sites
+          .where((site) => scopedSiteIds.contains(site.id))
+          .map((site) => site.organizationId)
+          .where((id) => id.trim().isNotEmpty)
+          .toSet();
+    }
+
+    Set<String> resolvedOrganizationIds = Set<String>.from(
+        _userOrganizationAccess[user.id] ?? defaultOrganizations);
+    Set<String> resolvedSiteIds =
+        Set<String>.from(_userSiteAccess[user.id] ?? defaultSites);
+    Set<String> resolvedZoneIds =
+        Set<String>.from(_userZoneAccess[user.id] ?? defaultZones);
+
+    try {
+      final accessIdsByKey = await _fetchAccessIdsByKey(
+        principalType: principalType,
+        principalId: user.id,
+      );
+      if (accessIdsByKey.isNotEmpty) {
+        final apiOrganizationIds = <String>{};
+        final apiSiteIds = <String>{};
+        final apiZoneIds = <String>{};
+        for (final key in accessIdsByKey.keys) {
+          final parsed = _parseAssignmentKey(key);
+          final type = parsed['type'] ?? '';
+          final id = parsed['id'] ?? '';
+          if (id.trim().isEmpty) continue;
+          if (type == 'organization') apiOrganizationIds.add(id);
+          if (type == 'site') apiSiteIds.add(id);
+          if (type == 'zone') apiZoneIds.add(id);
+        }
+        resolvedOrganizationIds = apiOrganizationIds;
+        resolvedSiteIds = apiSiteIds;
+        resolvedZoneIds = apiZoneIds;
+        if (resolvedOrganizationIds.isEmpty) {
+          resolvedOrganizationIds = scopedOrganizationsFromSites(
+            scopedSitesFromKeys(accessIdsByKey.keys.toSet()),
+          );
+        }
+      }
+    } catch (_) {
+      // Keep local/default fallback if access list fails.
+    }
+
+    Set<String> organizationIds = Set<String>.from(
+        resolvedOrganizationIds.isEmpty
+            ? defaultOrganizations
+            : resolvedOrganizationIds);
+    Set<String> siteIds = Set<String>.from(resolvedSiteIds);
+    Set<String> zoneIds = Set<String>.from(resolvedZoneIds);
+    var editMode = false;
+    var isSubmitting = false;
+
+    if (!context.mounted) return;
+    await showDialog<void>(
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
@@ -728,47 +865,6 @@ class _UsersScreenState extends State<UsersScreen> {
               .toList();
           final screenSize = MediaQuery.sizeOf(context);
           final dialogWidth = (screenSize.width * 0.92).clamp(320.0, 560.0);
-          final principalType = _principalTypeForRole(user.role);
-
-          Future<void> syncAfterSelectionChange({
-            required Set<String> previousOrganizationIds,
-            required Set<String> previousSiteIds,
-            required Set<String> previousZoneIds,
-          }) async {
-            final beforeKeys = _assignmentKeysFromSelection(
-              siteIds: previousSiteIds,
-              zoneIds: previousZoneIds,
-            );
-            final afterKeys = _assignmentKeysFromSelection(
-              siteIds: siteIds,
-              zoneIds: zoneIds,
-            );
-            try {
-              await _syncAccessAssignments(
-                principalType: principalType,
-                principalId: user.id,
-                beforeKeys: beforeKeys,
-                afterKeys: afterKeys,
-              );
-              if (!context.mounted) return;
-              setState(() {
-                _userOrganizationAccess[user.id] =
-                    Set<String>.from(organizationIds);
-                _userSiteAccess[user.id] = Set<String>.from(siteIds);
-                _userZoneAccess[user.id] = Set<String>.from(zoneIds);
-              });
-            } catch (e) {
-              if (!context.mounted) return;
-              setDialogState(() {
-                organizationIds = Set<String>.from(previousOrganizationIds);
-                siteIds = Set<String>.from(previousSiteIds);
-                zoneIds = Set<String>.from(previousZoneIds);
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Failed to update access: $e')),
-              );
-            }
-          }
 
           return AlertDialog(
             backgroundColor: isLight
@@ -834,11 +930,7 @@ class _UsersScreenState extends State<UsersScreen> {
                             .toList(),
                         selected: organizationIds,
                         selectedLabels: organizations,
-                        onToggle: (id) async {
-                          final previousOrganizationIds =
-                              Set<String>.from(organizationIds);
-                          final previousSiteIds = Set<String>.from(siteIds);
-                          final previousZoneIds = Set<String>.from(zoneIds);
+                        onToggle: (id) {
                           setDialogState(() {
                             if (organizationIds.contains(id)) {
                               organizationIds.remove(id);
@@ -857,11 +949,6 @@ class _UsersScreenState extends State<UsersScreen> {
                                     siteIds.contains(zone.siteId)))
                                 .toSet();
                           });
-                          await syncAfterSelectionChange(
-                            previousOrganizationIds: previousOrganizationIds,
-                            previousSiteIds: previousSiteIds,
-                            previousZoneIds: previousZoneIds,
-                          );
                         },
                         onViewAll: () async {
                           final next = await _showAccessSelectorDialog(
@@ -873,10 +960,6 @@ class _UsersScreenState extends State<UsersScreen> {
                             selected: organizationIds,
                           );
                           if (next == null || !context.mounted) return;
-                          final previousOrganizationIds =
-                              Set<String>.from(organizationIds);
-                          final previousSiteIds = Set<String>.from(siteIds);
-                          final previousZoneIds = Set<String>.from(zoneIds);
                           setDialogState(() {
                             organizationIds = next;
                             siteIds = siteIds
@@ -891,11 +974,6 @@ class _UsersScreenState extends State<UsersScreen> {
                                     siteIds.contains(zone.siteId)))
                                 .toSet();
                           });
-                          await syncAfterSelectionChange(
-                            previousOrganizationIds: previousOrganizationIds,
-                            previousSiteIds: previousSiteIds,
-                            previousZoneIds: previousZoneIds,
-                          );
                         },
                       ),
                       const SizedBox(height: 10),
@@ -907,11 +985,7 @@ class _UsersScreenState extends State<UsersScreen> {
                             .toList(),
                         selected: siteIds,
                         selectedLabels: sites,
-                        onToggle: (id) async {
-                          final previousOrganizationIds =
-                              Set<String>.from(organizationIds);
-                          final previousSiteIds = Set<String>.from(siteIds);
-                          final previousZoneIds = Set<String>.from(zoneIds);
+                        onToggle: (id) {
                           setDialogState(() {
                             if (siteIds.contains(id)) {
                               siteIds.remove(id);
@@ -923,12 +997,11 @@ class _UsersScreenState extends State<UsersScreen> {
                                     zone.id == z &&
                                     siteIds.contains(zone.siteId)))
                                 .toSet();
+                            organizationIds = db.sites
+                                .where((site) => siteIds.contains(site.id))
+                                .map((site) => site.organizationId)
+                                .toSet();
                           });
-                          await syncAfterSelectionChange(
-                            previousOrganizationIds: previousOrganizationIds,
-                            previousSiteIds: previousSiteIds,
-                            previousZoneIds: previousZoneIds,
-                          );
                         },
                         onViewAll: () async {
                           final next = await _showAccessSelectorDialog(
@@ -940,10 +1013,6 @@ class _UsersScreenState extends State<UsersScreen> {
                             selected: siteIds,
                           );
                           if (next == null || !context.mounted) return;
-                          final previousOrganizationIds =
-                              Set<String>.from(organizationIds);
-                          final previousSiteIds = Set<String>.from(siteIds);
-                          final previousZoneIds = Set<String>.from(zoneIds);
                           setDialogState(() {
                             siteIds = next;
                             zoneIds = zoneIds
@@ -951,12 +1020,11 @@ class _UsersScreenState extends State<UsersScreen> {
                                     zone.id == z &&
                                     siteIds.contains(zone.siteId)))
                                 .toSet();
+                            organizationIds = db.sites
+                                .where((site) => siteIds.contains(site.id))
+                                .map((site) => site.organizationId)
+                                .toSet();
                           });
-                          await syncAfterSelectionChange(
-                            previousOrganizationIds: previousOrganizationIds,
-                            previousSiteIds: previousSiteIds,
-                            previousZoneIds: previousZoneIds,
-                          );
                         },
                       ),
                       const SizedBox(height: 10),
@@ -968,23 +1036,23 @@ class _UsersScreenState extends State<UsersScreen> {
                             .toList(),
                         selected: zoneIds,
                         selectedLabels: zones,
-                        onToggle: (id) async {
-                          final previousOrganizationIds =
-                              Set<String>.from(organizationIds);
-                          final previousSiteIds = Set<String>.from(siteIds);
-                          final previousZoneIds = Set<String>.from(zoneIds);
+                        onToggle: (id) {
                           setDialogState(() {
                             if (zoneIds.contains(id)) {
                               zoneIds.remove(id);
                             } else {
                               zoneIds.add(id);
                             }
+                            final zoneBackedSiteIds = db.zones
+                                .where((zone) => zoneIds.contains(zone.id))
+                                .map((zone) => zone.siteId)
+                                .toSet();
+                            siteIds = siteIds.union(zoneBackedSiteIds);
+                            organizationIds = db.sites
+                                .where((site) => siteIds.contains(site.id))
+                                .map((site) => site.organizationId)
+                                .toSet();
                           });
-                          await syncAfterSelectionChange(
-                            previousOrganizationIds: previousOrganizationIds,
-                            previousSiteIds: previousSiteIds,
-                            previousZoneIds: previousZoneIds,
-                          );
                         },
                         onViewAll: () async {
                           final next = await _showAccessSelectorDialog(
@@ -996,18 +1064,18 @@ class _UsersScreenState extends State<UsersScreen> {
                             selected: zoneIds,
                           );
                           if (next == null || !context.mounted) return;
-                          final previousOrganizationIds =
-                              Set<String>.from(organizationIds);
-                          final previousSiteIds = Set<String>.from(siteIds);
-                          final previousZoneIds = Set<String>.from(zoneIds);
                           setDialogState(() {
                             zoneIds = next;
+                            final zoneBackedSiteIds = db.zones
+                                .where((zone) => zoneIds.contains(zone.id))
+                                .map((zone) => zone.siteId)
+                                .toSet();
+                            siteIds = siteIds.union(zoneBackedSiteIds);
+                            organizationIds = db.sites
+                                .where((site) => siteIds.contains(site.id))
+                                .map((site) => site.organizationId)
+                                .toSet();
                           });
-                          await syncAfterSelectionChange(
-                            previousOrganizationIds: previousOrganizationIds,
-                            previousSiteIds: previousSiteIds,
-                            previousZoneIds: previousZoneIds,
-                          );
                         },
                       ),
                     ],
@@ -1016,6 +1084,69 @@ class _UsersScreenState extends State<UsersScreen> {
               ),
             ),
             actions: [
+              if (editMode)
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          setDialogState(() => isSubmitting = true);
+                          try {
+                            final scopes = _buildAccessScopes(
+                              siteIds: siteIds,
+                              zoneIds: zoneIds,
+                              db: db,
+                            );
+                            if (scopes.isEmpty) {
+                              throw Exception(
+                                'Select at least one site or zone before submit.',
+                              );
+                            }
+                            await UsersApi.createAccess(
+                              principalType: principalType,
+                              principalId: user.id,
+                              scopes: scopes,
+                            );
+                            if (!context.mounted) return;
+                            setState(() {
+                              _userOrganizationAccess[user.id] =
+                                  Set<String>.from(organizationIds);
+                              _userSiteAccess[user.id] =
+                                  Set<String>.from(siteIds);
+                              _userZoneAccess[user.id] =
+                                  Set<String>.from(zoneIds);
+                            });
+                            setDialogState(() {
+                              editMode = false;
+                            });
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Access updated successfully'),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Failed to update access: $e'),
+                                ),
+                              );
+                            }
+                          } finally {
+                            if (context.mounted) {
+                              setDialogState(() => isSubmitting = false);
+                            }
+                          }
+                        },
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Submit'),
+                ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text('Close'),

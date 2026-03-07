@@ -18,13 +18,19 @@ class SensorParameter extends Equatable {
   });
 
   factory SensorParameter.fromJson(Map<String, dynamic> json) {
+    double asDouble(dynamic value) {
+      if (value is num) return value.toDouble();
+      return double.tryParse(value?.toString() ?? '') ?? 0.0;
+    }
+
     return SensorParameter(
-      id: json['id'] as String,
-      sensorTypeId: json['sensor_type_id'] as String,
-      name: json['name'] as String,
-      unit: json['unit'] as String,
-      minValue: (json['min_value'] as num).toDouble(),
-      maxValue: (json['max_value'] as num).toDouble(),
+      id: (json['sensorParameterId'] ?? json['id'] ?? '').toString(),
+      sensorTypeId:
+          (json['sensorTypeId'] ?? json['sensor_type_id'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      unit: (json['unit'] ?? '').toString(),
+      minValue: asDouble(json['minValue'] ?? json['min_value']),
+      maxValue: asDouble(json['maxValue'] ?? json['max_value']),
     );
   }
 

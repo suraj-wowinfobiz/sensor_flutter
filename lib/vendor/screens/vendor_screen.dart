@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart' as p;
 
 import '../../super_admin/core/responsive/responsive_extensions.dart';
 import '../../super_admin/core/theme/custom_theme_tokens.dart';
+import '../../super_admin/providers/super_admin_backend_provider.dart';
 import '../../super_admin/screens/analytics_screen.dart';
 import '../../super_admin/screens/organizations_screen.dart';
 import '../../super_admin/screens/users_screen.dart';
@@ -367,9 +369,13 @@ class _VendorScreenState extends ConsumerState<VendorScreen>
       case 'dashboard':
         return const VendorDashboardScreen();
       case 'users':
-        return const UsersScreen(
-          createDefaultRole: 'Vendor_engineer',
-          selectableRoles: ['Vendor_engineer'],
+        final vendorDb = ref.read(vendorDatabaseChangeNotifierProvider);
+        return p.ChangeNotifierProvider<SuperAdminBackendProvider>.value(
+          value: vendorDb,
+          child: const UsersScreen(
+            createDefaultRole: 'Vendor_engineer',
+            selectableRoles: ['Vendor_engineer'],
+          ),
         );
       case 'analytics':
         return const AnalyticsScreen();

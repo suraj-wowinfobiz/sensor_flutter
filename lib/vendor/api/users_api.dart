@@ -1,8 +1,13 @@
 import 'api_client.dart';
 
 class UsersApi {
+  static const String _vendorEngineersBase =
+      '/api/v1/vendors-engineer/engineers';
+  static const String _vendorEngineersGetAll =
+      '/api/v1/vendors-engineer/engineers/get-all';
+
   static Future<List<Map<String, dynamic>>> getUsers() async {
-    final response = await ApiClient.get('/api/v1/users/get-all');
+    final response = await ApiClient.get(_vendorEngineersGetAll);
     final body = response.body;
     if (body is List) {
       return body
@@ -26,7 +31,7 @@ class UsersApi {
   }
 
   static Future<Map<String, dynamic>> getUserById(String userId) async {
-    final response = await ApiClient.get('/api/v1/users/$userId');
+    final response = await ApiClient.get('$_vendorEngineersBase/$userId');
     return _asMap(response.body);
   }
 
@@ -39,7 +44,7 @@ class UsersApi {
     int? maxUsersAllowed,
   }) async {
     final response = await ApiClient.post(
-      '/api/v1/admins/users',
+      _vendorEngineersBase,
       data: {
         'name': name,
         'email': email,
@@ -100,7 +105,7 @@ class UsersApi {
     String? password,
   }) async {
     final response = await ApiClient.put(
-      '/api/v1/users/$id',
+      '$_vendorEngineersBase/$id',
       data: {
         'name': name,
         'email': email,
@@ -122,7 +127,7 @@ class UsersApi {
     required bool active,
   }) async {
     final response = await ApiClient.put(
-      '/api/v1/users/$userId',
+      '$_vendorEngineersBase/$userId',
       data: {
         'name': name,
         'email': email,
@@ -136,7 +141,7 @@ class UsersApi {
   }
 
   static Future<void> deleteUser(String id) async {
-    await ApiClient.delete('/api/v1/users/$id');
+    await ApiClient.delete('$_vendorEngineersBase/$id');
   }
 
   static Future<Map<String, dynamic>> assignAccess({

@@ -8,9 +8,11 @@ class ApiClient {
 
   static const String baseUrl = EngineerApiConfig.baseUrl;
   static const String _tokenKey = 'engineer_auth_token';
+  static const Duration _requestDeadline = Duration(seconds: 30);
 
   static Dio? _dio;
   static String? _token;
+  static bool _tokenLoaded = false;
 
   static Dio get _client {
     _dio ??= Dio(
@@ -24,68 +26,63 @@ class ApiClient {
   }
 
   static Future<void> setAuthToken(String token) async {
-    _token = token;
+    _token = token.trim();
+    _tokenLoaded = true;
+    _applyAuthorizationHeader();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
+    await prefs.setString(_tokenKey, _token!);
   }
 
   static Future<void> clearAuthToken() async {
     _token = null;
+    _tokenLoaded = true;
+    _applyAuthorizationHeader();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
   }
 
-  static Future<String?> _resolveToken() async {
-    if (_token != null && _token!.isNotEmpty) return _token;
+  static Future<void> _ensureTokenLoaded() async {
+    if (_tokenLoaded) return;
     final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getString(_tokenKey);
-    if (stored != null && stored.isNotEmpty) {
-      _token = stored;
-      return stored;
-    }
-    return null;
+    _token = prefs.getString(_tokenKey);
+    _tokenLoaded = true;
+    _applyAuthorizationHeader();
   }
 
-  static Future<Map<String, String>> _headers() async {
-    final token = await _resolveToken();
+  static void _applyAuthorizationHeader() {
+    final token = _token?.trim();
     if (token == null || token.isEmpty) {
-      return {'Content-Type': 'application/json'};
+      _client.options.headers.remove('Authorization');
+      return;
     }
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
+    _client.options.headers['Authorization'] = 'Bearer $token';
   }
 
   static Future<ApiEnvelope> get(String path) async {
-    final response =
-        await _client.get(path, options: Options(headers: await _headers()));
+    await _ensureTokenLoaded();
+    final response = await _client.get(path).timeout(_requestDeadline);
     return ApiEnvelope.fromResponse(response.data);
   }
 
   static Future<ApiEnvelope> post(String path,
       {Map<String, dynamic>? data}) async {
-    final response = await _client.post(
-      path,
-      data: data,
-      options: Options(headers: await _headers()),
-    );
+    await _ensureTokenLoaded();
+    final response =
+        await _client.post(path, data: data).timeout(_requestDeadline);
     return ApiEnvelope.fromResponse(response.data);
   }
 
   static Future<ApiEnvelope> put(String path,
       {Map<String, dynamic>? data}) async {
-    final response = await _client.put(
-      path,
-      data: data,
-      options: Options(headers: await _headers()),
-    );
+    await _ensureTokenLoaded();
+    final response =
+        await _client.put(path, data: data).timeout(_requestDeadline);
     return ApiEnvelope.fromResponse(response.data);
   }
 
   static Future<ApiEnvelope> delete(String path) async {
-    final response =
-        await _client.delete(path, options: Options(headers: await _headers()));
+    await _ensureTokenLoaded();
+    final response = await _client.delete(path).timeout(_requestDeadline);
     return ApiEnvelope.fromResponse(response.data);
   }
 }

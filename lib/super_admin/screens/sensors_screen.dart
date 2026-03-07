@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider;
 
+import '../api/sensor_parameter_api.dart';
 import '../models/sensor.dart';
 import '../providers/super_admin_backend_provider.dart';
 import '../providers/super_admin_riverpod_provider.dart';
@@ -45,6 +46,7 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
         provider.Provider.of<SuperAdminBackendProvider>(context, listen: false);
     await db.loadDevices();
     await db.loadSensorTypes();
+    await db.loadSensorParameters();
     if (!mounted) return;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final subColor =
@@ -52,6 +54,94 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
     final defaultDeviceId = db.devices.isNotEmpty ? db.devices.first.id : '';
     final defaultTypeId =
         db.sensorTypes.isNotEmpty ? db.sensorTypes.first.id : '';
+    String sensorParameterId = '';
+    List<Map<String, dynamic>> sensorParametersForType = [];
+    bool sensorParametersLoading = false;
+    List<DropdownMenuItem<String>> parameterItems() {
+      return sensorParametersForType
+          .map(
+            (param) => DropdownMenuItem<String>(
+              value: (param['sensorParameterId'] ?? param['id'] ?? '')
+                  .toString()
+                  .trim(),
+              child: Text(
+                '${(param['name'] ?? '').toString().trim().isEmpty ? "Parameter" : (param['name'] ?? '').toString().trim()}'
+                '${(param['unit'] ?? '').toString().trim().isEmpty ? "" : " (${(param['unit'] ?? '').toString().trim()})"}',
+              ),
+            ),
+          )
+          .where((item) => (item.value ?? '').trim().isNotEmpty)
+          .toList();
+    }
+
+    Future<void> fetchParametersForType(
+      String typeId, {
+      void Function(void Function())? setDialogState,
+      String? preferredParameterId,
+      bool preserveSelection = true,
+      void Function()? onSelectionChanged,
+    }) async {
+      final normalizedTypeId = typeId.trim();
+      if (setDialogState != null) {
+        setDialogState(() => sensorParametersLoading = true);
+      } else {
+        sensorParametersLoading = true;
+      }
+      try {
+        var fetched = <Map<String, dynamic>>[];
+        if (normalizedTypeId.isNotEmpty) {
+          fetched = await SensorParameterApi.getParametersBySensorType(
+            normalizedTypeId,
+          );
+        }
+        if (fetched.isEmpty && normalizedTypeId.isNotEmpty) {
+          fetched = db.sensorParameters
+              .where((param) => param.sensorTypeId.trim() == normalizedTypeId)
+              .map((param) => {
+                    'sensorParameterId': param.id,
+                    'sensorTypeId': param.sensorTypeId,
+                    'name': param.name,
+                    'unit': param.unit,
+                    'minValue': param.minValue,
+                    'maxValue': param.maxValue,
+                  })
+              .toList();
+        }
+
+        void apply() {
+          sensorParametersForType = fetched;
+          final options = parameterItems();
+          final requested = (preferredParameterId ?? '').trim();
+          final canUseRequested = requested.isNotEmpty &&
+              options.any((item) => item.value == requested);
+          if (canUseRequested) {
+            sensorParameterId = requested;
+          } else if (preserveSelection &&
+              sensorParameterId.trim().isNotEmpty &&
+              options.any((item) => item.value == sensorParameterId)) {
+            // keep existing selection
+          } else {
+            sensorParameterId =
+                options.isNotEmpty ? (options.first.value ?? '') : '';
+          }
+          sensorParametersLoading = false;
+        }
+
+        if (setDialogState != null) {
+          setDialogState(apply);
+        } else {
+          apply();
+        }
+      } catch (_) {
+        if (setDialogState != null) {
+          setDialogState(() => sensorParametersLoading = false);
+        } else {
+          sensorParametersLoading = false;
+        }
+      } finally {
+        onSelectionChanged?.call();
+      }
+    }
 
     if (sensor != null) {
       _editingId = sensor.id;
@@ -67,6 +157,8 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
       _deviceId = defaultDeviceId;
       _sensorTypeId = defaultTypeId;
     }
+    await fetchParametersForType(_sensorTypeId);
+    if (!mounted) return;
 
     showGeneralDialog(
       context: context,
@@ -144,6 +236,124 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                         onChanged: (v) => setState(() => _serialNumber = v),
                       ),
                       const SizedBox(height: 12),
+                      _dialogTextField(
+                        label: 'Sensor Name',
+                        value: _sensorName,
+                        onChanged: (v) => setState(() => _sensorName = v),
+                      ),
+                      const SizedBox(height: 12),
+                      _dialogDropdown(
+                        label: 'Sensor Type',
+                        value: _sensorTypeId.isEmpty ? null : _sensorTypeId,
+                        hint: 'Select sensor type',
+                        items: db.sensorTypes
+                            .map((type) => DropdownMenuItem<String>(
+                                  value: type.id,
+                                  child: Text(type.name),
+                                ))
+                            .toList(),
+                        onChanged: (value) async {
+                          final nextTypeId = value ?? '';
+                          setState(() {
+                            _sensorTypeId = nextTypeId;
+                            sensorParameterId = '';
+                          });
+                          await fetchParametersForType(
+                            _sensorTypeId,
+                            setDialogState: setState,
+                          );
+                        },
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            await _showCreateSensorTypeDialog();
+                            if (!mounted) return;
+                            await db.loadSensorTypes();
+                            if (!context.mounted) return;
+                            setState(() {
+                              if (_sensorTypeId.isEmpty &&
+                                  db.sensorTypes.isNotEmpty) {
+                                _sensorTypeId = db.sensorTypes.first.id;
+                              }
+                            });
+                            await fetchParametersForType(
+                              _sensorTypeId,
+                              setDialogState: setState,
+                            );
+                          },
+                          icon: const Icon(Icons.add, size: 16),
+                          label: Text(
+                            db.sensorTypes.isEmpty
+                                ? 'Create Sensor Type'
+                                : 'Create New Sensor Type',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _dialogDropdown(
+                        label: 'Sensor Parameter',
+                        value: sensorParameterId.isEmpty
+                            ? null
+                            : sensorParameterId,
+                        hint: 'Select sensor parameter',
+                        items: parameterItems(),
+                        onChanged: (value) =>
+                            setState(() => sensorParameterId = value ?? ''),
+                      ),
+                      if (sensorParametersLoading)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 6),
+                          child: LinearProgressIndicator(minHeight: 2),
+                        ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              final createdParameterId =
+                                  await _showCreateOrEditSensorParameterDialog(
+                                initialSensorTypeId: _sensorTypeId,
+                              );
+                              if (!mounted) return;
+                              await db.loadSensorParameters();
+                              if (!context.mounted) return;
+                              await fetchParametersForType(
+                                _sensorTypeId,
+                                setDialogState: setState,
+                                preferredParameterId: createdParameterId,
+                              );
+                            },
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('Create Sensor Parameter'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: sensorParameterId.trim().isEmpty
+                                ? null
+                                : () async {
+                                    final updatedParameterId =
+                                        await _showCreateOrEditSensorParameterDialog(
+                                      initialSensorTypeId: _sensorTypeId,
+                                      editingParameterId: sensorParameterId,
+                                    );
+                                    if (!mounted) return;
+                                    await db.loadSensorParameters();
+                                    if (!context.mounted) return;
+                                    await fetchParametersForType(
+                                      _sensorTypeId,
+                                      setDialogState: setState,
+                                      preferredParameterId: updatedParameterId,
+                                    );
+                                  },
+                            icon: const Icon(Icons.edit_outlined, size: 16),
+                            label: const Text('Edit Selected Parameter'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
@@ -162,50 +372,6 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 12),
-                      _dialogTextField(
-                        label: 'Sensor Name',
-                        value: _sensorName,
-                        onChanged: (v) => setState(() => _sensorName = v),
-                      ),
-                      const SizedBox(height: 12),
-                      _dialogDropdown(
-                        label: 'Sensor Type',
-                        value: _sensorTypeId.isEmpty ? null : _sensorTypeId,
-                        hint: 'Select sensor type',
-                        items: db.sensorTypes
-                            .map((type) => DropdownMenuItem<String>(
-                                  value: type.id,
-                                  child: Text(type.name),
-                                ))
-                            .toList(),
-                        onChanged: (value) =>
-                            setState(() => _sensorTypeId = value ?? ''),
-                      ),
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            await _showCreateSensorTypeDialog();
-                            if (!mounted) return;
-                            await db.loadSensorTypes();
-                            if (!context.mounted) return;
-                            setState(() {
-                              if (_sensorTypeId.isEmpty &&
-                                  db.sensorTypes.isNotEmpty) {
-                                _sensorTypeId = db.sensorTypes.first.id;
-                              }
-                            });
-                          },
-                          icon: const Icon(Icons.add, size: 16),
-                          label: Text(
-                            db.sensorTypes.isEmpty
-                                ? 'Create Sensor Type'
-                                : 'Create New Sensor Type',
-                          ),
-                        ),
                       ),
                       const SizedBox(height: 16),
                       LayoutBuilder(
@@ -295,6 +461,11 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                                       'Please select sensor type or create one.',
                                     );
                                   }
+                                  if (sensorParameterId.trim().isEmpty) {
+                                    throw Exception(
+                                      'Please select sensor parameter.',
+                                    );
+                                  }
 
                                   if (_editingId == null) {
                                     await backend.create('sensors', {
@@ -302,6 +473,8 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                                       'serial_number': _serialNumber.trim(),
                                       'device_id': _deviceId,
                                       'sensor_type_id': _sensorTypeId,
+                                      'sensor_parameter_id': sensorParameterId,
+                                      'sensorParameterId': sensorParameterId,
                                       'lat': _latitude.trim(),
                                       'log': _longitude.trim(),
                                       'status': 'ACTIVE',
@@ -314,6 +487,8 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                                       'serial_number': _serialNumber.trim(),
                                       'device_id': _deviceId,
                                       'sensor_type_id': _sensorTypeId,
+                                      'sensor_parameter_id': sensorParameterId,
+                                      'sensorParameterId': sensorParameterId,
                                       'lat': _latitude.trim(),
                                       'log': _longitude.trim(),
                                       'status': 'ACTIVE',
@@ -461,6 +636,163 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
         );
       },
     );
+  }
+
+  Future<String?> _showCreateOrEditSensorParameterDialog({
+    required String initialSensorTypeId,
+    String? editingParameterId,
+  }) async {
+    final db =
+        provider.Provider.of<SuperAdminBackendProvider>(context, listen: false);
+    await db.loadSensorTypes();
+    await db.loadSensorParameters();
+    if (!mounted) return null;
+
+    final editingParameter = db.sensorParameters
+        .where((param) => param.id == editingParameterId)
+        .firstOrNull;
+
+    String sensorTypeId = editingParameter?.sensorTypeId ?? initialSensorTypeId;
+    if (sensorTypeId.trim().isEmpty && db.sensorTypes.isNotEmpty) {
+      sensorTypeId = db.sensorTypes.first.id;
+    }
+    String name = editingParameter?.name ?? '';
+    String unit = editingParameter?.unit ?? '';
+    String minValue =
+        editingParameter == null ? '0' : editingParameter.minValue.toString();
+    String maxValue =
+        editingParameter == null ? '0' : editingParameter.maxValue.toString();
+    String? savedId;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(
+            editingParameter == null
+                ? 'Create Sensor Parameter'
+                : 'Edit Sensor Parameter',
+          ),
+          content: StatefulBuilder(
+            builder: (context, setDialogState) => SizedBox(
+              width: 440,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _dialogDropdown(
+                    label: 'Sensor Type',
+                    value: sensorTypeId.isEmpty ? null : sensorTypeId,
+                    hint: 'Select sensor type',
+                    items: db.sensorTypes
+                        .map((type) => DropdownMenuItem<String>(
+                              value: type.id,
+                              child: Text(type.name),
+                            ))
+                        .toList(),
+                    onChanged: (value) =>
+                        setDialogState(() => sensorTypeId = value ?? ''),
+                  ),
+                  const SizedBox(height: 10),
+                  _dialogTextField(
+                    label: 'Name',
+                    value: name,
+                    onChanged: (v) => setDialogState(() => name = v),
+                  ),
+                  const SizedBox(height: 10),
+                  _dialogTextField(
+                    label: 'Unit',
+                    value: unit,
+                    onChanged: (v) => setDialogState(() => unit = v),
+                  ),
+                  const SizedBox(height: 10),
+                  _dialogTextField(
+                    label: 'Min Value',
+                    value: minValue,
+                    onChanged: (v) => setDialogState(() => minValue = v),
+                  ),
+                  const SizedBox(height: 10),
+                  _dialogTextField(
+                    label: 'Max Value',
+                    value: maxValue,
+                    onChanged: (v) => setDialogState(() => maxValue = v),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (sensorTypeId.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Sensor type is required')),
+                  );
+                  return;
+                }
+                if (name.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Sensor parameter name is required')),
+                  );
+                  return;
+                }
+                final min = double.tryParse(minValue.trim());
+                final max = double.tryParse(maxValue.trim());
+                if (min == null || max == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Min and max values must be numeric')),
+                  );
+                  return;
+                }
+                try {
+                  Map<String, dynamic> response;
+                  if (editingParameter == null) {
+                    response = await SensorParameterApi.createSensorParameter(
+                      sensorTypeId: sensorTypeId,
+                      name: name.trim(),
+                      unit: unit.trim(),
+                      minValue: min,
+                      maxValue: max,
+                    );
+                  } else {
+                    response = await SensorParameterApi.updateSensorParameter(
+                      sensorTypeId: sensorTypeId,
+                      sensorParameterId: editingParameter.id,
+                      name: name.trim(),
+                      unit: unit.trim(),
+                      minValue: min,
+                      maxValue: max,
+                    );
+                  }
+                  final responseId =
+                      (response['sensorParameterId'] ?? response['id'] ?? '')
+                          .toString()
+                          .trim();
+                  savedId = responseId.isNotEmpty
+                      ? responseId
+                      : (editingParameter?.id ?? '');
+                  await db.loadSensorParameters();
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                        content: Text('Failed to save sensor parameter: $e')),
+                  );
+                }
+              },
+              child: Text(editingParameter == null ? 'Create' : 'Update'),
+            ),
+          ],
+        );
+      },
+    );
+    return savedId;
   }
 
   Widget _dialogTextField({

@@ -44,8 +44,16 @@ class _EngineerSensorsScreenState extends ConsumerState<EngineerSensorsScreen> {
   Future<void> _showSensorModal({Sensor? sensor}) async {
     final db =
         provider.Provider.of<EngineerDatabaseProvider>(context, listen: false);
-    await db.loadDevices();
-    await db.loadSensorTypes();
+    final loadTasks = <Future<void>>[];
+    if (db.devices.isEmpty) {
+      loadTasks.add(db.loadDevices());
+    }
+    if (db.sensorTypes.isEmpty) {
+      loadTasks.add(db.loadSensorTypes());
+    }
+    if (loadTasks.isNotEmpty) {
+      await Future.wait(loadTasks);
+    }
     if (!mounted) return;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final subColor =
@@ -280,11 +288,6 @@ class _EngineerSensorsScreenState extends ConsumerState<EngineerSensorsScreen> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () async {
-                                final backend = provider.Provider.of<
-                                    EngineerDatabaseProvider>(
-                                  context,
-                                  listen: false,
-                                );
                                 try {
                                   if (_deviceId.trim().isEmpty) {
                                     throw Exception(
@@ -298,7 +301,7 @@ class _EngineerSensorsScreenState extends ConsumerState<EngineerSensorsScreen> {
                                   }
 
                                   if (_editingId == null) {
-                                    await backend.create('sensors', {
+                                    await db.create('sensors', {
                                       'name': _sensorName.trim(),
                                       'serial_number': _serialNumber.trim(),
                                       'device_id': _deviceId,
@@ -309,8 +312,7 @@ class _EngineerSensorsScreenState extends ConsumerState<EngineerSensorsScreen> {
                                       'unit': '',
                                     });
                                   } else {
-                                    await backend
-                                        .update('sensors', _editingId!, {
+                                    await db.update('sensors', _editingId!, {
                                       'name': _sensorName.trim(),
                                       'serial_number': _serialNumber.trim(),
                                       'device_id': _deviceId,
@@ -386,6 +388,8 @@ class _EngineerSensorsScreenState extends ConsumerState<EngineerSensorsScreen> {
   }
 
   Future<void> _showCreateSensorTypeDialog() async {
+    final db =
+        provider.Provider.of<EngineerDatabaseProvider>(context, listen: false);
     String name = '';
     String category = 'general';
     String description = '';
@@ -430,19 +434,14 @@ class _EngineerSensorsScreenState extends ConsumerState<EngineerSensorsScreen> {
             ElevatedButton(
               onPressed: () async {
                 if (name.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
                     const SnackBar(
                         content: Text('Sensor type name is required')),
                   );
                   return;
                 }
                 try {
-                  final backend =
-                      provider.Provider.of<EngineerDatabaseProvider>(
-                    context,
-                    listen: false,
-                  );
-                  await backend.create('sensor_types', {
+                  await db.create('sensor_types', {
                     'name': name.trim(),
                     'category':
                         category.trim().isEmpty ? 'general' : category.trim(),
@@ -450,8 +449,8 @@ class _EngineerSensorsScreenState extends ConsumerState<EngineerSensorsScreen> {
                   });
                   if (dialogContext.mounted) Navigator.pop(dialogContext);
                 } catch (e) {
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  if (!dialogContext.mounted) return;
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
                     SnackBar(content: Text('Failed to create sensor type: $e')),
                   );
                 }

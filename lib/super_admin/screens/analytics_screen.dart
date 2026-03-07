@@ -41,6 +41,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<SuperAdminBackendProvider>().loadThresholdValues();
+    });
     _startProcessedLiveFetch();
   }
 
@@ -200,8 +204,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget build(BuildContext context) {
     return Consumer<SuperAdminBackendProvider>(
       builder: (context, db, child) {
-        final graphThresholds =
-            db.thresholdRulesForGraph(ThresholdGraphTarget.analyticsMain);
+        final graphThresholds = _apiThresholdRules(db);
         final filteredSensors = db.sensors.where((s) {
           final search = _searchQuery.trim().toLowerCase();
           final sensorType = db.sensorTypes
@@ -564,6 +567,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                         color: Color(0xFF111111), width: 1),
                                   ),
                                 ),
+                                extraLinesData: ExtraLinesData(
+                                  horizontalLines: _apiThresholdLines(db),
+                                ),
                                 titlesData: FlTitlesData(
                                   topTitles: const AxisTitles(
                                     sideTitles: SideTitles(showTitles: false),
@@ -703,8 +709,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 child: _selectFilter(
                   label: 'Status',
                   value: _statusFilter,
-                  items: _statusFilterItems(db.thresholdRulesForGraph(
-                      ThresholdGraphTarget.analyticsMain)),
+                  items: _statusFilterItems(_apiThresholdRules(db)),
                   onChanged: (v) => setState(() => _statusFilter = v ?? 'all'),
                 ),
               ),
@@ -839,6 +844,36 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       if (reading >= threshold.value) return threshold.key;
     }
     return 'normal';
+  }
+
+  List<ThresholdRule> _apiThresholdRules(SuperAdminBackendProvider db) {
+    final values = <double>{};
+    for (final threshold in db.thresholdValues) {
+      if (threshold.sensorParameterId.trim().isEmpty ||
+          threshold.thresholdProfileId.trim().isEmpty) {
+        continue;
+      }
+      if (threshold.warningLevel.isFinite && threshold.warningLevel > 0) {
+        values.add(threshold.warningLevel);
+      }
+      if (threshold.criticalLevel.isFinite && threshold.criticalLevel > 0) {
+        values.add(threshold.criticalLevel);
+      }
+    }
+    final sorted = values.toList()..sort();
+    return List<ThresholdRule>.generate(
+      sorted.length,
+      (index) => ThresholdRule(
+        id: 'api_$index',
+        label: index == sorted.length - 1 ? 'Critical' : 'Warning',
+        value: sorted[index],
+        sound: '',
+        color: index == sorted.length - 1
+            ? const Color(0xFFE54C4C)
+            : const Color(0xFFD39A00),
+        graphTargets: const {ThresholdGraphTarget.analyticsMain},
+      ),
+    );
   }
 
   List<DropdownMenuItem<String>> _statusFilterItems(
@@ -1050,6 +1085,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     double? fixedMaxY,
     double? fixedLeftInterval,
   }) {
+    final db = context.read<SuperAdminBackendProvider>();
     final dataOrDefault = data.isEmpty ? [const FlSpot(0, 0)] : data;
     final minY = fixedMinY ?? (dataOrDefault.map((e) => e.y).reduce(min) - 0.3);
     final maxY = fixedMaxY ?? (dataOrDefault.map((e) => e.y).reduce(max) + 0.3);
@@ -1084,6 +1120,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           borderData: FlBorderData(
             show: true,
             border: Border.all(color: const Color(0xFF12303E), width: 1),
+          ),
+          extraLinesData: ExtraLinesData(
+            horizontalLines: _apiThresholdLines(db),
           ),
           titlesData: FlTitlesData(
             topTitles: const AxisTitles(
@@ -1144,6 +1183,54 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         ),
       ),
     );
+  }
+
+  List<HorizontalLine> _apiThresholdLines(SuperAdminBackendProvider db) {
+    bool hasBinding(MapEntry<String, double> entry) =>
+        entry.value.isFinite && entry.value > 0;
+
+    final seen = <String>{};
+    final lines = <HorizontalLine>[];
+    for (final value in db.thresholdValues) {
+      if (value.sensorParameterId.trim().isEmpty ||
+          value.thresholdProfileId.trim().isEmpty) {
+        continue;
+      }
+      final candidates = <MapEntry<String, double>>[
+        MapEntry('Min', value.minThreshold),
+        MapEntry('Max', value.maxThreshold),
+        MapEntry('Warning', value.warningLevel),
+        MapEntry('Critical', value.criticalLevel),
+      ].where(hasBinding);
+
+      for (final candidate in candidates) {
+        final key = '${candidate.key}|${candidate.value.toStringAsFixed(3)}';
+        if (!seen.add(key)) continue;
+        final color = switch (candidate.key) {
+          'Min' => const Color(0xFF2563EB),
+          'Max' => const Color(0xFF9333EA),
+          'Warning' => const Color(0xFFD39A00),
+          'Critical' => const Color(0xFFE54C4C),
+          _ => const Color(0xFF4B5563),
+        };
+        lines.add(
+          HorizontalLine(
+            y: candidate.value,
+            color: color,
+            strokeWidth: 1.3,
+            dashArray: [6, 4],
+            label: HorizontalLineLabel(
+              show: true,
+              alignment: Alignment.topRight,
+              style: TextStyle(color: color, fontWeight: FontWeight.w600),
+              labelResolver: (_) =>
+                  '${candidate.key}: ${candidate.value.toStringAsFixed(1)}',
+            ),
+          ),
+        );
+      }
+    }
+    return lines;
   }
 }
 

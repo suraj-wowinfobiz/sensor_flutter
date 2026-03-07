@@ -157,12 +157,95 @@ class UsersApi {
       throw ArgumentError('Provide exactly one of siteId or zoneId');
     }
     final response = await ApiClient.post(
-      '/api/v1/super-admins/access/assign',
+      '/api/v1/access',
       data: {
         'principalType': principalType,
         'principalId': principalId,
-        if (normalizedSiteId.isNotEmpty) 'siteId': normalizedSiteId,
-        if (normalizedZoneId.isNotEmpty) 'zoneId': normalizedZoneId,
+        'scopes': [
+          {
+            if (normalizedSiteId.isNotEmpty) 'siteId': normalizedSiteId,
+            if (normalizedZoneId.isNotEmpty) 'zoneId': normalizedZoneId,
+          }
+        ],
+      },
+    );
+    return _asMap(response.body);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAccessList() async {
+    final response = await ApiClient.get('/api/v1/access');
+    final body = response.body;
+    if (body is List) {
+      return body
+          .whereType<Map>()
+          .map((e) => e.cast<String, dynamic>())
+          .toList();
+    }
+    if (body is Map) {
+      final map = body.cast<String, dynamic>();
+      final candidates = [
+        map['data'],
+        map['items'],
+        map['results'],
+        map['access'],
+        map['accesses'],
+      ];
+      for (final candidate in candidates) {
+        if (candidate is List) {
+          return candidate
+              .whereType<Map>()
+              .map((e) => e.cast<String, dynamic>())
+              .toList();
+        }
+      }
+    }
+    return const [];
+  }
+
+  static Future<Map<String, dynamic>> createAccess({
+    required String principalType,
+    required String principalId,
+    required List<Map<String, String>> scopes,
+  }) async {
+    final normalizedScopes = scopes
+        .map((scope) => {
+              if ((scope['organizationId'] ?? '').trim().isNotEmpty)
+                'organizationId': scope['organizationId']!.trim(),
+              if ((scope['siteId'] ?? '').trim().isNotEmpty)
+                'siteId': scope['siteId']!.trim(),
+              if ((scope['zoneId'] ?? '').trim().isNotEmpty)
+                'zoneId': scope['zoneId']!.trim(),
+            })
+        .where((scope) => scope.isNotEmpty)
+        .toList();
+    final response = await ApiClient.post(
+      '/api/v1/access',
+      data: {
+        'principalType': principalType,
+        'principalId': principalId,
+        'scopes': normalizedScopes,
+      },
+    );
+    return _asMap(response.body);
+  }
+
+  static Future<Map<String, dynamic>> updateAccess({
+    required String accessId,
+    required String principalType,
+    required String principalId,
+    String? organizationId,
+    String? siteId,
+    String? zoneId,
+  }) async {
+    final response = await ApiClient.put(
+      '/api/v1/access/$accessId',
+      data: {
+        'principalType': principalType,
+        'principalId': principalId,
+        if ((organizationId ?? '').trim().isNotEmpty)
+          'organizationId': organizationId!.trim(),
+        if ((siteId ?? '').trim().isNotEmpty) 'siteId': siteId!.trim(),
+        if ((zoneId ?? '').trim().isNotEmpty) 'zoneId': zoneId!.trim(),
       },
     );
     return _asMap(response.body);
@@ -174,21 +257,9 @@ class UsersApi {
     String? siteId,
     String? zoneId,
   }) async {
-    final normalizedSiteId = (siteId ?? '').trim();
-    final normalizedZoneId = (zoneId ?? '').trim();
-    if (normalizedSiteId.isEmpty == normalizedZoneId.isEmpty) {
-      throw ArgumentError('Provide exactly one of siteId or zoneId');
-    }
-    final response = await ApiClient.post(
-      '/api/v1/super-admins/access/revoke',
-      data: {
-        'principalType': principalType,
-        'principalId': principalId,
-        if (normalizedSiteId.isNotEmpty) 'siteId': normalizedSiteId,
-        if (normalizedZoneId.isNotEmpty) 'zoneId': normalizedZoneId,
-      },
-    );
-    return _asMap(response.body);
+    // Revoke endpoint is not available in the current access API contract.
+    // Keep signature for backward compatibility with callers.
+    return const {};
   }
 
   static Map<String, dynamic> _asMap(dynamic body) {

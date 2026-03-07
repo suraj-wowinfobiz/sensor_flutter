@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider;
 import 'dart:convert';
 
-import '../../super_admin/api/device_api.dart';
+import '../api/device_api.dart';
 import '../models/device.dart';
 import '../providers/engineer_database_provider.dart';
 import '../providers/engineer_riverpod_provider.dart';
@@ -70,8 +70,16 @@ class _EngineerDevicesScreenState extends ConsumerState<EngineerDevicesScreen> {
   Future<void> _showDeviceModal({Device? device}) async {
     final db =
         provider.Provider.of<EngineerDatabaseProvider>(context, listen: false);
-    await db.loadOrganizations();
-    await db.loadSites();
+    final loadTasks = <Future<void>>[];
+    if (db.organizations.isEmpty) {
+      loadTasks.add(db.loadOrganizations());
+    }
+    if (db.sites.isEmpty) {
+      loadTasks.add(db.loadSites());
+    }
+    if (loadTasks.isNotEmpty) {
+      await Future.wait(loadTasks);
+    }
     if (!mounted) return;
 
     final isLight = Theme.of(context).brightness == Brightness.light;
@@ -124,6 +132,7 @@ class _EngineerDevicesScreenState extends ConsumerState<EngineerDevicesScreen> {
                 .firstOrNull ??
             defaultOrganizationId;
       }
+
       if (siteId.isNotEmpty &&
           db.zones.where((z) => z.siteId == siteId).isEmpty) {
         await db.loadZones(siteId);
@@ -133,6 +142,19 @@ class _EngineerDevicesScreenState extends ConsumerState<EngineerDevicesScreen> {
       }
     } else {
       lastHeartBeatCtrl.text = _isoUtcNow();
+      organizationId = defaultOrganizationId;
+      final defaultSite =
+          db.sites.where((s) => s.organizationId == organizationId).firstOrNull;
+      siteId = defaultSite?.id ?? '';
+      if (siteId.isNotEmpty &&
+          db.zones.where((z) => z.siteId == siteId).isEmpty) {
+        await db.loadZones(siteId);
+      }
+      zoneId = db.zones
+              .where((z) => z.siteId == siteId)
+              .map((z) => z.id)
+              .firstOrNull ??
+          '';
     }
     if (!mounted) return;
 
@@ -394,11 +416,6 @@ class _EngineerDevicesScreenState extends ConsumerState<EngineerDevicesScreen> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () async {
-                                final backend = provider.Provider.of<
-                                    EngineerDatabaseProvider>(
-                                  context,
-                                  listen: false,
-                                );
                                 const status = 'active';
                                 if (organizationId.isEmpty ||
                                     siteId.isEmpty ||
@@ -467,7 +484,7 @@ class _EngineerDevicesScreenState extends ConsumerState<EngineerDevicesScreen> {
                                 }
                                 try {
                                   if (editingId.isEmpty) {
-                                    await backend.create('devices', {
+                                    await db.create('devices', {
                                       'serial_number':
                                           serialNumberCtrl.text.trim(),
                                       'firmware_version':
@@ -488,7 +505,7 @@ class _EngineerDevicesScreenState extends ConsumerState<EngineerDevicesScreen> {
                                       'status': status,
                                     });
                                   } else {
-                                    await backend.update(
+                                    await db.update(
                                       'devices',
                                       editingId,
                                       {

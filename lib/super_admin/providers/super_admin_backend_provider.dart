@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../api/device_api.dart';
 import '../api/organization_api.dart' as org_api;
 import '../api/sensor_api.dart';
+import '../api/sensor_parameter_api.dart';
 import '../api/sensor_type_api.dart';
 import '../api/thresholds_api.dart';
 import '../api/users_api.dart';
@@ -45,44 +46,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
   Future<void>? _loadDevicesTask;
   Future<void>? _loadSensorsTask;
   int _thresholdRuleSeed = 4;
-  final List<ThresholdRule> _thresholdRules = [
-    const ThresholdRule(
-      id: 'warning',
-      label: 'Warning',
-      value: 2.8,
-      sound: 'Soft Chime',
-      color: Color(0xFFD39A00),
-      graphTargets: {
-        ThresholdGraphTarget.analyticsMain,
-        ThresholdGraphTarget.dashboardRealtime,
-        ThresholdGraphTarget.dashboardThresholdMonitoring,
-      },
-    ),
-    const ThresholdRule(
-      id: 'critical',
-      label: 'Critical',
-      value: 4.0,
-      sound: 'Siren',
-      color: Color(0xFFE54C4C),
-      graphTargets: {
-        ThresholdGraphTarget.analyticsMain,
-        ThresholdGraphTarget.dashboardRealtime,
-        ThresholdGraphTarget.dashboardThresholdMonitoring,
-      },
-    ),
-    const ThresholdRule(
-      id: 'emergency',
-      label: 'Emergency',
-      value: 5.2,
-      sound: 'Emergency Bell',
-      color: Color(0xFF7A4FD6),
-      graphTargets: {
-        ThresholdGraphTarget.analyticsMain,
-        ThresholdGraphTarget.dashboardRealtime,
-        ThresholdGraphTarget.dashboardThresholdMonitoring,
-      },
-    ),
-  ];
+  final List<ThresholdRule> _thresholdRules = [];
 
   SuperAdminBackendProvider() {
     _initializeData();
@@ -469,6 +433,25 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loadSensorParameters() async {
+    try {
+      final body = await SensorParameterApi.getAllSensorParameters();
+      final loaded = body
+          .map((json) => SensorParameter.fromJson(json))
+          .where((item) => item.id.trim().isNotEmpty)
+          .toList();
+      final deduped = <String, SensorParameter>{};
+      for (final item in loaded) {
+        deduped[item.id] = item;
+      }
+      sensorParameters = deduped.values.toList();
+    } catch (e) {
+      print('Error loading sensor parameters: $e');
+      sensorParameters = [];
+    }
+    notifyListeners();
+  }
+
   Future<void> loadThresholdProfiles() async {
     try {
       final body = await ThresholdsApi.getProfiles().timeout(
@@ -586,10 +569,14 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         break;
       case 'sensors':
         final sensorId = _asString(data['sensor_id'] ?? data['sensorId']);
+        final sensorParameterId =
+            _asString(data['sensor_parameter_id'] ?? data['sensorParameterId']);
         await SensorApi.createSensor(
           sensorId: sensorId.isEmpty ? null : sensorId,
           deviceId: data['device_id'] as String,
           sensorTypeId: data['sensor_type_id'] as String,
+          sensorParameterId:
+              sensorParameterId.isEmpty ? null : sensorParameterId,
           name: _asString(data['name'] ?? data['serial_number'], 'Sensor'),
           serialNumber: _asString(data['serial_number']),
           macAddress: _asString(data['mac_address']),
@@ -608,6 +595,21 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           description: _asString(data['description']),
         );
         await loadSensorTypes();
+        break;
+      case 'sensor_parameters':
+        final typeId =
+            _asString(data['sensorTypeId'] ?? data['sensor_type_id']);
+        if (typeId.isEmpty) {
+          throw ArgumentError('sensorTypeId is required to create parameter');
+        }
+        await SensorParameterApi.createSensorParameter(
+          sensorTypeId: typeId,
+          name: _asString(data['name'], 'Parameter'),
+          unit: _asString(data['unit']),
+          minValue: _asDouble(data['minValue'] ?? data['min_value']),
+          maxValue: _asDouble(data['maxValue'] ?? data['max_value']),
+        );
+        await loadSensorParameters();
         break;
       case 'thresholds':
         await ThresholdsApi.createProfile(
@@ -764,10 +766,14 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         await loadDevices();
         break;
       case 'sensors':
+        final sensorParameterId =
+            _asString(data['sensor_parameter_id'] ?? data['sensorParameterId']);
         await SensorApi.updateSensor(
           sensorId: id,
           deviceId: data['device_id'] as String,
           sensorTypeId: data['sensor_type_id'] as String,
+          sensorParameterId:
+              sensorParameterId.isEmpty ? null : sensorParameterId,
           name: _asString(data['name'] ?? data['serial_number'], 'Sensor'),
           serialNumber: _asString(data['serial_number']),
           macAddress: _asString(data['mac_address']),
@@ -786,6 +792,23 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           description: data['description'] as String,
         );
         await loadThresholdProfiles();
+        break;
+      case 'sensor_parameters':
+        final typeId =
+            _asString(data['sensorTypeId'] ?? data['sensor_type_id']);
+        if (typeId.isEmpty) {
+          throw ArgumentError('sensorTypeId is required to update parameter');
+        }
+        await SensorParameterApi.updateSensorParameter(
+          sensorTypeId: typeId,
+          sensorParameterId:
+              _asString(data['sensorParameterId'] ?? data['id'], id),
+          name: _asString(data['name'], 'Parameter'),
+          unit: _asString(data['unit']),
+          minValue: _asDouble(data['minValue'] ?? data['min_value']),
+          maxValue: _asDouble(data['maxValue'] ?? data['max_value']),
+        );
+        await loadSensorParameters();
         break;
       case 'users':
         await UsersApi.updateUser(
@@ -831,6 +854,10 @@ class SuperAdminBackendProvider extends ChangeNotifier {
       case 'thresholds':
         await ThresholdsApi.deleteProfile(id);
         await loadThresholdProfiles();
+        break;
+      case 'threshold_values':
+        await ThresholdsApi.deleteThresholdValue(id);
+        await loadThresholdValues();
         break;
       case 'users':
         await UsersApi.deleteUser(id);

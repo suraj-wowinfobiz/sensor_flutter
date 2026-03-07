@@ -49,7 +49,6 @@ class _UserAccountSettingsPanelState extends State<UserAccountSettingsPanel> {
     super.initState();
     _nameController.text = widget.userName;
     _emailController.text = widget.userEmail;
-    _loadProfileForm();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _prepareThresholdsTab();
@@ -276,11 +275,9 @@ class _UserAccountSettingsPanelState extends State<UserAccountSettingsPanel> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Manage profile, preferences, notifications and thresholds',
+              'Manage preferences, notifications and thresholds',
               style: TextStyle(fontSize: 15, color: subColor),
             ),
-            const SizedBox(height: 18),
-            _buildProfileTab(context),
             const SizedBox(height: 16),
             _buildPreferencesTab(context),
             const SizedBox(height: 16),
@@ -293,52 +290,107 @@ class _UserAccountSettingsPanelState extends State<UserAccountSettingsPanel> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildProfileTab(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final titleColor =
+        isLight ? const Color(0xFF1B313D) : const Color(0xFFE2EDF8);
+    final valueColor =
+        isLight ? const Color(0xFF365364) : const Color(0xFFBBD0E0);
+    final resolvedName = _nameController.text.trim().isNotEmpty
+        ? _nameController.text.trim()
+        : widget.userName;
+    final resolvedEmail = _emailController.text.trim().isNotEmpty
+        ? _emailController.text.trim()
+        : widget.userEmail;
+
     return _sectionContainer(
       context,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Profile Information',
-            style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 12),
-          _buildInputGrid(context),
-          const SizedBox(height: 14),
-          const Text(
-            'Change Password',
-            style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () => _showChangePasswordDialog(context),
-              icon: const Icon(Icons.key),
-              label: const Text('Change Password'),
+          Text(
+            'Logged In Account',
+            style: TextStyle(
+              fontSize: 34 * 0.6,
+              fontWeight: FontWeight.w800,
+              color: titleColor,
             ),
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _profileSaving
-                  ? null
-                  : () async {
-                      await _saveProfileForm();
-                    },
-              child: _profileSaving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Update Profile'),
+          Text(
+            'Name: $resolvedName',
+            style: TextStyle(
+                fontSize: 15, fontWeight: FontWeight.w600, color: valueColor),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Login: $resolvedEmail',
+            style: TextStyle(
+                fontSize: 15, fontWeight: FontWeight.w600, color: valueColor),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Role: ${widget.roleLabel}',
+            style: TextStyle(
+                fontSize: 15, fontWeight: FontWeight.w600, color: valueColor),
+          ),
+          Visibility(
+            visible: false,
+            maintainState: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 14),
+                const Text(
+                  'Profile Information',
+                  style: TextStyle(
+                    fontSize: 34 * 0.6,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildInputGrid(context),
+                const SizedBox(height: 14),
+                const Text(
+                  'Change Password',
+                  style: TextStyle(
+                    fontSize: 34 * 0.6,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () => _showChangePasswordDialog(context),
+                    icon: const Icon(Icons.key),
+                    label: const Text('Change Password'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _profileSaving
+                        ? null
+                        : () async {
+                            await _saveProfileForm();
+                          },
+                    child: _profileSaving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Update Profile'),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                _buildProfileLogoutFooter(context),
+              ],
             ),
           ),
-          const SizedBox(height: 18),
-          _buildProfileLogoutFooter(context),
         ],
       ),
     );

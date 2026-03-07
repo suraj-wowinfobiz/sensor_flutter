@@ -32,7 +32,8 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
-      await db.loadSensors();
+      await db.loadSensorTypes();
+      await db.loadSensorParameters();
       await db.loadThresholdProfiles();
       await db.loadThresholdValues();
     });
@@ -105,31 +106,48 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
 
   Future<void> _showThresholdValueModal() async {
     final db = Provider.of<SuperAdminBackendProvider>(context, listen: false);
-    await db.loadSensors();
+    await db.loadSensorTypes();
+    await db.loadSensorParameters();
     await db.loadThresholdProfiles();
     if (!mounted) return;
 
-    final sensorOptions = db.sensors
-        .where((sensor) => sensor.id.trim().isNotEmpty)
-        .map((sensor) => {
-              'value': sensor.id,
-              'label':
-                  sensor.serialNumber.isEmpty ? sensor.id : sensor.serialNumber,
-            })
-        .toList();
-    if (sensorOptions.isEmpty) {
-      sensorOptions.addAll(
-        db.sensorParameters
+    String sensorTypeId = '';
+    List<Map<String, String>> buildParameterOptions(String typeId) {
+      var filtered = db.sensorParameters
+          .where((param) => param.id.trim().isNotEmpty)
+          .toList();
+      if (typeId.trim().isNotEmpty) {
+        filtered = filtered
+            .where((param) => param.sensorTypeId.trim() == typeId.trim())
+            .toList();
+      }
+      if (filtered.isEmpty) {
+        filtered = db.sensorParameters
             .where((param) => param.id.trim().isNotEmpty)
-            .map((param) => {
-                  'value': param.id,
-                  'label': param.name.isEmpty ? param.id : param.name,
-                }),
-      );
+            .toList();
+      }
+      return filtered
+          .map((param) => {
+                'value': param.id,
+                'label': param.name.trim().isEmpty ? 'Parameter' : param.name,
+              })
+          .toList();
     }
 
-    _sensorParameterId =
-        sensorOptions.isNotEmpty ? sensorOptions.first['value']! : '';
+    if (db.sensorTypes.isNotEmpty) {
+      final firstWithParameter = db.sensorTypes
+          .where((type) => db.sensorParameters
+              .any((param) => param.sensorTypeId.trim() == type.id.trim()))
+          .map((type) => type.id)
+          .firstOrNull;
+      sensorTypeId = firstWithParameter ?? db.sensorTypes.first.id;
+    }
+
+    var sensorParameterOptions = buildParameterOptions(sensorTypeId);
+
+    _sensorParameterId = sensorParameterOptions.isNotEmpty
+        ? sensorParameterOptions.first['value']!
+        : '';
     _thresholdProfileId =
         db.thresholdProfiles.isNotEmpty ? db.thresholdProfiles.first.id : '';
     _minThresholdValue = '0';
@@ -152,10 +170,34 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
                 'keyboardType': TextInputType.number,
               },
               {
+                'label': 'sensorTypeId',
+                'type': 'select',
+                'value': sensorTypeId.isEmpty ? null : sensorTypeId,
+                'options': db.sensorTypes
+                    .where((type) => type.id.trim().isNotEmpty)
+                    .map((type) => {
+                          'value': type.id,
+                          'label': type.name.isEmpty ? type.id : type.name,
+                        })
+                    .toList(),
+                'onChanged': (String? value) => setState(() {
+                      sensorTypeId = value ?? '';
+                      sensorParameterOptions =
+                          buildParameterOptions(sensorTypeId);
+                      if (sensorParameterOptions.isEmpty) {
+                        _sensorParameterId = '';
+                      } else if (!sensorParameterOptions
+                          .any((opt) => opt['value'] == _sensorParameterId)) {
+                        _sensorParameterId =
+                            sensorParameterOptions.first['value']!;
+                      }
+                    }),
+              },
+              {
                 'label': 'sensorParameterId',
                 'type': 'select',
                 'value': _sensorParameterId.isEmpty ? null : _sensorParameterId,
-                'options': sensorOptions,
+                'options': sensorParameterOptions,
                 'onChanged': (String? value) => setState(() {
                       _sensorParameterId = value ?? '';
                     }),
@@ -333,6 +375,24 @@ class _ThresholdsScreenState extends State<ThresholdsScreen> {
                               ])
                           .toList(),
                       onAdd: () => _showThresholdValueModal(),
+                      onDelete: (index) async {
+                        try {
+                          await db.delete(
+                            'threshold_values',
+                            db.thresholdValues[index].id,
+                          );
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Failed to delete threshold value: $e',
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      },
                     ),
             ),
           ],
