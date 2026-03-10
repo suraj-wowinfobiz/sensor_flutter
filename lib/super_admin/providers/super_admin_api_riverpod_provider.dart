@@ -5,7 +5,6 @@ import '../api/analytics_api.dart';
 import '../api/audit_logs_api.dart';
 import '../api/dashboard_api.dart';
 import '../api/reports_api.dart';
-import '../api/thresholds_api.dart';
 import '../models/alert.dart';
 
 final superAdminAlertsApiProvider = FutureProvider<List<Alert>>((ref) async {
@@ -35,11 +34,6 @@ final superAdminAnalyticsOverviewApiProvider =
 final superAdminAnalyticsRecentEventsApiProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
   return AnalyticsApi.getRecentEvents();
-});
-
-final superAdminThresholdProfilesApiProvider =
-    FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  return ThresholdsApi.getProfiles();
 });
 
 final superAdminReportsApiProvider =

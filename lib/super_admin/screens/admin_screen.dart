@@ -16,7 +16,6 @@ import 'devices_screen.dart';
 import 'organizations_screen.dart';
 import 'reports_screen.dart';
 import 'sensors_screen.dart';
-import 'thresholds_screen.dart';
 import 'users_screen.dart';
 
 class AdminScreen extends ConsumerStatefulWidget {
@@ -344,8 +343,6 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
         return const AnalyticsScreen();
       case 'reports':
         return const ReportsScreen();
-      case 'thresholds':
-        return const ThresholdsScreen();
       case 'audit':
         return const AuditScreen();
       case 'config':

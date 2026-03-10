@@ -5,11 +5,11 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/analytics_sse_service.dart';
+import '../services/generic_sse_service.dart';
 import '../../super_admin/shared/models/threshold_rule.dart';
 import '../providers/engineer_api_riverpod_provider.dart';
 import '../providers/engineer_riverpod_provider.dart';
-import '../services/analytics_sse_service.dart';
-import '../services/generic_sse_service.dart';
 
 class EngineerDashboardScreen extends ConsumerStatefulWidget {
   final bool embeddedScroll;
@@ -50,7 +50,6 @@ class _EngineerDashboardScreenState
   _AnalyzedDetailSnapshot? _latestAnalyzedSnapshot;
   final List<_ProcessedReadingSnapshot> _processedSnapshots = [];
   final Set<String> _processedSensorIds = <String>{};
-  DateTime? _lastProcessedAt;
   int _rawIndex = 0;
   int _processedIndex = 0;
   int _analyzedIndex = 0;
@@ -158,7 +157,6 @@ class _EngineerDashboardScreenState
         _processedIndex++;
         _processedSnapshots.add(snapshot);
         _processedSensorIds.add(snapshot.sensorId);
-        _lastProcessedAt = snapshot.receivedAt;
         _trimAndReindexProcessedSeries();
         _previousProcessedTilt = snapshot.tilt;
         _previousProcessedTimestampSec = nowSec;
@@ -564,32 +562,317 @@ class _EngineerDashboardScreenState
     return '${minutes}m ago';
   }
 
+  DateTime? _parseDateTime(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String && value.trim().isNotEmpty) {
+      return DateTime.tryParse(value.trim());
+    }
+    return null;
+  }
+
+  String _safeText(dynamic value, {String fallback = '--'}) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? fallback : text;
+  }
+
+  bool _containsKeyword(String source, List<String> keywords) {
+    for (final keyword in keywords) {
+      if (source.contains(keyword)) return true;
+    }
+    return false;
+  }
+
+  bool _isOnlineStatus(String status) {
+    final value = status.trim().toLowerCase();
+    return value == 'active' ||
+        value == 'online' ||
+        value == 'healthy' ||
+        value == 'running';
+  }
+
+  bool _isDeviceFaultStatus(String status) {
+    final value = status.trim().toLowerCase();
+    return _containsKeyword(value, const [
+      'fault',
+      'error',
+      'offline',
+      'inactive',
+      'down',
+      'disconnect',
+      'fail',
+      'unreachable',
+      'unhealthy',
+    ]);
+  }
+
+  String _normalizeAlertLevel(String level) {
+    final value = level.trim().toLowerCase();
+    if (value.contains('emergency')) return 'emergency';
+    if (value.contains('critical')) return 'critical';
+    if (value.contains('high')) return 'high';
+    if (value.contains('warning') || value.contains('warn')) return 'warning';
+    if (value.contains('info')) return 'info';
+    return value.isEmpty ? 'normal' : value;
+  }
+
+  int _alertSeverityRank(String level) {
+    switch (_normalizeAlertLevel(level)) {
+      case 'emergency':
+        return 5;
+      case 'critical':
+        return 4;
+      case 'high':
+        return 3;
+      case 'warning':
+        return 2;
+      case 'info':
+        return 1;
+      default:
+        return 0;
+    }
+  }
+
+  bool _isEscalationLevel(String level) {
+    final normalized = _normalizeAlertLevel(level);
+    return normalized == 'emergency' ||
+        normalized == 'critical' ||
+        normalized == 'high';
+  }
+
+  String _statusLabel(String value) {
+    switch (_normalizeAlertLevel(value)) {
+      case 'emergency':
+        return 'Emergency';
+      case 'critical':
+        return 'Critical';
+      case 'high':
+        return 'High';
+      case 'warning':
+        return 'Warning';
+      case 'info':
+        return 'Info';
+      default:
+        return 'Normal';
+    }
+  }
+
+  bool _isDeviceFaultAlert(dynamic alert) {
+    final message = _safeText(alert.message, fallback: '').toLowerCase();
+    final parameter =
+        _safeText(alert.sensorParameterId, fallback: '').toLowerCase();
+    return _containsKeyword(message, const [
+          'device',
+          'gateway',
+          'offline',
+          'disconnect',
+          'heartbeat',
+          'power',
+          'connectivity',
+          'communication',
+          'network',
+        ]) ||
+        _containsKeyword(parameter, const [
+          'device',
+          'gateway',
+          'heartbeat',
+          'power',
+          'connect',
+          'network',
+        ]);
+  }
+
+  bool _isSensorFaultAlert(dynamic alert) {
+    final message = _safeText(alert.message, fallback: '').toLowerCase();
+    final parameter =
+        _safeText(alert.sensorParameterId, fallback: '').toLowerCase();
+    return _containsKeyword(message, const [
+          'sensor',
+          'tilt',
+          'vibration',
+          'calibration',
+          'drift',
+          'threshold',
+          'noise',
+          'stuck',
+          'signal',
+          'reading',
+          'axis',
+        ]) ||
+        _containsKeyword(parameter, const [
+          'sensor',
+          'tilt',
+          'vibration',
+          'temperature',
+          'reading',
+          'axis',
+          'magnitude',
+        ]);
+  }
+
+  List<dynamic> _activeAlerts(dynamic db) {
+    final value = db.getActiveAlerts();
+    return value is List ? value : const <dynamic>[];
+  }
+
+  int _installedDevicesCount(dynamic db) {
+    final devices = db.devices;
+    return devices is List ? devices.length : 0;
+  }
+
+  int _installedDevicesInDays(dynamic db, {int days = 30}) {
+    final threshold = DateTime.now().subtract(Duration(days: days));
+    final devices = db.devices;
+    if (devices is! List) return 0;
+    return devices.where((device) {
+      final installedAt = _parseDateTime(device.installedAt);
+      return installedAt != null && installedAt.isAfter(threshold);
+    }).length;
+  }
+
+  int _installedSensorsInDays(dynamic db, {int days = 30}) {
+    final threshold = DateTime.now().subtract(Duration(days: days));
+    final sensors = db.sensors;
+    if (sensors is! List) return 0;
+    return sensors.where((sensor) {
+      final installedAt = _parseDateTime(sensor.installedAt);
+      return installedAt != null && installedAt.isAfter(threshold);
+    }).length;
+  }
+
+  int _onlineDeviceCount(dynamic db) {
+    final devices = db.devices;
+    if (devices is! List) return 0;
+    final now = DateTime.now();
+    var count = 0;
+    for (final device in devices) {
+      final status = _safeText(device.status, fallback: '').toLowerCase();
+      if (_isOnlineStatus(status)) {
+        count++;
+        continue;
+      }
+      final heartbeat = _parseDateTime(device.lastHeartBeat);
+      if (heartbeat != null &&
+          now.difference(heartbeat.toLocal()).inMinutes <= 15) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  int _sensorFaultCount(dynamic db) {
+    final alerts = _activeAlerts(db);
+    final faultySensors = <String>{};
+    for (final alert in alerts) {
+      if (!_isSensorFaultAlert(alert)) continue;
+      final sensorId = _safeText(alert.sensorId, fallback: '').trim();
+      if (sensorId.isNotEmpty) faultySensors.add(sensorId);
+    }
+
+    if (faultySensors.isEmpty && _processedSnapshots.isNotEmpty) {
+      final thresholds = _dashboardThresholds(db);
+      final criticalCutoff = thresholds.$2;
+      for (final snapshot in _processedSnapshots.reversed.take(40)) {
+        if (snapshot.tilt.abs() >= criticalCutoff) {
+          faultySensors.add(snapshot.sensorId);
+        }
+      }
+    }
+
+    return faultySensors.length;
+  }
+
+  int _deviceFaultCount(dynamic db) {
+    final sensors = db.sensors is List ? db.sensors as List : const <dynamic>[];
+    final devices = db.devices is List ? db.devices as List : const <dynamic>[];
+
+    final sensorToDevice = <String, String>{};
+    for (final sensor in sensors) {
+      final sensorId = _safeText(sensor.id, fallback: '').trim();
+      final deviceId = _safeText(sensor.deviceId, fallback: '').trim();
+      if (sensorId.isNotEmpty && deviceId.isNotEmpty) {
+        sensorToDevice[sensorId] = deviceId;
+      }
+    }
+
+    final faultyDevices = <String>{};
+    for (final device in devices) {
+      final status = _safeText(device.status, fallback: '');
+      if (_isDeviceFaultStatus(status)) {
+        final deviceId = _safeText(device.id, fallback: '').trim();
+        if (deviceId.isNotEmpty) faultyDevices.add(deviceId);
+      }
+    }
+
+    var unmappedFaultAlerts = 0;
+    for (final alert in _activeAlerts(db)) {
+      if (!_isDeviceFaultAlert(alert)) continue;
+      final sensorId = _safeText(alert.sensorId, fallback: '').trim();
+      final deviceId = sensorToDevice[sensorId];
+      if (deviceId != null && deviceId.isNotEmpty) {
+        faultyDevices.add(deviceId);
+      } else {
+        unmappedFaultAlerts++;
+      }
+    }
+
+    return faultyDevices.length + unmappedFaultAlerts;
+  }
+
+  int _escalationCount(dynamic db) {
+    final alerts = _activeAlerts(db);
+    var count = 0;
+    for (final alert in alerts) {
+      if (_isEscalationLevel(_safeText(alert.alertLevel, fallback: ''))) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  Map<String, String> _sensorHighestAlertLevel(dynamic db) {
+    final highestLevel = <String, String>{};
+    final highestRank = <String, int>{};
+
+    for (final alert in _activeAlerts(db)) {
+      final sensorId = _safeText(alert.sensorId, fallback: '').trim();
+      if (sensorId.isEmpty) continue;
+      final level = _normalizeAlertLevel(_safeText(alert.alertLevel));
+      final rank = _alertSeverityRank(level);
+      if (rank >= (highestRank[sensorId] ?? -1)) {
+        highestRank[sensorId] = rank;
+        highestLevel[sensorId] = level;
+      }
+    }
+    return highestLevel;
+  }
+
+  String _durationLabel(Duration duration) {
+    if (duration.inMinutes < 1) return '<1m';
+    if (duration.inHours < 1) return '${duration.inMinutes}m';
+    if (duration.inDays < 1) {
+      final minutes = duration.inMinutes % 60;
+      return minutes == 0
+          ? '${duration.inHours}h'
+          : '${duration.inHours}h ${minutes}m';
+    }
+    final days = duration.inDays;
+    final hours = duration.inHours % 24;
+    return hours == 0 ? '${days}d' : '${days}d ${hours}h';
+  }
+
   @override
   Widget build(BuildContext context) {
     final db = ref.watch(engineerDatabaseChangeNotifierProvider);
     final statsApi = ref.watch(engineerDashboardStatsApiProvider).valueOrNull;
     final activeAlerts = (statsApi?['activeAlerts'] as num?)?.toInt() ??
-        db.getActiveAlerts().length;
-    final avgTilt = (statsApi?['averageTilt'] as num?)?.toDouble() ??
-        (db.sensors.isEmpty
-            ? 0.0
-            : db.sensors
-                    .map((s) => s.lastReading.abs())
-                    .reduce((a, b) => a + b) /
-                db.sensors.length);
-    final maxTilt = (statsApi?['maxTilt'] as num?)?.toDouble() ??
-        (db.sensors.isEmpty
-            ? 0.0
-            : db.sensors
-                .map((s) => s.lastReading.abs())
-                .reduce((a, b) => max(a, b)));
+        _activeAlerts(db).length;
 
     final content = Padding(
       padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildTopStats(context, avgTilt, maxTilt, activeAlerts),
+          _buildTopStats(context, db, activeAlerts),
           const SizedBox(height: 18),
           _buildLiveSeriesCard(
             context,
@@ -621,6 +904,8 @@ class _EngineerDashboardScreenState
           _buildAnalyzedRow(context),
           const SizedBox(height: 18),
           _buildAnalyticsGrid(context, db),
+          const SizedBox(height: 18),
+          _buildDeepAnalysisCard(context, db),
           const SizedBox(height: 18),
           _buildScatterCard(context),
           const SizedBox(height: 18),
@@ -792,55 +1077,48 @@ class _EngineerDashboardScreenState
 
   Widget _buildTopStats(
     BuildContext context,
-    double avgTilt,
-    double maxTilt,
+    dynamic db,
     int activeAlerts,
   ) {
-    final liveAvgTilt = _processedZData.isEmpty
-        ? avgTilt
-        : _processedZData.map((e) => e.y.abs()).reduce((a, b) => a + b) /
-            _processedZData.length;
-    final liveMaxTilt = _processedZData.isEmpty
-        ? maxTilt
-        : _processedZData.map((e) => e.y.abs()).reduce(max);
-    final motionRate = _processedMotionData.isEmpty
-        ? 0.0
-        : _processedMotionData.map((e) => e.y).reduce((a, b) => a + b) /
-            _processedMotionData.length;
-    final systemHealth =
-        (100 - (activeAlerts * 2) - (motionRate * 18)).clamp(0, 100).toDouble();
+    final totalDevices = _installedDevicesCount(db);
+    final recentInstalls = _installedDevicesInDays(db, days: 30);
+    final deviceFaults = _deviceFaultCount(db);
+    final sensorFaults = _sensorFaultCount(db);
+    final escalations = _escalationCount(db);
 
     final cards = [
       _MetricData(
-        title: 'AVG TILT ANGLE',
-        value: '${liveAvgTilt.toStringAsFixed(2)}°',
-        subtitle: _processedZData.isEmpty ? 'Baseline' : 'Processed live',
-        icon: Icons.trending_up,
+        title: 'INSTALLED DEVICES',
+        value: totalDevices.toString(),
+        subtitle: '$recentInstalls installed in last 30 days',
+        icon: Icons.precision_manufacturing_outlined,
         tint: const Color(0xFF5973d8),
-        isHighlight: false,
       ),
       _MetricData(
-        title: 'MAX TILT ANGLE',
-        value: '${liveMaxTilt.toStringAsFixed(2)}°',
-        subtitle: _processedZData.isEmpty ? 'Fallback' : 'Live window',
-        icon: Icons.warning_amber_rounded,
+        title: 'DEVICE FAULTS',
+        value: deviceFaults.toString(),
+        subtitle: deviceFaults == 0
+            ? 'No open device failures'
+            : 'Open connectivity/power faults',
+        icon: Icons.router_outlined,
         tint: const Color(0xFFd29a00),
       ),
       _MetricData(
-        title: 'SYSTEM HEALTH',
-        value: '${systemHealth.toStringAsFixed(0)}%',
-        subtitle: _processedMotionData.isEmpty
-            ? 'Operational'
-            : 'Alerts + motion aware',
-        icon: Icons.check_circle_outline,
+        title: 'SENSOR FAULTS',
+        value: sensorFaults.toString(),
+        subtitle: sensorFaults == 0
+            ? 'No active sensor faults'
+            : 'Sensors requiring field inspection',
+        icon: Icons.sensors_outlined,
         tint: const Color(0xFF0ea65b),
       ),
       _MetricData(
-        title: 'LAST UPDATE',
-        value: _processedZData.isEmpty ? 'Idle' : 'SSE',
-        subtitle: _agoLabel(_lastProcessedAt),
-        icon: Icons.notifications_none,
-        tint: const Color(0xFF5973d8),
+        title: 'ESCALATIONS',
+        value: escalations.toString(),
+        subtitle: '$activeAlerts active alerts in queue',
+        icon: Icons.report_problem_outlined,
+        tint: const Color(0xFFE54C4C),
+        isHighlight: escalations > 0,
       ),
     ];
 
@@ -1533,22 +1811,23 @@ class _EngineerDashboardScreenState
   }
 
   Widget _statusDistributionCard(BuildContext context, dynamic db) {
-    final thresholds = _dashboardThresholds(db);
-    int normal = 0;
-    int warning = 0;
-    int critical = 0;
-    for (final spot in _processedZData) {
-      final level = _levelForTilt(spot.y.abs(), thresholds);
-      if (level == 'critical') {
-        critical++;
-      } else if (level == 'warning') {
-        warning++;
+    final alerts = _activeAlerts(db);
+    var sensorFaults = 0;
+    var deviceFaults = 0;
+    var otherFaults = 0;
+
+    for (final alert in alerts) {
+      if (_isDeviceFaultAlert(alert)) {
+        deviceFaults++;
+      } else if (_isSensorFaultAlert(alert)) {
+        sensorFaults++;
       } else {
-        normal++;
+        otherFaults++;
       }
     }
-    if (_processedZData.isEmpty) {
-      normal = 1;
+
+    if (alerts.isEmpty) {
+      otherFaults = 1;
     }
 
     return _DashboardPanel(
@@ -1556,7 +1835,10 @@ class _EngineerDashboardScreenState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _panelTitle(
-              context, 'Sensor Status Distribution', Icons.memory_outlined),
+            context,
+            'Open Fault Distribution',
+            Icons.memory_outlined,
+          ),
           const SizedBox(height: 8),
           SizedBox(
             height: 280,
@@ -1566,20 +1848,20 @@ class _EngineerDashboardScreenState
                 centerSpaceRadius: 60,
                 sections: [
                   PieChartSectionData(
-                    value: normal.toDouble(),
-                    color: const Color(0xFF0ca15f),
-                    title: '',
-                    radius: 60,
-                  ),
-                  PieChartSectionData(
-                    value: warning.toDouble(),
+                    value: sensorFaults.toDouble(),
                     color: const Color(0xFFd39a00),
                     title: '',
                     radius: 60,
                   ),
                   PieChartSectionData(
-                    value: critical.toDouble(),
+                    value: deviceFaults.toDouble(),
                     color: const Color(0xFFea3e43),
+                    title: '',
+                    radius: 60,
+                  ),
+                  PieChartSectionData(
+                    value: otherFaults.toDouble(),
+                    color: const Color(0xFF0ca15f),
                     title: '',
                     radius: 60,
                   ),
@@ -1592,9 +1874,9 @@ class _EngineerDashboardScreenState
             spacing: 20,
             runSpacing: 6,
             children: [
-              _LegendItem(color: Color(0xFF0ca15f), label: 'Normal'),
-              _LegendItem(color: Color(0xFFd39a00), label: 'Warning'),
-              _LegendItem(color: Color(0xFFea3e43), label: 'Critical'),
+              _LegendItem(color: Color(0xFFd39a00), label: 'Sensor faults'),
+              _LegendItem(color: Color(0xFFea3e43), label: 'Device faults'),
+              _LegendItem(color: Color(0xFF0ca15f), label: 'Other alerts'),
             ],
           ),
         ],
@@ -1699,122 +1981,139 @@ class _EngineerDashboardScreenState
   }
 
   Widget _thresholdMonitoringCard(BuildContext context, dynamic db) {
-    final thresholds = _dashboardThresholds(db);
-    final warningCutoff = thresholds.$1;
-    final criticalCutoff = thresholds.$2;
-    final bars = _processedZData.length > 7
-        ? _processedZData.sublist(_processedZData.length - 7)
-        : _processedZData;
-    final barSnapshots = _processedSnapshots.length > bars.length
-        ? _processedSnapshots.sublist(_processedSnapshots.length - bars.length)
-        : List<_ProcessedReadingSnapshot>.from(_processedSnapshots);
-    final maxBar = bars.isEmpty
-        ? 5.0
-        : max(5.0, bars.map((e) => e.y.abs()).reduce(max) + 0.5);
+    final sensorAlertCounts = <String, int>{};
+    for (final alert in _activeAlerts(db)) {
+      final sensorId = _safeText(alert.sensorId, fallback: '').trim();
+      if (sensorId.isEmpty) continue;
+      sensorAlertCounts[sensorId] = (sensorAlertCounts[sensorId] ?? 0) + 1;
+    }
+
+    final bars = sensorAlertCounts.entries.toList()
+      ..sort((a, b) {
+        final byCount = b.value.compareTo(a.value);
+        if (byCount != 0) return byCount;
+        return a.key.compareTo(b.key);
+      });
+    final topBars = bars.take(7).toList(growable: false);
+    final maxBar = topBars.isEmpty
+        ? 3.0
+        : max(
+            3.0,
+            topBars.map((entry) => entry.value).reduce(max).toDouble() + 1,
+          );
 
     return _DashboardPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _panelTitle(
-              context, 'Threshold Monitoring', Icons.warning_amber_rounded),
+            context,
+            'Escalation Queue By Sensor',
+            Icons.warning_amber_rounded,
+          ),
           const SizedBox(height: 8),
           SizedBox(
             height: 280,
-            child: BarChart(
-              BarChartData(
-                minY: 0,
-                maxY: maxBar,
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  horizontalInterval: (maxBar / 5).clamp(0.5, 20.0),
-                  getDrawingHorizontalLine: (_) =>
-                      const FlLine(color: Color(0xFFd2dbe0)),
-                ),
-                borderData: FlBorderData(
-                  show: true,
-                  border: Border(
-                    left: BorderSide(color: Colors.blueGrey.shade200),
-                    bottom: BorderSide(color: Colors.blueGrey.shade200),
-                    top: BorderSide.none,
-                    right: BorderSide.none,
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  leftTitles: const AxisTitles(
-                    axisNameWidget: Text(
-                      'Tilt (°)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1E2930),
-                      ),
+            child: topBars.isEmpty
+                ? Center(
+                    child: Text(
+                      'No escalations pending in active alerts.',
+                      style: TextStyle(color: _mutedTextColor(context)),
                     ),
-                    sideTitles: SideTitles(showTitles: true, reservedSize: 34),
-                  ),
-                  bottomTitles: AxisTitles(
-                    axisNameWidget: const Text(
-                      'Recent samples',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1E2930),
+                  )
+                : BarChart(
+                    BarChartData(
+                      minY: 0,
+                      maxY: maxBar,
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: (maxBar / 5).clamp(1.0, 20.0),
+                        getDrawingHorizontalLine: (_) =>
+                            const FlLine(color: Color(0xFFd2dbe0)),
                       ),
-                    ),
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) => Transform.rotate(
-                        angle: -0.7,
-                        child: Text(
-                          () {
-                            final i = value.toInt();
-                            if (i < 0 || i >= barSnapshots.length) return '--';
-                            final sensor = barSnapshots[i].sensorId;
-                            return sensor.length > 6
-                                ? sensor.substring(sensor.length - 6)
-                                : sensor;
-                          }(),
-                          style: TextStyle(
-                              fontSize: 10, color: _mutedTextColor(context)),
+                      borderData: FlBorderData(
+                        show: true,
+                        border: Border(
+                          left: BorderSide(color: Colors.blueGrey.shade200),
+                          bottom: BorderSide(color: Colors.blueGrey.shade200),
+                          top: BorderSide.none,
+                          right: BorderSide.none,
                         ),
                       ),
+                      titlesData: FlTitlesData(
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        leftTitles: const AxisTitles(
+                          axisNameWidget: Text(
+                            'Open alerts',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1E2930),
+                            ),
+                          ),
+                          sideTitles:
+                              SideTitles(showTitles: true, reservedSize: 34),
+                        ),
+                        bottomTitles: AxisTitles(
+                          axisNameWidget: const Text(
+                            'Sensors',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1E2930),
+                            ),
+                          ),
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (value, meta) => Transform.rotate(
+                              angle: -0.7,
+                              child: Text(
+                                () {
+                                  final i = value.toInt();
+                                  if (i < 0 || i >= topBars.length) {
+                                    return '--';
+                                  }
+                                  final sensorId = topBars[i].key;
+                                  return sensorId.length > 6
+                                      ? sensorId.substring(sensorId.length - 6)
+                                      : sensorId;
+                                }(),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: _mutedTextColor(context),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      barGroups: List.generate(topBars.length, (i) {
+                        final value = topBars[i].value;
+                        final color = value >= 3
+                            ? const Color(0xFFea3e43)
+                            : value >= 2
+                                ? const Color(0xFFd39a00)
+                                : const Color(0xFF0ca15f);
+                        return BarChartGroupData(
+                          x: i,
+                          barRods: [
+                            BarChartRodData(
+                              toY: value.toDouble(),
+                              width: 26,
+                              color: color,
+                              borderRadius: BorderRadius.circular(0),
+                            ),
+                          ],
+                        );
+                      }),
                     ),
                   ),
-                ),
-                extraLinesData: ExtraLinesData(
-                  horizontalLines: _thresholdLinesForGraph(
-                    context,
-                    ThresholdGraphTarget.dashboardThresholdMonitoring,
-                  ),
-                ),
-                barGroups: List.generate(bars.length, (i) {
-                  final value = bars[i].y.abs();
-                  final color = value >= criticalCutoff
-                      ? const Color(0xFFea3e43)
-                      : value >= warningCutoff
-                          ? const Color(0xFFd39a00)
-                          : const Color(0xFF0ca15f);
-                  return BarChartGroupData(
-                    x: i,
-                    barRods: [
-                      BarChartRodData(
-                        toY: value,
-                        width: 26,
-                        color: color,
-                        borderRadius: BorderRadius.circular(0),
-                      ),
-                    ],
-                  );
-                }),
-              ),
-            ),
           ),
         ],
       ),
@@ -1938,15 +2237,54 @@ class _EngineerDashboardScreenState
   Widget _buildSensorReadingsCard(BuildContext context) {
     final db = ref.watch(engineerDatabaseChangeNotifierProvider);
     final thresholds = _dashboardThresholds(db);
+    final sensors = List.of(db.sensors);
+    final devices = List.of(db.devices);
+    final sites = List.of(db.sites);
+    final zones = List.of(db.zones);
+
+    final sensorById = <String, dynamic>{};
+    for (final sensor in sensors) {
+      final sensorId = _safeText(sensor.id, fallback: '').trim();
+      if (sensorId.isNotEmpty) sensorById[sensorId] = sensor;
+    }
+
+    final deviceById = <String, dynamic>{};
+    for (final device in devices) {
+      final deviceId = _safeText(device.id, fallback: '').trim();
+      if (deviceId.isNotEmpty) deviceById[deviceId] = device;
+    }
+
+    final siteById = <String, dynamic>{};
+    for (final site in sites) {
+      final siteId = _safeText(site.id, fallback: '').trim();
+      if (siteId.isNotEmpty) siteById[siteId] = site;
+    }
+
+    final zoneById = <String, dynamic>{};
+    for (final zone in zones) {
+      final zoneId = _safeText(zone.id, fallback: '').trim();
+      if (zoneId.isNotEmpty) zoneById[zoneId] = zone;
+    }
+
+    final highestAlertBySensor = _sensorHighestAlertLevel(db);
+
     final rows = _processedSnapshots.reversed.take(8).map((snapshot) {
       final shortId = snapshot.sensorId.length > 12
           ? '${snapshot.sensorId.substring(0, 12)}…'
           : snapshot.sensorId;
-      final status = _levelForTilt(snapshot.tilt.abs(), thresholds);
+      final sensor = sensorById[snapshot.sensorId];
+      final deviceId = _safeText(sensor?.deviceId, fallback: '').trim();
+      final device = deviceById[deviceId];
+      final siteId = _safeText(device?.siteId, fallback: '').trim();
+      final zoneId = _safeText(device?.zoneId, fallback: '').trim();
+      final siteName = _safeText(siteById[siteId]?.name);
+      final zoneName = _safeText(zoneById[zoneId]?.name);
+      final status = highestAlertBySensor[snapshot.sensorId] ??
+          _levelForTilt(snapshot.tilt.abs(), thresholds);
       return [
         shortId,
-        'Processed stream',
-        'Tilting',
+        siteName,
+        zoneName,
         '${snapshot.roll.toStringAsFixed(2)}°',
         '${snapshot.pitch.toStringAsFixed(2)}°',
         '${snapshot.tilt.toStringAsFixed(2)}°',
@@ -1966,7 +2304,7 @@ class _EngineerDashboardScreenState
             children: [
               _panelTitle(
                 context,
-                'Tilt Sensor Readings - Live Data',
+                'Live Sensor Fault Feed',
                 Icons.show_chart_outlined,
               ),
               _chip(context, 'Export', icon: Icons.upload_outlined),
@@ -1992,18 +2330,22 @@ class _EngineerDashboardScreenState
                 columnSpacing: 26,
                 columns: [
                   _tableHeading(context, 'Sensor ID'),
-                  _tableHeading(context, 'Location'),
+                  _tableHeading(context, 'Site'),
                   _tableHeading(context, 'Zone'),
-                  _tableHeading(context, 'X Axis (°)'),
-                  _tableHeading(context, 'Y Axis (°)'),
-                  _tableHeading(context, 'Total Tilt (°)'),
+                  _tableHeading(context, 'Roll (°)'),
+                  _tableHeading(context, 'Pitch (°)'),
+                  _tableHeading(context, 'Tilt (°)'),
                   _tableHeading(context, 'Status'),
                   _tableHeading(context, 'Last Update'),
                 ],
                 rows: rows.map((r) {
-                  final status = r[6];
-                  final isWarning = status == 'warning';
-                  final isCritical = status == 'critical';
+                  final status = _safeText(r[6], fallback: 'normal');
+                  final normalizedStatus = _normalizeAlertLevel(status);
+                  final isCritical = normalizedStatus == 'critical' ||
+                      normalizedStatus == 'emergency';
+                  final isWarning = !isCritical &&
+                      (normalizedStatus == 'high' ||
+                          normalizedStatus == 'warning');
                   return DataRow(cells: [
                     DataCell(Text(r[0])),
                     DataCell(Text(r[1])),
@@ -2030,7 +2372,7 @@ class _EngineerDashboardScreenState
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Text(
-                        status,
+                        _statusLabel(normalizedStatus),
                         style: TextStyle(
                           color: isCritical
                               ? const Color(0xFFb2262e)
@@ -2074,55 +2416,54 @@ class _EngineerDashboardScreenState
   }
 
   Widget _buildBottomLiveStats(BuildContext context, dynamic db) {
-    final now = DateTime.now();
-    final samplesPerMinute = _processedSnapshots
-        .where((s) => now.difference(s.receivedAt).inSeconds <= 60)
-        .length;
-    final throughput = samplesPerMinute / 60.0;
-    final motionRate = _processedMotionData.isEmpty
-        ? 0.0
-        : (_processedMotionData.map((e) => e.y).reduce((a, b) => a + b) /
-                _processedMotionData.length) *
-            100;
-    final lastVibration =
-        _processedVibrationData.isEmpty ? null : _processedVibrationData.last.y;
+    final totalDevices = _installedDevicesCount(db);
+    final onlineDevices = _onlineDeviceCount(db);
+    final liveSensors = _processedSensorIds.length;
+    final deviceFaults = _deviceFaultCount(db);
+    final sensorFaults = _sensorFaultCount(db);
+    final escalations = _escalationCount(db);
+    final recentDeviceInstalls = _installedDevicesInDays(db, days: 30);
+    final recentSensorInstalls = _installedSensorsInDays(db, days: 30);
+    final availability =
+        totalDevices == 0 ? 0.0 : (onlineDevices / totalDevices) * 100;
+    final totalFaults = deviceFaults + sensorFaults;
 
     final cards = [
       _MiniStatData(
-        title: 'ACTIVE SENSORS',
-        value: _processedSensorIds.length.toString(),
+        title: 'ONLINE DEVICES',
+        value: onlineDevices.toString(),
+        unit: '/$totalDevices',
+        detail: '${availability.toStringAsFixed(0)}% fleet availability',
+        badge: onlineDevices > 0 ? 'Live' : 'Idle',
+        icon: Icons.router_outlined,
+        iconColor: const Color(0xFF5f78de),
+      ),
+      _MiniStatData(
+        title: 'LIVE SENSORS',
+        value: liveSensors.toString(),
         unit: 'sensors',
-        detail: 'of ${(db.sensors as List).length} total',
-        badge: _processedSensorIds.isEmpty ? 'Idle' : 'Live',
+        detail: '$recentSensorInstalls installed in last 30 days',
+        badge: liveSensors > 0 ? 'Live' : 'Idle',
         icon: Icons.monitor_heart_outlined,
         iconColor: const Color(0xFF0aa34f),
       ),
       _MiniStatData(
-        title: 'DATA THROUGHPUT',
-        value: throughput.toStringAsFixed(2),
-        unit: 'pts/sec',
-        detail: '$samplesPerMinute samples in 1m',
-        badge: throughput > 0 ? 'Live' : 'Idle',
-        icon: Icons.bolt_outlined,
-        iconColor: const Color(0xFF5f78de),
-      ),
-      _MiniStatData(
-        title: 'MOTION RATE',
-        value: motionRate.toStringAsFixed(0),
-        unit: '%',
-        detail: 'detected in window',
-        badge: motionRate >= 50 ? 'High' : 'Normal',
-        icon: Icons.trending_up,
+        title: 'OPEN FAULTS',
+        value: totalFaults.toString(),
+        unit: 'cases',
+        detail: '$sensorFaults sensor + $deviceFaults device faults',
+        badge: totalFaults > 0 ? 'Action' : 'Stable',
+        icon: Icons.engineering_outlined,
         iconColor: const Color(0xFFd39a00),
       ),
       _MiniStatData(
-        title: 'VIBRATION RMS',
-        value: lastVibration?.toStringAsFixed(2) ?? '--',
-        unit: '',
-        detail: 'latest processed',
-        badge: lastVibration == null ? 'N/A' : 'Live',
-        icon: Icons.network_ping,
-        iconColor: const Color(0xFF2b8ab8),
+        title: 'ESCALATION QUEUE',
+        value: escalations.toString(),
+        unit: 'alerts',
+        detail: '$recentDeviceInstalls device installs in last 30 days',
+        badge: escalations > 0 ? 'Urgent' : 'Normal',
+        icon: Icons.report_problem_outlined,
+        iconColor: const Color(0xFFe54c4c),
       ),
     ];
 
@@ -2825,6 +3166,122 @@ class _EngineerDashboardScreenState
     );
   }
 
+  Widget _buildDeepAnalysisCard(BuildContext context, dynamic db) {
+    final activeAlerts = _activeAlerts(db);
+    final totalDevices = _installedDevicesCount(db);
+    final onlineDevices = _onlineDeviceCount(db);
+    final totalSensors = db.sensors is List ? (db.sensors as List).length : 0;
+    final liveSensors = _processedSensorIds.length;
+    final deviceFaults = _deviceFaultCount(db);
+    final sensorFaults = _sensorFaultCount(db);
+    final escalations = _escalationCount(db);
+    final recentDeviceInstalls = _installedDevicesInDays(db, days: 30);
+    final recentSensorInstalls = _installedSensorsInDays(db, days: 30);
+
+    final openAges = <Duration>[];
+    final now = DateTime.now();
+    for (final alert in activeAlerts) {
+      final triggeredAt = _parseDateTime(alert.triggeredAt);
+      if (triggeredAt == null) continue;
+      final age = now.difference(triggeredAt);
+      openAges.add(age.isNegative ? Duration.zero : age);
+    }
+
+    final averageOpenAge = openAges.isEmpty
+        ? Duration.zero
+        : Duration(
+            minutes: (openAges
+                        .map((age) => age.inMinutes.toDouble())
+                        .reduce((a, b) => a + b) /
+                    openAges.length)
+                .round(),
+          );
+    final oldestOpenAge = openAges.isEmpty
+        ? Duration.zero
+        : openAges.reduce(
+            (a, b) => a.compareTo(b) >= 0 ? a : b,
+          );
+
+    final availabilityPct =
+        totalDevices == 0 ? 0.0 : (onlineDevices / totalDevices) * 100;
+    final liveCoveragePct =
+        totalSensors == 0 ? 0.0 : (liveSensors / totalSensors) * 100;
+    final escalationPressure =
+        activeAlerts.isEmpty ? 0.0 : (escalations / activeAlerts.length) * 100;
+
+    final insights = <String>[
+      'Installation footprint: $totalDevices devices deployed, with $recentDeviceInstalls new installs in the last 30 days.',
+      'Fault backlog: $sensorFaults sensor faults and $deviceFaults device faults are currently open for engineer action.',
+      'Escalation pressure: $escalations escalated alerts (${escalationPressure.toStringAsFixed(0)}% of open alerts).',
+      'Response latency: average open age ${_durationLabel(averageOpenAge)}; oldest unresolved case ${_durationLabel(oldestOpenAge)}.',
+      'Live coverage: $onlineDevices/$totalDevices devices online (${availabilityPct.toStringAsFixed(0)}%) and $liveSensors/$totalSensors sensors reporting (${liveCoveragePct.toStringAsFixed(0)}%).',
+      'Install trend: $recentSensorInstalls sensors were installed in the last 30 days.',
+    ];
+
+    return _DashboardPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _panelTitle(
+            context,
+            'Engineer Operations Analysis',
+            Icons.insights_outlined,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Operational diagnostics focused on install velocity, fault backlog, escalation pressure, and service response.',
+            style: TextStyle(fontSize: 12, color: _mutedTextColor(context)),
+          ),
+          const SizedBox(height: 14),
+          ...List.generate(insights.length, (index) {
+            return Padding(
+              padding: EdgeInsets.only(
+                  bottom: index == insights.length - 1 ? 0 : 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 20,
+                    height: 20,
+                    margin: const EdgeInsets.only(top: 1),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? const Color(0xFFEAF0F4)
+                          : const Color(0xFF23394A),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${index + 1}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _titleColor(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      insights[index],
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.45,
+                        color: _titleColor(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
   Widget _panelTitle(BuildContext context, String text, IconData icon) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -2931,32 +3388,6 @@ class _EngineerDashboardScreenState
     if (value >= thresholds.$2) return 'critical';
     if (value >= thresholds.$1) return 'warning';
     return 'normal';
-  }
-
-  List<HorizontalLine> _thresholdLinesForGraph(
-    BuildContext context,
-    ThresholdGraphTarget target,
-  ) {
-    final db = ref.watch(engineerDatabaseChangeNotifierProvider);
-    final rules = db.thresholdRulesForGraph(target);
-
-    return rules
-        .map(
-          (rule) => HorizontalLine(
-            y: rule.value,
-            color: rule.color,
-            strokeWidth: 1.5,
-            dashArray: [6, 4],
-            label: HorizontalLineLabel(
-              show: true,
-              alignment: Alignment.topRight,
-              style: TextStyle(color: rule.color, fontWeight: FontWeight.w600),
-              labelResolver: (_) =>
-                  '${rule.label}: ${rule.value.toStringAsFixed(1)}°',
-            ),
-          ),
-        )
-        .toList();
   }
 }
 

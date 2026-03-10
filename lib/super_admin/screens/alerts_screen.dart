@@ -5,10 +5,51 @@ import '../api/alerts_api.dart';
 import '../api/sensor_api.dart';
 import '../models/alert.dart';
 import '../providers/super_admin_api_riverpod_provider.dart';
+import '../providers/super_admin_riverpod_provider.dart';
 import '../widgets/crud_modal.dart';
 
-class AlertsScreen extends ConsumerWidget {
+class AlertsScreen extends ConsumerStatefulWidget {
   const AlertsScreen({super.key});
+
+  @override
+  ConsumerState<AlertsScreen> createState() => _AlertsScreenState();
+}
+
+class _AlertsScreenState extends ConsumerState<AlertsScreen> {
+  bool _isPrimingThresholds = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _primeThresholdData();
+    });
+  }
+
+  Future<void> _primeThresholdData() async {
+    if (_isPrimingThresholds || !mounted) return;
+    _isPrimingThresholds = true;
+    final db = ref.read(superAdminBackendChangeNotifierProvider);
+
+    Future<void> safe(Future<void> future) async {
+      try {
+        await future;
+      } catch (_) {
+        // Keep alerts page resilient if one endpoint fails.
+      }
+    }
+
+    try {
+      await Future.wait([
+        safe(db.loadThresholdProfiles()),
+        safe(db.loadThresholdValues()),
+        safe(db.loadSensorTypes()),
+        safe(db.loadSensorParameters()),
+      ]);
+    } finally {
+      _isPrimingThresholds = false;
+    }
+  }
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/'
@@ -62,10 +103,7 @@ class AlertsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _showCreateAlertDialog(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
+  Future<void> _showCreateAlertDialog(BuildContext context) async {
     final sensors = await SensorApi.getAllSensors();
     if (!context.mounted) return;
     final sensorOptions = <Map<String, String>>[];
@@ -180,7 +218,6 @@ class AlertsScreen extends ConsumerWidget {
 
   Future<void> _showEditAlertDialog(
     BuildContext context,
-    WidgetRef ref,
     Alert alert,
   ) async {
     final sensors = await SensorApi.getAllSensors();
@@ -299,7 +336,6 @@ class AlertsScreen extends ConsumerWidget {
 
   Future<void> _deleteAlert(
     BuildContext context,
-    WidgetRef ref,
     Alert alert,
   ) async {
     if (alert.id.trim().isEmpty) return;
@@ -332,9 +368,564 @@ class AlertsScreen extends ConsumerWidget {
     }
   }
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Future<void> _showCreateThresholdProfileDialog(BuildContext context) async {
+    String name = '';
+    String description = '';
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return CrudModal(
+            title: 'Add Threshold Profile',
+            fields: [
+              {
+                'label': 'name',
+                'value': name,
+                'onChanged': (String value) =>
+                    setDialogState(() => name = value),
+                'keyboardType': TextInputType.text,
+              },
+              {
+                'label': 'description',
+                'value': description,
+                'onChanged': (String value) =>
+                    setDialogState(() => description = value),
+                'keyboardType': TextInputType.text,
+              },
+            ],
+            onSave: () async {
+              if (name.trim().isEmpty) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(content: Text('Profile name is required')),
+                );
+                return;
+              }
+              try {
+                final db = ref.read(superAdminBackendChangeNotifierProvider);
+                await db.create('thresholds', {
+                  'name': name.trim(),
+                  'description': description.trim(),
+                });
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              } catch (e) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to create threshold profile: $e'),
+                    ),
+                  );
+                }
+              }
+            },
+            onCancel: () => Navigator.pop(dialogContext),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _showCreateThresholdValueDialog(BuildContext context) async {
+    final db = ref.read(superAdminBackendChangeNotifierProvider);
+    await _primeThresholdData();
+    if (!context.mounted) return;
+
+    if (db.thresholdProfiles.isEmpty || db.sensorParameters.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Add at least one threshold profile and sensor parameter first',
+          ),
+        ),
+      );
+      return;
+    }
+
+    String sensorTypeId = '';
+    String thresholdProfileId = db.thresholdProfiles.first.id;
+    String sensorParameterId = db.sensorParameters.first.id;
+    String minThresholdValue = '0';
+    String maxThresholdValue = '0';
+    String warningLevel = '0';
+    String criticalLevel = '0';
+
+    if (db.sensorTypes.isNotEmpty) {
+      sensorTypeId = db.sensorTypes.first.id;
+    } else if (db.sensorParameters.isNotEmpty) {
+      sensorTypeId = db.sensorParameters.first.sensorTypeId;
+    }
+
+    List<Map<String, String>> parameterOptionsForType(String typeId) {
+      final trimmed = typeId.trim();
+      var filtered = db.sensorParameters
+          .where((parameter) => parameter.id.trim().isNotEmpty)
+          .toList();
+      if (trimmed.isNotEmpty) {
+        filtered = filtered
+            .where((parameter) => parameter.sensorTypeId.trim() == trimmed)
+            .toList();
+      }
+      if (filtered.isEmpty) {
+        filtered = db.sensorParameters
+            .where((parameter) => parameter.id.trim().isNotEmpty)
+            .toList();
+      }
+      return filtered
+          .map(
+            (parameter) => {
+              'value': parameter.id,
+              'label':
+                  parameter.name.trim().isEmpty ? parameter.id : parameter.name,
+            },
+          )
+          .toList();
+    }
+
+    var sensorParameterOptions = parameterOptionsForType(sensorTypeId);
+    if (sensorParameterOptions.isNotEmpty) {
+      sensorParameterId = sensorParameterOptions.first['value']!;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return CrudModal(
+            title: 'Add Threshold Value',
+            fields: [
+              {
+                'label': 'sensorTypeId',
+                'type': 'select',
+                'value': sensorTypeId.isEmpty ? null : sensorTypeId,
+                'options': db.sensorTypes
+                    .where((type) => type.id.trim().isNotEmpty)
+                    .map(
+                      (type) => {
+                        'value': type.id,
+                        'label': type.name.trim().isEmpty ? type.id : type.name,
+                      },
+                    )
+                    .toList(),
+                'onChanged': (String? value) => setDialogState(() {
+                      sensorTypeId = value ?? '';
+                      sensorParameterOptions =
+                          parameterOptionsForType(sensorTypeId);
+                      if (sensorParameterOptions.isEmpty) {
+                        sensorParameterId = '';
+                      } else {
+                        sensorParameterId =
+                            sensorParameterOptions.first['value']!;
+                      }
+                    }),
+              },
+              {
+                'label': 'sensorParameterId',
+                'type': 'select',
+                'value': sensorParameterId.isEmpty ? null : sensorParameterId,
+                'options': sensorParameterOptions,
+                'onChanged': (String? value) => setDialogState(() {
+                      sensorParameterId = value ?? '';
+                    }),
+              },
+              {
+                'label': 'thresholdProfileId',
+                'type': 'select',
+                'value': thresholdProfileId.isEmpty ? null : thresholdProfileId,
+                'options': db.thresholdProfiles
+                    .map(
+                      (profile) => {
+                        'value': profile.id,
+                        'label': profile.description.trim().isEmpty
+                            ? profile.name
+                            : '${profile.name} - ${profile.description}',
+                      },
+                    )
+                    .toList(),
+                'onChanged': (String? value) => setDialogState(() {
+                      thresholdProfileId = value ?? '';
+                    }),
+              },
+              {
+                'label': 'minThresholdValue',
+                'value': minThresholdValue,
+                'onChanged': (String value) =>
+                    setDialogState(() => minThresholdValue = value),
+                'keyboardType': TextInputType.number,
+              },
+              {
+                'label': 'maxThresholdValue',
+                'value': maxThresholdValue,
+                'onChanged': (String value) =>
+                    setDialogState(() => maxThresholdValue = value),
+                'keyboardType': TextInputType.number,
+              },
+              {
+                'label': 'warningLevel',
+                'value': warningLevel,
+                'onChanged': (String value) =>
+                    setDialogState(() => warningLevel = value),
+                'keyboardType': TextInputType.number,
+              },
+              {
+                'label': 'criticalLevel',
+                'value': criticalLevel,
+                'onChanged': (String value) =>
+                    setDialogState(() => criticalLevel = value),
+                'keyboardType': TextInputType.number,
+              },
+            ],
+            onSave: () async {
+              if (thresholdProfileId.trim().isEmpty ||
+                  sensorParameterId.trim().isEmpty) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Threshold profile and sensor parameter are required',
+                    ),
+                  ),
+                );
+                return;
+              }
+
+              final minValue = double.tryParse(minThresholdValue.trim());
+              final maxValue = double.tryParse(maxThresholdValue.trim());
+              final warningValue = double.tryParse(warningLevel.trim());
+              final criticalValue = double.tryParse(criticalLevel.trim());
+
+              if (minValue == null ||
+                  maxValue == null ||
+                  warningValue == null ||
+                  criticalValue == null) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(
+                    content: Text('Threshold values must be valid numbers'),
+                  ),
+                );
+                return;
+              }
+
+              try {
+                await db.create('threshold_values', {
+                  'minThresholdValue': minValue,
+                  'sensorParameterId': sensorParameterId.trim(),
+                  'thresholdProfileId': thresholdProfileId.trim(),
+                  'maxThresholdValue': maxValue,
+                  'warningLevel': warningValue,
+                  'criticalLevel': criticalValue,
+                });
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              } catch (e) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to create threshold value: $e'),
+                    ),
+                  );
+                }
+              }
+            },
+            onCancel: () => Navigator.pop(dialogContext),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _deleteThresholdProfile(
+    BuildContext context,
+    String profileId,
+  ) async {
+    if (profileId.trim().isEmpty) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Threshold Profile'),
+        content: const Text(
+          'Are you sure you want to delete this threshold profile?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !context.mounted) return;
+    try {
+      final db = ref.read(superAdminBackendChangeNotifierProvider);
+      await db.delete('thresholds', profileId);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete threshold profile: $e')),
+      );
+    }
+  }
+
+  Future<void> _deleteThresholdValue(
+    BuildContext context,
+    String thresholdValueId,
+  ) async {
+    if (thresholdValueId.trim().isEmpty) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Threshold Value'),
+        content: const Text(
+          'Are you sure you want to delete this threshold value?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !context.mounted) return;
+    try {
+      final db = ref.read(superAdminBackendChangeNotifierProvider);
+      await db.delete('threshold_values', thresholdValueId);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete threshold value: $e')),
+      );
+    }
+  }
+
+  Widget _buildThresholdManagementSection(BuildContext context, dynamic db) {
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final profileNameById = <String, String>{
+      for (final profile in db.thresholdProfiles) profile.id: profile.name,
+    };
+    final sensorParameterLabelById = <String, String>{
+      for (final parameter in db.sensorParameters)
+        parameter.id:
+            parameter.name.trim().isEmpty ? parameter.id : parameter.name,
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Threshold Management',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: isLight
+                          ? const Color(0xFF132733)
+                          : const Color(0xFFD8E8F5),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${db.thresholdProfiles.length} profiles · ${db.thresholdValues.length} values',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isLight
+                          ? const Color(0xFF60717c)
+                          : const Color(0xFF9FB4C6),
+                    ),
+                  ),
+                ],
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _showCreateThresholdProfileDialog(context),
+                    icon: const Icon(Icons.add_chart_outlined),
+                    label: const Text('Add Profile'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () => _showCreateThresholdValueDialog(context),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Threshold'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Profiles',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color:
+                  isLight ? const Color(0xFF1a303c) : const Color(0xFFD8E8F5),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (db.thresholdProfiles.isEmpty)
+            Text(
+              'No threshold profiles available',
+              style: TextStyle(
+                color:
+                    isLight ? const Color(0xFF60717c) : const Color(0xFF9FB4C6),
+              ),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columns: const [
+                  DataColumn(label: Text('Name')),
+                  DataColumn(label: Text('Description')),
+                  DataColumn(label: Text('Actions')),
+                ],
+                rows: db.thresholdProfiles.map<DataRow>((profile) {
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 220),
+                          child: Text(
+                            profile.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      DataCell(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 340),
+                          child: Text(
+                            profile.description.trim().isEmpty
+                                ? '--'
+                                : profile.description,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      DataCell(
+                        IconButton(
+                          tooltip: 'Delete profile',
+                          onPressed: () =>
+                              _deleteThresholdProfile(context, profile.id),
+                          icon: const Icon(Icons.delete_outline),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          const SizedBox(height: 18),
+          Text(
+            'Threshold Values',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color:
+                  isLight ? const Color(0xFF1a303c) : const Color(0xFFD8E8F5),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (db.thresholdValues.isEmpty)
+            Text(
+              'No threshold values configured',
+              style: TextStyle(
+                color:
+                    isLight ? const Color(0xFF60717c) : const Color(0xFF9FB4C6),
+              ),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columns: const [
+                  DataColumn(label: Text('Profile')),
+                  DataColumn(label: Text('Sensor Parameter')),
+                  DataColumn(label: Text('Min')),
+                  DataColumn(label: Text('Max')),
+                  DataColumn(label: Text('Warning')),
+                  DataColumn(label: Text('Critical')),
+                  DataColumn(label: Text('Actions')),
+                ],
+                rows: db.thresholdValues.map<DataRow>((value) {
+                  final profileName =
+                      profileNameById[value.thresholdProfileId] ??
+                          value.thresholdProfileId;
+                  final parameterName =
+                      sensorParameterLabelById[value.sensorParameterId] ??
+                          value.sensorParameterId;
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 180),
+                          child: Text(
+                            profileName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      DataCell(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 180),
+                          child: Text(
+                            parameterName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      DataCell(Text(value.minThreshold.toStringAsFixed(2))),
+                      DataCell(Text(value.maxThreshold.toStringAsFixed(2))),
+                      DataCell(Text(value.warningLevel.toStringAsFixed(2))),
+                      DataCell(Text(value.criticalLevel.toStringAsFixed(2))),
+                      DataCell(
+                        IconButton(
+                          tooltip: 'Delete value',
+                          onPressed: () =>
+                              _deleteThresholdValue(context, value.id),
+                          icon: const Icon(Icons.delete_outline),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final db = ref.watch(superAdminBackendChangeNotifierProvider);
     final alertsAsync = ref.watch(superAdminAlertsApiProvider);
     final apiAlerts = alertsAsync.maybeWhen(
       data: (value) => value,
@@ -379,7 +970,7 @@ class AlertsScreen extends ConsumerWidget {
           Align(
             alignment: Alignment.centerRight,
             child: FilledButton.icon(
-              onPressed: () => _showCreateAlertDialog(context, ref),
+              onPressed: () => _showCreateAlertDialog(context),
               icon: const Icon(Icons.add_alert),
               label: const Text('Add Alert'),
             ),
@@ -398,9 +989,11 @@ class AlertsScreen extends ConsumerWidget {
               await AlertsApi.resolveAlert(alertId);
               ref.invalidate(superAdminAlertsApiProvider);
             },
-            onEdit: (alert) => _showEditAlertDialog(context, ref, alert),
-            onDelete: (alert) => _deleteAlert(context, ref, alert),
+            onEdit: (alert) => _showEditAlertDialog(context, alert),
+            onDelete: (alert) => _deleteAlert(context, alert),
           ),
+          const SizedBox(height: 16),
+          _buildThresholdManagementSection(context, db),
         ],
       ),
     );
