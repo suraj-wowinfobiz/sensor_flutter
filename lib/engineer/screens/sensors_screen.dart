@@ -609,7 +609,7 @@ class _EngineerSensorsScreenState extends ConsumerState<EngineerSensorsScreen> {
     if (lower.contains('pressure')) return Icons.speed_outlined;
     if (lower.contains('vibration')) return Icons.waves_outlined;
     if (lower.contains('temperature') || lower.contains('thermal')) {
-      return Icons.device_thermostat_outlined;
+      return Icons.sensors;
     }
     if (lower.contains('tilt') || lower.contains('inclinometer')) {
       return Icons.show_chart;
@@ -622,11 +622,32 @@ class _EngineerSensorsScreenState extends ConsumerState<EngineerSensorsScreen> {
     if (lower.contains('humidity')) return '%';
     if (lower.contains('pressure')) return 'Pa';
     if (lower.contains('vibration')) return 'mm/s';
-    if (lower.contains('temperature') || lower.contains('thermal')) return '°C';
-    return '°';
+    if (lower.contains('temperature') || lower.contains('thermal')) return 'C';
+    return '';
   }
 
   int _channelFor(int index) => (index % 4) + 1;
+
+  Future<bool> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirm delete'),
+        content: const Text('Are you sure you want to delete this sensor?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
 
   void _togglePower(String sensorId) {
     setState(() {
@@ -1131,8 +1152,11 @@ class _EngineerSensorsScreenState extends ConsumerState<EngineerSensorsScreen> {
               onEdit: () => _showSensorModal(sensor: sensor),
               onPower: () => _togglePower(sensor.id),
               onDelete: () async {
+                final confirm = await _confirmDelete(context);
+                if (!confirm || !context.mounted) return;
                 try {
                   await db.delete('sensors', sensor.id);
+                  setState(() => _refreshKey++);
                 } catch (e) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1270,8 +1294,11 @@ class _EngineerSensorsScreenState extends ConsumerState<EngineerSensorsScreen> {
                   ),
                   IconButton(
                     onPressed: () async {
+                      final confirm = await _confirmDelete(context);
+                      if (!confirm || !context.mounted) return;
                       try {
                         await db.delete('sensors', sensor.id);
+                        setState(() => _refreshKey++);
                       } catch (e) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(

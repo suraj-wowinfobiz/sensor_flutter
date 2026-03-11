@@ -40,6 +40,43 @@ class _EngineerDevicesScreenState extends ConsumerState<EngineerDevicesScreen> {
     return DateTime.tryParse(trimmed) != null;
   }
 
+  Future<void> _showErrorDialog(BuildContext context, String message) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Something went wrong'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirm delete'),
+        content: const Text('Are you sure you want to delete this device?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
   String _asString(dynamic value, [String fallback = '']) {
     final parsed = value?.toString().trim() ?? '';
     return parsed.isEmpty ? fallback : parsed;
@@ -421,12 +458,9 @@ class _EngineerDevicesScreenState extends ConsumerState<EngineerDevicesScreen> {
                                     siteId.isEmpty ||
                                     zoneId.isEmpty) {
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Select organization, site, and zone',
-                                        ),
-                                      ),
+                                    _showErrorDialog(
+                                      context,
+                                      'Select organization, site, and zone',
                                     );
                                   }
                                   return;
@@ -441,12 +475,9 @@ class _EngineerDevicesScreenState extends ConsumerState<EngineerDevicesScreen> {
                                     longitudeCtrl.text.trim().isEmpty ||
                                     lastHeartBeatCtrl.text.trim().isEmpty) {
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Fill all device fields before saving',
-                                        ),
-                                      ),
+                                    _showErrorDialog(
+                                      context,
+                                      'Fill all device fields before saving',
                                     );
                                   }
                                   return;
@@ -460,24 +491,18 @@ class _EngineerDevicesScreenState extends ConsumerState<EngineerDevicesScreen> {
                                             longitudeCtrl.text.trim()) ==
                                         null) {
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Channels must be integer, latitude/longitude must be valid numbers',
-                                        ),
-                                      ),
+                                    _showErrorDialog(
+                                      context,
+                                      'Channels must be integer, latitude/longitude must be valid numbers',
                                     );
                                   }
                                   return;
                                 }
                                 if (!_isValidIsoUtc(lastHeartBeatCtrl.text)) {
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Last Heartbeat must be ISO UTC format like 2026-02-28T06:15:10.092Z',
-                                        ),
-                                      ),
+                                    _showErrorDialog(
+                                      context,
+                                      'Last Heartbeat must be ISO UTC format like 2026-02-28T06:15:10.092Z',
                                     );
                                   }
                                   return;
@@ -535,11 +560,9 @@ class _EngineerDevicesScreenState extends ConsumerState<EngineerDevicesScreen> {
                                   if (context.mounted) Navigator.pop(context);
                                 } catch (e) {
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content:
-                                            Text('Failed to save device: $e'),
-                                      ),
+                                    _showErrorDialog(
+                                      context,
+                                      'Failed to save device: $e',
                                     );
                                   }
                                 }
@@ -1200,8 +1223,11 @@ class _EngineerDevicesScreenState extends ConsumerState<EngineerDevicesScreen> {
               onEdit: () => _showDeviceModal(device: device),
               onPower: () => _togglePower(db, device),
               onDelete: () async {
+                final confirm = await _confirmDelete(context);
+                if (!confirm || !context.mounted) return;
                 try {
                   await db.delete('devices', device.id);
+                  setState(() => _refreshKey++);
                 } catch (e) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1322,8 +1348,11 @@ class _EngineerDevicesScreenState extends ConsumerState<EngineerDevicesScreen> {
                   ),
                   IconButton(
                     onPressed: () async {
+                      final confirm = await _confirmDelete(context);
+                      if (!confirm || !context.mounted) return;
                       try {
                         await db.delete('devices', device.id);
+                        setState(() => _refreshKey++);
                       } catch (e) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(

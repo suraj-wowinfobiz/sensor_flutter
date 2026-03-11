@@ -558,6 +558,11 @@ class _UserAdminDashboardScreenState
     return '${minutes}m ago';
   }
 
+  String _safeText(dynamic value, {String fallback = '--'}) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? fallback : text;
+  }
+
   @override
   Widget build(BuildContext context) {
     final db = ref.watch(userAdminDatabaseChangeNotifierProvider);
@@ -575,30 +580,25 @@ class _UserAdminDashboardScreenState
       (db.users as List).map((item) => item.createdAt as DateTime),
       days: 30,
     );
-    final criticalSeries = _dailySpotsFromDates(
-      (db.alerts as List).where((item) {
-        if (item.resolvedAt != null) return false;
-        final level = (item.alertLevel as String).trim().toLowerCase();
-        return level.contains('critical') || level.contains('high');
-      }).map((item) => item.triggeredAt as DateTime),
+    final vendorActivitySeries = _dailySpotsFromDates(
+      (db.users as List).where((item) {
+        final role = (item.role as String).trim().toLowerCase();
+        return role.contains('vendor');
+      }).map((item) => item.updatedAt as DateTime),
       days: 30,
     );
-    final warningSeries = _dailySpotsFromDates(
-      (db.alerts as List).where((item) {
-        if (item.resolvedAt != null) return false;
-        final level = (item.alertLevel as String).trim().toLowerCase();
-        return level.contains('warn');
-      }).map((item) => item.triggeredAt as DateTime),
+    final engineerActivitySeries = _dailySpotsFromDates(
+      (db.users as List).where((item) {
+        final role = (item.role as String).trim().toLowerCase();
+        return role.contains('engineer');
+      }).map((item) => item.updatedAt as DateTime),
       days: 30,
     );
-    final infoSeries = _dailySpotsFromDates(
-      (db.alerts as List).where((item) {
-        if (item.resolvedAt != null) return false;
-        final level = (item.alertLevel as String).trim().toLowerCase();
-        return !level.contains('critical') &&
-            !level.contains('high') &&
-            !level.contains('warn');
-      }).map((item) => item.triggeredAt as DateTime),
+    final userActivitySeries = _dailySpotsFromDates(
+      (db.users as List).where((item) {
+        final role = (item.role as String).trim().toLowerCase();
+        return role.contains('user') && !role.contains('admin');
+      }).map((item) => item.updatedAt as DateTime),
       days: 30,
     );
 
@@ -613,28 +613,46 @@ class _UserAdminDashboardScreenState
             activeAlerts: activeAlerts,
             latestUpdateAt: platformUpdateAt,
           ),
-          // const SizedBox(height: 18),
-          // _buildLiveSeriesCard(
-          //   context,
-          //   title: 'Onboarding Trend (30 Days)',
-          //   icon: Icons.hub_outlined,
-          //   xData: orgSeries,
-          //   yData: siteSeries,
-          //   zData: userSeries,
-          //   xLabel: 'Organizations',
-          //   yLabel: 'Sites',
-          //   zLabel: 'Users',
-          //   yAxisLabel: 'Created entities',
-          //   xAxisLabel: 'Day index',
-          // ),
           const SizedBox(height: 18),
-          _buildKinematicsRow(context),
+          _buildLiveSeriesCard(
+            context,
+            title: 'Onboarding Trend (30 Days)',
+            icon: Icons.hub_outlined,
+            xData: orgSeries,
+            yData: siteSeries,
+            zData: userSeries,
+            xLabel: 'Organizations',
+            yLabel: 'Sites',
+            zLabel: 'Users',
+            yAxisLabel: 'Created entities',
+            xAxisLabel: 'Last 30 days',
+            xTickLabels: _dayLabels(30),
+          ),
+          const SizedBox(height: 18),
+          _buildLiveSeriesCard(
+            context,
+            title: 'User Activity Trend',
+            icon: Icons.people_outline,
+            xData: vendorActivitySeries,
+            yData: engineerActivitySeries,
+            zData: userActivitySeries,
+            xLabel: 'Vendors',
+            yLabel: 'Engineers',
+            zLabel: 'Users',
+            yAxisLabel: 'Recent updates per day',
+            xAxisLabel: 'Last 30 days',
+            xTickLabels: _dayLabels(30),
+          ),
+          const SizedBox(height: 18),
+          _buildAnalyticsGrid(context, db),
+          const SizedBox(height: 18),
+          _buildScatterCard(context),
           const SizedBox(height: 18),
           _buildSensorReadingsCard(context),
           const SizedBox(height: 18),
           _buildBottomLiveStats(context, db),
           const SizedBox(height: 18),
-          _buildTiltRangeDistribution(context, db),
+          _buildTopTiltSensorsCard(context, db),
         ],
       ),
     );
@@ -659,16 +677,22 @@ class _UserAdminDashboardScreenState
     String zLabel = 'Z',
     String yAxisLabel = 'Value',
     String xAxisLabel = 'Sample',
+    List<String>? xTickLabels,
   }) {
     final allSpots = [...xData, ...yData, ...zData];
     final hasData = allSpots.isNotEmpty;
     final minY = hasData ? allSpots.map((e) => e.y).reduce(min) - 1 : 0.0;
     final maxY = hasData ? allSpots.map((e) => e.y).reduce(max) + 1 : 10.0;
-    final minX = hasData ? allSpots.map((e) => e.x).reduce(min) : 0.0;
-    final maxX = hasData ? allSpots.map((e) => e.x).reduce(max) : 65.0;
     final safeXData = xData.isEmpty ? const [FlSpot(0, 0)] : xData;
     final safeYData = yData.isEmpty ? const [FlSpot(0, 0)] : yData;
     final safeZData = zData.isEmpty ? const [FlSpot(0, 0)] : zData;
+    final hasTickLabels = xTickLabels != null && xTickLabels.isNotEmpty;
+    final minX = hasTickLabels
+        ? 0.0
+        : (hasData ? allSpots.map((e) => e.x).reduce(min) : 0.0);
+    final maxX = hasTickLabels
+        ? (xTickLabels!.length - 1).toDouble()
+        : (hasData ? allSpots.map((e) => e.x).reduce(max) : 65.0);
 
     return _DashboardPanel(
       child: Column(
@@ -751,15 +775,31 @@ class _UserAdminDashboardScreenState
                     ),
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 24,
-                      interval: 10,
-                      getTitlesWidget: (value, _) => Text(
-                        value.toInt().toString(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: _mutedTextColor(context),
-                        ),
-                      ),
+                      reservedSize: hasTickLabels ? 32 : 24,
+                      interval: hasTickLabels ? 1 : 10,
+                      getTitlesWidget: (value, _) {
+                        if (hasTickLabels) {
+                          final index = value.round();
+                          if (index < 0 ||
+                              index >= (xTickLabels?.length ?? 0)) {
+                            return const SizedBox.shrink();
+                          }
+                          return Text(
+                            xTickLabels![index],
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: _mutedTextColor(context),
+                            ),
+                          );
+                        }
+                        return Text(
+                          value.toInt().toString(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: _mutedTextColor(context),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -895,27 +935,7 @@ class _UserAdminDashboardScreenState
   }
 
   Widget _buildKinematicsRow(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final twoCols = constraints.maxWidth >= 1050;
-        if (!twoCols) {
-          return Column(
-            children: [
-              _buildVelocityCard(context),
-              const SizedBox(height: 16),
-              _buildAccelerationTrendCard(context),
-            ],
-          );
-        }
-        return Row(
-          children: [
-            Expanded(child: _buildVelocityCard(context)),
-            const SizedBox(width: 16),
-            Expanded(child: _buildAccelerationTrendCard(context)),
-          ],
-        );
-      },
-    );
+    return _buildVelocityCard(context);
   }
 
   // Widget _buildAnalyzedRow(BuildContext context) {
@@ -983,20 +1003,15 @@ class _UserAdminDashboardScreenState
 
   Widget _buildVelocityCard(BuildContext context) {
     final db = ref.watch(userAdminDatabaseChangeNotifierProvider);
-    final activeSpots = _dailySpotsFromDates(
-      (db.alerts as List)
-          .where((item) => item.resolvedAt == null)
-          .map((item) => item.triggeredAt as DateTime),
+    final deviceSpots = _dailySpotsFromDates(
+      (db.devices as List).map((item) => item.installedAt as DateTime),
       days: 14,
     );
-    final criticalSpots = _dailySpotsFromDates(
-      (db.alerts as List).where((item) {
-        final level = (item.alertLevel as String).trim().toLowerCase();
-        return level.contains('critical') || level.contains('high');
-      }).map((item) => item.triggeredAt as DateTime),
+    final sensorSpots = _dailySpotsFromDates(
+      (db.sensors as List).map((item) => item.installedAt as DateTime),
       days: 14,
     );
-    final all = [...activeSpots, ...criticalSpots];
+    final all = [...deviceSpots, ...sensorSpots];
     final hasData = all.isNotEmpty;
     final maxY = hasData ? max(1.0, all.map((e) => e.y).reduce(max) + 1) : 1.0;
 
@@ -1004,10 +1019,10 @@ class _UserAdminDashboardScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _panelTitle(context, 'Alert Momentum', Icons.speed_outlined),
+          _panelTitle(context, 'Asset Install Momentum', Icons.speed_outlined),
           const SizedBox(height: 8),
           Text(
-            'Daily active vs critical/high alert load across the platform.',
+            'Daily device vs sensor installs across the platform.',
             style: TextStyle(fontSize: 12, color: _mutedTextColor(context)),
           ),
           const SizedBox(height: 12),
@@ -1042,7 +1057,7 @@ class _UserAdminDashboardScreenState
                         ),
                         leftTitles: AxisTitles(
                           axisNameWidget: Text(
-                            'Alerts',
+                            'Installs',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
@@ -1084,14 +1099,14 @@ class _UserAdminDashboardScreenState
                       ),
                       lineBarsData: [
                         LineChartBarData(
-                          spots: activeSpots,
+                          spots: deviceSpots,
                           isCurved: true,
                           color: const Color(0xFF0f9ca0),
                           barWidth: 2.5,
                           dotData: const FlDotData(show: false),
                         ),
                         LineChartBarData(
-                          spots: criticalSpots,
+                          spots: sensorSpots,
                           isCurved: true,
                           color: const Color(0xFFF59E0B),
                           barWidth: 2.0,
@@ -1102,7 +1117,7 @@ class _UserAdminDashboardScreenState
                   )
                 : Center(
                     child: Text(
-                      'No alert trend data yet.',
+                      'No install activity yet.',
                       style: TextStyle(color: _mutedTextColor(context)),
                     ),
                   ),
@@ -1112,8 +1127,8 @@ class _UserAdminDashboardScreenState
             spacing: 12,
             runSpacing: 6,
             children: [
-              _LegendItem(color: Color(0xFF0f9ca0), label: 'Active alerts'),
-              _LegendItem(color: Color(0xFFF59E0B), label: 'Critical/high'),
+              _LegendItem(color: Color(0xFF0f9ca0), label: 'Devices'),
+              _LegendItem(color: Color(0xFFF59E0B), label: 'Sensors'),
             ],
           ),
         ],
@@ -1421,7 +1436,7 @@ class _UserAdminDashboardScreenState
   Widget _historicalTrendCard(BuildContext context) {
     final db = ref.watch(userAdminDatabaseChangeNotifierProvider);
     final spots = _dailySpotsFromDates(
-      (db.alerts as List).map((item) => item.triggeredAt as DateTime),
+      (db.devices as List).map((item) => item.installedAt as DateTime),
       days: 14,
     );
     final hasData = spots.isNotEmpty;
@@ -1434,7 +1449,7 @@ class _UserAdminDashboardScreenState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _panelTitle(
-              context, 'Alert Volume Trend (14 Days)', Icons.trending_up),
+              context, 'Device Install Trend (14 Days)', Icons.trending_up),
           const SizedBox(height: 8),
           SizedBox(
             height: 280,
@@ -1483,7 +1498,7 @@ class _UserAdminDashboardScreenState
                         ),
                         leftTitles: AxisTitles(
                           axisNameWidget: const Text(
-                            'Alerts',
+                            'Devices',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
@@ -1537,7 +1552,7 @@ class _UserAdminDashboardScreenState
                       ],
                     ),
                   )
-                : const Center(child: Text('Waiting for alert trend data...')),
+                : const Center(child: Text('No device installs yet.')),
           ),
         ],
       ),
@@ -1624,10 +1639,10 @@ class _UserAdminDashboardScreenState
 
   Widget _tiltPatternCard(BuildContext context) {
     final db = ref.watch(userAdminDatabaseChangeNotifierProvider);
-    final orgAlerts = _organizationAlertCounts(db);
-    final names = orgAlerts.keys.toList();
-    final values = orgAlerts.values.toList();
-    final maxAlerts = values.isEmpty
+    final orgSites = _organizationSiteCounts(db);
+    final names = orgSites.keys.toList();
+    final values = orgSites.values.toList();
+    final maxSites = values.isEmpty
         ? 1.0
         : max<double>(1.0, values.reduce(max).toDouble() + 1);
 
@@ -1635,18 +1650,18 @@ class _UserAdminDashboardScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _panelTitle(context, 'Alerts Per Organization', Icons.show_chart),
+          _panelTitle(context, 'Sites Per Organization', Icons.show_chart),
           const SizedBox(height: 8),
           SizedBox(
             height: 280,
             child: BarChart(
               BarChartData(
                 minY: 0,
-                maxY: maxAlerts,
+                maxY: maxSites,
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: (maxAlerts / 4).clamp(1, 10.0),
+                  horizontalInterval: (maxSites / 4).clamp(1, 10.0),
                   getDrawingHorizontalLine: (_) =>
                       const FlLine(color: Color(0xFFd2dbe0)),
                 ),
@@ -1668,7 +1683,7 @@ class _UserAdminDashboardScreenState
                   ),
                   leftTitles: const AxisTitles(
                     axisNameWidget: Text(
-                      'Active alerts',
+                      'Sites',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -1712,11 +1727,11 @@ class _UserAdminDashboardScreenState
                       BarChartRodData(
                         toY: value,
                         width: 14,
-                        color: value >= 5
-                            ? const Color(0xFFea3e43)
-                            : value >= 2
-                                ? const Color(0xFFd39a00)
-                                : const Color(0xFF0f8b89),
+                        color: value >= 10
+                            ? const Color(0xFF2E8BFF)
+                            : value >= 5
+                                ? const Color(0xFF0ca15f)
+                                : const Color(0xFFd39a00),
                         borderRadius: BorderRadius.circular(1),
                       ),
                     ],
@@ -3083,6 +3098,18 @@ class _UserAdminDashboardScreenState
     return stamps.first;
   }
 
+  List<String> _dayLabels(int days) {
+    final now = DateTime.now();
+    return List.generate(
+      days,
+      (index) {
+        final day = DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: days - 1 - index));
+        return day.day.toString().padLeft(2, '0');
+      },
+    );
+  }
+
   List<FlSpot> _dailySpotsFromDates(
     Iterable<DateTime> dates, {
     required int days,
@@ -3105,6 +3132,21 @@ class _UserAdminDashboardScreenState
       (index) =>
           FlSpot(index.toDouble(), buckets.values.elementAt(index).toDouble()),
     );
+  }
+
+  Map<String, int> _organizationSiteCounts(dynamic db) {
+    final orgById = <String, dynamic>{
+      for (final org in db.organizations as List)
+        (org.id as String).trim(): org,
+    };
+    final counts = <String, int>{};
+    for (final site in db.sites as List) {
+      final orgId = (site.organizationId as String).trim();
+      if (orgId.isEmpty) continue;
+      final orgName = _safeText(orgById[orgId]?.name, fallback: orgId);
+      counts[orgName] = (counts[orgName] ?? 0) + 1;
+    }
+    return counts;
   }
 
   Map<String, int> _organizationAlertCounts(dynamic db) {

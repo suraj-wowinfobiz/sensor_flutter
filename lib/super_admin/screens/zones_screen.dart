@@ -18,6 +18,27 @@ class _ZonesScreenState extends State<ZonesScreen> {
   String _name = '';
   String _siteId = '';
 
+  Future<bool> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirm delete'),
+        content: const Text('Are you sure you want to delete this zone?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -115,6 +136,8 @@ class _ZonesScreenState extends State<ZonesScreen> {
           onAdd: () => _showZoneModal(),
           onEdit: (index) => _showZoneModal(zone: db.zones[index]),
           onDelete: (index) async {
+            final confirm = await _confirmDelete(context);
+            if (!confirm || !context.mounted) return;
             try {
               await db.delete('zones', db.zones[index].id);
             } catch (e) {

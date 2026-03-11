@@ -52,6 +52,27 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
     super.dispose();
   }
 
+  Future<bool> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirm delete'),
+        content: const Text('Are you sure you want to delete this user?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
   Future<void> _showUserModal({User? user}) async {
     if (user != null) {
       _editingId = user.id;
@@ -1705,8 +1726,12 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                               icon: Icons.delete_outline,
                               iconColor: Colors.red,
                               onTap: () async {
+                                final confirm = await _confirmDelete(context);
+                                if (!confirm || !context.mounted) return;
                                 try {
                                   await db.delete('users', user.id);
+                                  await db.loadUsers();
+                                  if (mounted) setState(() {});
                                 } catch (e) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1951,8 +1976,12 @@ class _UserAdminUsersScreenState extends State<UserAdminUsersScreen> {
                       icon: Icons.delete_outline,
                       iconColor: Colors.red,
                       onTap: () async {
+                        final confirm = await _confirmDelete(context);
+                        if (!confirm || !context.mounted) return;
                         try {
                           await db.delete('users', user.id);
+                          await db.loadUsers();
+                          if (mounted) setState(() {});
                         } catch (e) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(

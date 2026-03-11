@@ -68,6 +68,27 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
     );
   }
 
+  Future<bool> _confirmDelete(BuildContext context, String label) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirm delete'),
+        content: Text('Are you sure you want to delete this $label?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
   void _ensureSelections(SuperAdminBackendProvider db) {
     final currentOrgId = _selectedOrganizationId;
     final currentSiteId = _selectedSiteId;
@@ -625,6 +646,8 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
           }),
           onEdit: () => _showOrganizationModal(organization: org, db: db),
           onDelete: () async {
+            final confirm = await _confirmDelete(context, 'organization');
+            if (!confirm || !mounted) return;
             try {
               await db.delete('organizations', org.id);
               setState(() {
@@ -668,6 +691,8 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
           },
           onEdit: () => _showSiteModal(site: site, db: db),
           onDelete: () async {
+            final confirm = await _confirmDelete(context, 'site');
+            if (!confirm || !mounted) return;
             try {
               await db.delete('sites', site.id);
               setState(() {
@@ -702,6 +727,8 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
           onTap: () => setState(() => _selectedZoneId = zone.id),
           onEdit: () => _showZoneModal(zone: zone, db: db),
           onDelete: () async {
+            final confirm = await _confirmDelete(context, 'zone');
+            if (!confirm || !mounted) return;
             try {
               await db.delete('zones', zone.id);
               setState(() {

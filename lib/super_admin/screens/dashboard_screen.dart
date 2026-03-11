@@ -63,6 +63,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void initState() {
     super.initState();
     _connectToStreams();
+    Future.microtask(_primeDashboardData);
   }
 
   void _connectToStreams() async {
@@ -158,6 +159,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         _previousProcessedAngularVelocity = angularVelocity;
       });
     });
+  }
+
+  Future<void> _primeDashboardData() async {
+    final db = ref.read(superAdminBackendChangeNotifierProvider);
+    try {
+      await Future.wait([
+        db.loadOrganizations(),
+        db.loadSites(),
+        db.loadDevices(),
+        db.loadSensors(),
+        db.loadUsers(),
+      ]);
+    } catch (_) {
+      // Best-effort preload for dashboard tables.
+    }
   }
 
   @override
@@ -557,6 +573,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return '${minutes}m ago';
   }
 
+  String _shortDate(DateTime? when) {
+    if (when == null) return '--';
+    final yyyy = when.year.toString().padLeft(4, '0');
+    final mm = when.month.toString().padLeft(2, '0');
+    final dd = when.day.toString().padLeft(2, '0');
+    return '$yyyy-$mm-$dd';
+  }
+
   @override
   Widget build(BuildContext context) {
     final db = ref.watch(superAdminBackendChangeNotifierProvider);
@@ -584,16 +608,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       return level.contains('critical') || level.contains('high');
     }).length;
     final platformUpdateAt = _latestPlatformUpdateAt(db);
-    final orgSeries = _dailySpotsFromDates(
-      (db.organizations as List).map((item) => item.createdAt as DateTime),
+    final vendorSeries = _dailySpotsFromDates(
+      (db.users as List).where((item) {
+        final role = (item.role as String).trim().toLowerCase();
+        return role.contains('vendor');
+      }).map((item) => item.createdAt as DateTime),
       days: 30,
     );
-    final siteSeries = _dailySpotsFromDates(
-      (db.sites as List).map((item) => item.createdAt as DateTime),
+    final engineerSeries = _dailySpotsFromDates(
+      (db.users as List).where((item) {
+        final role = (item.role as String).trim().toLowerCase();
+        return role.contains('engineer');
+      }).map((item) => item.createdAt as DateTime),
       days: 30,
     );
-    final userSeries = _dailySpotsFromDates(
-      (db.users as List).map((item) => item.createdAt as DateTime),
+    final userRoleSeries = _dailySpotsFromDates(
+      (db.users as List).where((item) {
+        final role = (item.role as String).trim().toLowerCase();
+        return role.contains('user') && !role.contains('admin');
+      }).map((item) => item.createdAt as DateTime),
       days: 30,
     );
     final criticalSeries = _dailySpotsFromDates(
@@ -639,33 +672,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           const SizedBox(height: 18),
           _buildLiveSeriesCard(
             context,
-            title: 'Tenant Onboarding Trend',
-            icon: Icons.sensors,
-            xData: orgSeries,
-            yData: siteSeries,
-            zData: userSeries,
-            xLabel: 'Organizations',
-            yLabel: 'Sites',
+            title: 'User Role Onboarding Trend',
+            icon: Icons.people_outline,
+            xData: vendorSeries,
+            yData: engineerSeries,
+            zData: userRoleSeries,
+            xLabel: 'Vendors',
+            yLabel: 'Engineers',
             zLabel: 'Users',
-            yAxisLabel: 'Records per day',
+            yAxisLabel: 'New accounts per day',
             xAxisLabel: 'Last 30 days',
+            xTickLabels: _dayLabels(30),
           ),
-          const SizedBox(height: 18),
-          _buildLiveSeriesCard(
-            context,
-            title: 'Alert Severity Trend',
-            icon: Icons.settings_input_component_outlined,
-            xData: criticalSeries,
-            yData: warningSeries,
-            zData: infoSeries,
-            xLabel: 'Critical/High',
-            yLabel: 'Warning',
-            zLabel: 'Info',
-            yAxisLabel: 'Alerts per day',
-            xAxisLabel: 'Last 14 days',
-          ),
-          const SizedBox(height: 18),
-          _buildKinematicsRow(context),
           const SizedBox(height: 18),
           _buildAnalyzedRow(context),
           const SizedBox(height: 18),
@@ -676,8 +694,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           _buildSensorReadingsCard(context),
           const SizedBox(height: 18),
           _buildBottomLiveStats(context, db),
-          const SizedBox(height: 18),
-          _buildTiltRangeDistribution(context, db),
           const SizedBox(height: 18),
           _buildTopTiltSensorsCard(context, db),
         ],
@@ -704,16 +720,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     String zLabel = 'Z',
     String yAxisLabel = 'Value',
     String xAxisLabel = 'Sample',
+    List<String>? xTickLabels,
   }) {
     final allSpots = [...xData, ...yData, ...zData];
     final hasData = allSpots.isNotEmpty;
     final minY = hasData ? allSpots.map((e) => e.y).reduce(min) - 1 : 0.0;
     final maxY = hasData ? allSpots.map((e) => e.y).reduce(max) + 1 : 10.0;
-    final minX = hasData ? allSpots.map((e) => e.x).reduce(min) : 0.0;
-    final maxX = hasData ? allSpots.map((e) => e.x).reduce(max) : 65.0;
     final safeXData = xData.isEmpty ? const [FlSpot(0, 0)] : xData;
     final safeYData = yData.isEmpty ? const [FlSpot(0, 0)] : yData;
     final safeZData = zData.isEmpty ? const [FlSpot(0, 0)] : zData;
+    final hasTickLabels = xTickLabels != null && xTickLabels.isNotEmpty;
+    final minX = hasTickLabels
+        ? 0.0
+        : (hasData ? allSpots.map((e) => e.x).reduce(min) : 0.0);
+    final maxX = hasTickLabels
+        ? (xTickLabels!.length - 1).toDouble()
+        : (hasData ? allSpots.map((e) => e.x).reduce(max) : 65.0);
 
     return _DashboardPanel(
       child: Column(
@@ -796,15 +818,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 24,
-                      interval: 10,
-                      getTitlesWidget: (value, _) => Text(
-                        value.toInt().toString(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: _mutedTextColor(context),
-                        ),
-                      ),
+                      reservedSize: hasTickLabels ? 32 : 24,
+                      interval: hasTickLabels ? 1 : 10,
+                      getTitlesWidget: (value, _) {
+                        if (hasTickLabels) {
+                          final index = value.round();
+                          if (index < 0 ||
+                              index >= (xTickLabels?.length ?? 0)) {
+                            return const SizedBox.shrink();
+                          }
+                          return Text(
+                            xTickLabels![index],
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: _mutedTextColor(context),
+                            ),
+                          );
+                        }
+                        return Text(
+                          value.toInt().toString(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: _mutedTextColor(context),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -919,27 +957,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildKinematicsRow(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final twoCols = constraints.maxWidth >= 1050;
-        if (!twoCols) {
-          return Column(
-            children: [
-              _buildVelocityCard(context),
-              const SizedBox(height: 16),
-              _buildAccelerationTrendCard(context),
-            ],
-          );
-        }
-        return Row(
-          children: [
-            Expanded(child: _buildVelocityCard(context)),
-            const SizedBox(width: 16),
-            Expanded(child: _buildAccelerationTrendCard(context)),
-          ],
-        );
-      },
-    );
+    return _buildVelocityCard(context);
   }
 
   Widget _buildAnalyzedRow(BuildContext context) {
@@ -956,52 +974,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       (db.sites as List).map((item) => item.createdAt as DateTime),
       days: 30,
     );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final twoCols = constraints.maxWidth >= 1050;
-        const rowCardHeight = 520.0;
-        final analyzedCard = _buildLiveSeriesCard(
-          context,
-          title: 'Asset Onboarding Trend',
-          icon: Icons.psychology_alt_outlined,
-          xData: deviceSpots,
-          yData: sensorSpots,
-          zData: siteSpots,
-          xLabel: 'Devices',
-          yLabel: 'Sensors',
-          zLabel: 'Sites',
-          yAxisLabel: 'Assets per day',
-          xAxisLabel: 'Last 30 days',
-        );
-        final radarCard = _buildAnalyzedRadarCard(context);
-        if (!twoCols) {
-          return Column(
-            children: [
-              analyzedCard,
-              const SizedBox(height: 16),
-              radarCard,
-            ],
-          );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: rowCardHeight,
-                child: analyzedCard,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: SizedBox(
-                height: rowCardHeight,
-                child: radarCard,
-              ),
-            ),
-          ],
-        );
-      },
+    return _buildLiveSeriesCard(
+      context,
+      title: 'Asset Onboarding Trend',
+      icon: Icons.psychology_alt_outlined,
+      xData: deviceSpots,
+      yData: sensorSpots,
+      zData: siteSpots,
+      xLabel: 'Devices',
+      yLabel: 'Sensors',
+      zLabel: 'Sites',
+      yAxisLabel: 'Assets per day',
+      xAxisLabel: 'Last 30 days',
+      xTickLabels: _dayLabels(30),
     );
   }
 
@@ -1303,8 +1288,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         if (!twoCols) {
           return Column(
             children: [
-              _historicalTrendCard(context),
-              const SizedBox(height: 16),
               _statusDistributionCard(context, db),
               const SizedBox(height: 16),
               _tiltPatternCard(context),
@@ -1315,13 +1298,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         }
         return Column(
           children: [
-            Row(
-              children: [
-                Expanded(child: _historicalTrendCard(context)),
-                const SizedBox(width: 16),
-                Expanded(child: _statusDistributionCard(context, db)),
-              ],
-            ),
+            _statusDistributionCard(context, db),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -1333,241 +1310,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ],
         );
       },
-    );
-  }
-
-  Widget _buildAnalyzedRadarCard(BuildContext context) {
-    final db = ref.watch(superAdminBackendChangeNotifierProvider);
-    final organizations = (db.organizations as List).length.toDouble();
-    final sites = (db.sites as List).length.toDouble();
-    final zones = (db.zones as List).length.toDouble();
-    final users = (db.users as List).length.toDouble();
-    final devices = (db.devices as List).length.toDouble();
-    final sensors = (db.sensors as List).length.toDouble();
-    final activeAlerts = (db.alerts as List)
-        .where((item) => item.resolvedAt == null)
-        .length
-        .toDouble();
-    final maxScale = max<double>(
-      1.0,
-      [organizations, sites, zones, users, devices, sensors, activeAlerts]
-          .reduce(max),
-    );
-    return _DashboardPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _panelTitle(
-            context,
-            'Platform Composition Profile',
-            Icons.radar_outlined,
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 300,
-            child: RadarChart(
-              RadarChartData(
-                radarShape: RadarShape.polygon,
-                tickCount: 5,
-                titlePositionPercentageOffset: 0.16,
-                titleTextStyle: TextStyle(
-                  color: _mutedTextColor(context),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-                ticksTextStyle: TextStyle(
-                  color: _mutedTextColor(context),
-                  fontSize: 10,
-                ),
-                tickBorderData: BorderSide(
-                  color: Theme.of(context).dividerColor,
-                  width: 1,
-                ),
-                gridBorderData: BorderSide(
-                  color: Theme.of(context).dividerColor,
-                  width: 1,
-                ),
-                getTitle: (index, angle) {
-                  const titles = [
-                    'Orgs',
-                    'Sites',
-                    'Zones',
-                    'Users',
-                    'Devices',
-                    'Sensors',
-                    'Alerts',
-                  ];
-                  return RadarChartTitle(
-                    text: titles[index],
-                    angle: angle,
-                  );
-                },
-                dataSets: [
-                  RadarDataSet(
-                    fillColor: Theme.of(context).colorScheme.primary.withValues(
-                          alpha: 0.20,
-                        ),
-                    borderColor: Theme.of(context).colorScheme.primary,
-                    borderWidth: 2.2,
-                    entryRadius: 3.2,
-                    dataEntries: [
-                      RadarEntry(value: _radarScale(organizations, maxScale)),
-                      RadarEntry(value: _radarScale(sites, maxScale)),
-                      RadarEntry(value: _radarScale(zones, maxScale)),
-                      RadarEntry(value: _radarScale(users, maxScale)),
-                      RadarEntry(value: _radarScale(devices, maxScale)),
-                      RadarEntry(value: _radarScale(sensors, maxScale)),
-                      RadarEntry(value: _radarScale(activeAlerts, maxScale)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              _valueChip(context, 'Orgs', organizations.toStringAsFixed(0)),
-              _valueChip(context, 'Sites', sites.toStringAsFixed(0)),
-              _valueChip(context, 'Zones', zones.toStringAsFixed(0)),
-              _valueChip(context, 'Users', users.toStringAsFixed(0)),
-              _valueChip(context, 'Devices', devices.toStringAsFixed(0)),
-              _valueChip(context, 'Sensors', sensors.toStringAsFixed(0)),
-              _valueChip(
-                  context, 'Active Alerts', activeAlerts.toStringAsFixed(0)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _historicalTrendCard(BuildContext context) {
-    final db = ref.watch(superAdminBackendChangeNotifierProvider);
-    final spots = _dailySpotsFromDates(
-      (db.alerts as List).map((item) => item.triggeredAt as DateTime),
-      days: 14,
-    );
-    final hasData = spots.isNotEmpty;
-    final maxY =
-        hasData ? max<double>(1.0, spots.map((e) => e.y).reduce(max) + 1) : 1.0;
-    final maxX = hasData ? spots.last.x : 14.0;
-
-    return _DashboardPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _panelTitle(
-              context, 'Alert Volume Trend (14 Days)', Icons.trending_up),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 280,
-            child: hasData
-                ? LineChart(
-                    LineChartData(
-                      minX: 0,
-                      maxX: maxX <= 0 ? 1 : maxX,
-                      minY: 0,
-                      maxY: maxY,
-                      gridData: FlGridData(
-                        show: true,
-                        drawVerticalLine: true,
-                        horizontalInterval: (maxY / 8).clamp(1, 10.0),
-                        verticalInterval: 5,
-                        getDrawingHorizontalLine: (value) {
-                          final major = (value - value.round()).abs() < 0.04;
-                          return FlLine(
-                            color: const Color(0xFF111111)
-                                .withValues(alpha: major ? 0.7 : 0.35),
-                            strokeWidth: major ? 1.0 : 0.7,
-                            dashArray: major ? null : const [10, 6],
-                          );
-                        },
-                        getDrawingVerticalLine: (_) => FlLine(
-                          color: const Color(0xFF111111).withValues(alpha: 0.3),
-                          strokeWidth: 0.7,
-                        ),
-                      ),
-                      borderData: FlBorderData(
-                        show: true,
-                        border: const Border(
-                          left: BorderSide(color: Color(0xFF111111), width: 1),
-                          bottom:
-                              BorderSide(color: Color(0xFF111111), width: 1),
-                          top: BorderSide(color: Color(0xFF111111), width: 1),
-                          right: BorderSide(color: Color(0xFF111111), width: 1),
-                        ),
-                      ),
-                      extraLinesData: const ExtraLinesData(horizontalLines: []),
-                      titlesData: FlTitlesData(
-                        topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        leftTitles: AxisTitles(
-                          axisNameWidget: const Text(
-                            'Alerts',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF1E2930),
-                            ),
-                          ),
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 42,
-                            interval: (maxY / 5).clamp(1, 20.0),
-                            getTitlesWidget: (value, _) => Text(
-                              value.toStringAsFixed(2),
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Color(0xFF1E2930),
-                              ),
-                            ),
-                          ),
-                        ),
-                        bottomTitles: AxisTitles(
-                          axisNameWidget: const Text(
-                            'Day index',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF1E2930),
-                            ),
-                          ),
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 22,
-                            interval: 10,
-                            getTitlesWidget: (value, _) => Text(
-                              value.toInt().toString(),
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Color(0xFF1E2930),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      lineBarsData: [
-                        LineChartBarData(
-                          spots: spots,
-                          isCurved: true,
-                          color: const Color(0xFF111D8A),
-                          barWidth: 2.0,
-                          dotData: const FlDotData(show: false),
-                        ),
-                      ],
-                    ),
-                  )
-                : const Center(child: Text('Waiting for alert trend data...')),
-          ),
-        ],
-      ),
     );
   }
 
@@ -2071,23 +1813,42 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final sites = List.of(db.sites as List);
     final zones = List.of(db.zones as List);
     final organizations = List.of(db.organizations as List);
-    final alerts = List.of(db.alerts as List)
-      ..sort((a, b) =>
-          (b.triggeredAt as DateTime).compareTo(a.triggeredAt as DateTime));
-    final rows = alerts.take(8).map((alert) {
-      final sensorId = (alert.sensorId as String).trim();
-      final shortId =
-          sensorId.length > 12 ? '${sensorId.substring(0, 12)}…' : sensorId;
-      final sensor = sensors
-          .where((item) => (item.id as String).trim() == sensorId)
+    final rows = <List<String>>[];
+    for (final device in devices) {
+      final site = sites
+          .where((item) =>
+              (item.id as String).trim() ==
+              (device.siteId as String).trim())
           .firstOrNull;
-      final device = sensor == null
+      final zone = zones
+          .where((item) =>
+              (item.id as String).trim() ==
+              (device.zoneId as String).trim())
+          .firstOrNull;
+      final organization = site == null
           ? null
-          : devices
+          : organizations
               .where((item) =>
                   (item.id as String).trim() ==
-                  (sensor.deviceId as String).trim())
+                  (site.organizationId as String).trim())
               .firstOrNull;
+      rows.add([
+        'Device',
+        (device.deviceCode as String?)?.trim().isNotEmpty == true
+            ? device.deviceCode as String
+            : (device.serialNumber as String? ?? device.id as String),
+        organization?.name ?? '--',
+        site?.name ?? '--',
+        zone?.name ?? '--',
+        _shortDate(device.installedAt as DateTime?),
+      ]);
+    }
+    for (final sensor in sensors) {
+      final device = devices
+          .where((item) =>
+              (item.id as String).trim() ==
+              (sensor.deviceId as String).trim())
+          .firstOrNull;
       final site = device == null
           ? null
           : sites
@@ -2109,23 +1870,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   (item.id as String).trim() ==
                   (site.organizationId as String).trim())
               .firstOrNull;
-      final level = (alert.alertLevel as String).trim().toLowerCase();
-      final status = level.contains('critical') || level.contains('high')
-          ? 'critical'
-          : level.contains('warn')
-              ? 'warning'
-              : 'normal';
-      return [
-        shortId,
-        '${organization?.name ?? '--'} / ${site?.name ?? '--'}',
+      rows.add([
+        'Sensor',
+        (sensor.serialNumber as String?)?.trim().isNotEmpty == true
+            ? sensor.serialNumber as String
+            : (sensor.id as String),
+        organization?.name ?? '--',
+        site?.name ?? '--',
         zone?.name ?? '--',
-        (alert.alertLevel as String),
-        (alert.status as String).isEmpty ? '--' : (alert.status as String),
-        (alert.message as String),
-        status,
-        _agoLabel(alert.triggeredAt as DateTime),
-      ];
-    }).toList();
+        _shortDate(sensor.installedAt as DateTime?),
+      ]);
+    }
+    rows.sort((a, b) => b[5].compareTo(a[5]));
+    final recentRows = rows.take(8).toList();
 
     return _DashboardPanel(
       child: Column(
@@ -2138,8 +1895,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             children: [
               _panelTitle(
                 context,
-                'Recent Processed Events - Live Feed',
-                Icons.show_chart_outlined,
+                'Recent Installations',
+                Icons.inventory_2_outlined,
               ),
               _chip(context, 'Export', icon: Icons.upload_outlined),
             ],
@@ -2163,19 +1920,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 horizontalMargin: 10,
                 columnSpacing: 26,
                 columns: [
-                  _tableHeading(context, 'Source ID'),
-                  _tableHeading(context, 'Tenant / Site'),
+                  _tableHeading(context, 'Type'),
+                  _tableHeading(context, 'Asset'),
+                  _tableHeading(context, 'Organization'),
+                  _tableHeading(context, 'Site'),
                   _tableHeading(context, 'Zone'),
-                  _tableHeading(context, 'Severity'),
-                  _tableHeading(context, 'Alert Status'),
-                  _tableHeading(context, 'Message'),
-                  _tableHeading(context, 'Risk'),
-                  _tableHeading(context, 'Last Update'),
+                  _tableHeading(context, 'Installed'),
                 ],
-                rows: rows.map((r) {
-                  final status = r[6];
-                  final isWarning = status == 'warning';
-                  final isCritical = status == 'critical';
+                rows: recentRows.map((r) {
                   return DataRow(cells: [
                     DataCell(Text(r[0])),
                     DataCell(Text(r[1])),
@@ -2183,47 +1935,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     DataCell(Text(r[3])),
                     DataCell(Text(r[4])),
                     DataCell(Text(r[5])),
-                    DataCell(Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: isCritical
-                            ? const Color(0xFFf7d3d6)
-                            : isWarning
-                                ? const Color(0xFFf9edc9)
-                                : const Color(0xFFd7f2df),
-                        border: Border.all(
-                          color: isCritical
-                              ? const Color(0xFFe35b63)
-                              : isWarning
-                                  ? const Color(0xFFd9a21d)
-                                  : const Color(0xFF2eaf61),
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Text(
-                        status,
-                        style: TextStyle(
-                          color: isCritical
-                              ? const Color(0xFFb2262e)
-                              : isWarning
-                                  ? const Color(0xFFb38200)
-                                  : const Color(0xFF0d9a4d),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    )),
-                    DataCell(Text(r[7])),
                   ]);
                 }).toList(),
               ),
             ),
           ),
-          if (rows.isEmpty)
+          if (recentRows.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 12),
               child: Text(
-                'No recent alert records available.',
+                'No recent installations available.',
                 style: TextStyle(color: _mutedTextColor(context)),
               ),
             ),
@@ -2247,23 +1968,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildBottomLiveStats(BuildContext context, dynamic db) {
     final now = DateTime.now();
-    final alertsLast24h = (db.alerts as List)
+    final devicesLast30d = (db.devices as List)
         .where((item) =>
-            now.difference(item.triggeredAt as DateTime).inHours <= 24)
+            now.difference(item.installedAt as DateTime).inDays <= 30)
         .length;
-    final throughput = alertsLast24h / 24.0;
-    final activeAlerts =
-        (db.alerts as List).where((item) => item.resolvedAt == null).length;
-    final totalAlerts = (db.alerts as List).length;
-    final anomalyRate =
-        totalAlerts == 0 ? 0.0 : ((activeAlerts / totalAlerts) * 100);
-    final latestAlertAt = (db.alerts as List).isEmpty
-        ? null
-        : ((db.alerts as List)
-                .map((item) => item.triggeredAt as DateTime)
-                .toList()
-              ..sort((a, b) => b.compareTo(a)))
-            .first;
+    final sensorsLast30d = (db.sensors as List)
+        .where((item) =>
+            now.difference(item.installedAt as DateTime).inDays <= 30)
+        .length;
+    final sitesLast30d = (db.sites as List)
+        .where((item) =>
+            now.difference(item.createdAt as DateTime).inDays <= 30)
+        .length;
     final activeOrganizationsCount = (db.organizations as List)
         .where(
             (item) => (item.status as String).trim().toLowerCase() == 'active')
@@ -2280,30 +1996,30 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         iconColor: const Color(0xFF0aa34f),
       ),
       _MiniStatData(
-        title: 'EVENT THROUGHPUT',
-        value: throughput.toStringAsFixed(2),
-        unit: 'evt/sec',
-        detail: '$alertsLast24h alerts in 24h',
-        badge: throughput > 0 ? 'Live' : 'Idle',
-        icon: Icons.bolt_outlined,
+        title: 'DEVICES INSTALLED',
+        value: devicesLast30d.toString(),
+        unit: 'last 30d',
+        detail: '${(db.devices as List).length} total devices',
+        badge: devicesLast30d > 0 ? 'Active' : 'Idle',
+        icon: Icons.devices_other_outlined,
         iconColor: const Color(0xFF5f78de),
       ),
       _MiniStatData(
-        title: 'ANOMALY RATE',
-        value: anomalyRate.toStringAsFixed(0),
-        unit: '%',
-        detail: 'active alerts share',
-        badge: anomalyRate >= 50 ? 'High' : 'Normal',
-        icon: Icons.trending_up,
+        title: 'SENSORS INSTALLED',
+        value: sensorsLast30d.toString(),
+        unit: 'last 30d',
+        detail: '${(db.sensors as List).length} total sensors',
+        badge: sensorsLast30d > 0 ? 'Active' : 'Idle',
+        icon: Icons.sensors_outlined,
         iconColor: const Color(0xFFd39a00),
       ),
       _MiniStatData(
-        title: 'LAST ALERT',
-        value: latestAlertAt == null ? '--' : _agoLabel(latestAlertAt),
-        unit: '',
-        detail: 'most recent platform alert',
-        badge: latestAlertAt == null ? 'N/A' : 'Live',
-        icon: Icons.network_ping,
+        title: 'SITES ADDED',
+        value: sitesLast30d.toString(),
+        unit: 'last 30d',
+        detail: '${(db.sites as List).length} total sites',
+        badge: sitesLast30d > 0 ? 'Active' : 'Idle',
+        icon: Icons.location_on_outlined,
         iconColor: const Color(0xFF2b8ab8),
       ),
     ];
@@ -3049,6 +2765,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     if (stamps.isEmpty) return null;
     stamps.sort((a, b) => b.compareTo(a));
     return stamps.first;
+  }
+
+  List<String> _dayLabels(int days) {
+    final now = DateTime.now();
+    return List.generate(
+      days,
+      (index) {
+        final day = DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: days - 1 - index));
+        final dd = day.day.toString().padLeft(2, '0');
+        return dd;
+      },
+    );
   }
 
   List<FlSpot> _dailySpotsFromDates(

@@ -23,6 +23,7 @@ class EngineerDashboardScreen extends ConsumerStatefulWidget {
 
 class _EngineerDashboardScreenState
     extends ConsumerState<EngineerDashboardScreen> {
+  static const String _allSensorsValue = '__all__';
   final AnalyticsSseService _analyticsSseService = AnalyticsSseService();
   final GenericSseService _rawSseService =
       GenericSseService('/api/v1/ingestion/readings/live');
@@ -62,6 +63,7 @@ class _EngineerDashboardScreenState
   StreamSubscription? _analyticsSubscription;
   StreamSubscription? _rawSubscription;
   StreamSubscription? _processedSubscription;
+  String _selectedSensorId = _allSensorsValue;
 
   @override
   void initState() {
@@ -913,8 +915,6 @@ class _EngineerDashboardScreenState
           const SizedBox(height: 18),
           _buildBottomLiveStats(context, db),
           const SizedBox(height: 18),
-          _buildTiltRangeDistribution(context, db),
-          const SizedBox(height: 18),
           _buildTopTiltSensorsCard(context, db),
         ],
       ),
@@ -1180,52 +1180,18 @@ class _EngineerDashboardScreenState
   }
 
   Widget _buildAnalyzedRow(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final twoCols = constraints.maxWidth >= 1050;
-        const rowCardHeight = 520.0;
-        final analyzedCard = _buildLiveSeriesCard(
-          context,
-          title: 'Analyzed Live Data',
-          icon: Icons.psychology_alt_outlined,
-          xData: _analyzedRollData,
-          yData: _analyzedPitchData,
-          zData: _analyzedTiltData,
-          xLabel: 'Roll',
-          yLabel: 'Pitch',
-          zLabel: 'Tilt',
-          yAxisLabel: 'Analyzed angle (°)',
-          xAxisLabel: 'Analyzed sample index',
-        );
-        final radarCard = _buildAnalyzedRadarCard(context);
-        if (!twoCols) {
-          return Column(
-            children: [
-              analyzedCard,
-              const SizedBox(height: 16),
-              radarCard,
-            ],
-          );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: rowCardHeight,
-                child: analyzedCard,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: SizedBox(
-                height: rowCardHeight,
-                child: radarCard,
-              ),
-            ),
-          ],
-        );
-      },
+    return _buildLiveSeriesCard(
+      context,
+      title: 'Analyzed Live Data',
+      icon: Icons.psychology_alt_outlined,
+      xData: _analyzedRollData,
+      yData: _analyzedPitchData,
+      zData: _analyzedTiltData,
+      xLabel: 'Roll',
+      yLabel: 'Pitch',
+      zLabel: 'Tilt',
+      yAxisLabel: 'Analyzed angle (°)',
+      xAxisLabel: 'Analyzed sample index',
     );
   }
 
@@ -2241,6 +2207,22 @@ class _EngineerDashboardScreenState
     final devices = List.of(db.devices);
     final sites = List.of(db.sites);
     final zones = List.of(db.zones);
+    final sensorOptions = <({String id, String label})>[];
+    for (final sensor in sensors) {
+      final sensorId = _safeText(sensor.id, fallback: '').trim();
+      if (sensorId.isEmpty) continue;
+      final serial = _safeText(sensor.serialNumber, fallback: '').trim();
+      final shortId =
+          sensorId.length > 8 ? '${sensorId.substring(0, 8)}…' : sensorId;
+      final label = serial.isEmpty ? shortId : '$serial • $shortId';
+      sensorOptions.add((id: sensorId, label: label));
+    }
+    sensorOptions.sort((a, b) => a.label.compareTo(b.label));
+    final hasSelectedSensor = sensorOptions.any(
+      (item) => item.id == _selectedSensorId,
+    );
+    final effectiveSelectedId =
+        hasSelectedSensor ? _selectedSensorId : _allSensorsValue;
 
     final sensorById = <String, dynamic>{};
     for (final sensor in sensors) {
@@ -2268,7 +2250,14 @@ class _EngineerDashboardScreenState
 
     final highestAlertBySensor = _sensorHighestAlertLevel(db);
 
-    final rows = _processedSnapshots.reversed.take(8).map((snapshot) {
+    final rows = _processedSnapshots.reversed
+        .where((snapshot) {
+          final sensorId = snapshot.sensorId.trim();
+          return effectiveSelectedId == _allSensorsValue ||
+              sensorId == effectiveSelectedId;
+        })
+        .take(8)
+        .map((snapshot) {
       final shortId = snapshot.sensorId.length > 12
           ? '${snapshot.sensorId.substring(0, 12)}…'
           : snapshot.sensorId;
@@ -2306,6 +2295,54 @@ class _EngineerDashboardScreenState
                 context,
                 'Live Sensor Fault Feed',
                 Icons.show_chart_outlined,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? const Color(0xFFd6e1e6)
+                      : const Color(0xFF23394A),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Theme.of(context).dividerColor),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: effectiveSelectedId,
+                    isDense: true,
+                    icon: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: _mutedTextColor(context),
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: _allSensorsValue,
+                        child: Text('All sensors'),
+                      ),
+                      ...sensorOptions.map(
+                        (item) => DropdownMenuItem(
+                          value: item.id,
+                          child: SizedBox(
+                            width: 180,
+                            child: Text(
+                              item.label,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedSensorId = value ?? _allSensorsValue;
+                      });
+                    },
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: _mutedTextColor(context),
+                    ),
+                  ),
+                ),
               ),
               _chip(context, 'Export', icon: Icons.upload_outlined),
             ],

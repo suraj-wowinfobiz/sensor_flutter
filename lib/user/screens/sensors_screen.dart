@@ -472,7 +472,7 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${sensor.lastReading.toStringAsFixed(2)}°',
+                    sensor.lastReading.toStringAsFixed(2),
                     style: TextStyle(
                       fontSize: 30,
                       fontWeight: FontWeight.w800,
@@ -532,7 +532,7 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
             '${sensor.serialNumber}',
             '${sensor.sensorTypeId}',
             '${sensor.deviceId}',
-            '${sensor.lastReading.toStringAsFixed(2)}°',
+            sensor.lastReading.toStringAsFixed(2),
             installedAt,
             status,
           ];

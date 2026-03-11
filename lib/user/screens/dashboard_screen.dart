@@ -627,8 +627,6 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
           const SizedBox(height: 18),
           _buildBottomLiveStats(context, db),
           const SizedBox(height: 18),
-          _buildTiltRangeDistribution(context, db),
-          const SizedBox(height: 18),
           _buildTopTiltSensorsCard(context, db),
         ],
       ),
@@ -901,52 +899,18 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
   }
 
   Widget _buildAnalyzedRow(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final twoCols = constraints.maxWidth >= 1050;
-        const rowCardHeight = 520.0;
-        final analyzedCard = _buildLiveSeriesCard(
-          context,
-          title: 'Analyzed Live Data',
-          icon: Icons.psychology_alt_outlined,
-          xData: _analyzedRollData,
-          yData: _analyzedPitchData,
-          zData: _analyzedTiltData,
-          xLabel: 'Roll',
-          yLabel: 'Pitch',
-          zLabel: 'Tilt',
-          yAxisLabel: 'Analyzed angle (°)',
-          xAxisLabel: 'Analyzed sample index',
-        );
-        final radarCard = _buildAnalyzedRadarCard(context);
-        if (!twoCols) {
-          return Column(
-            children: [
-              analyzedCard,
-              const SizedBox(height: 16),
-              radarCard,
-            ],
-          );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: rowCardHeight,
-                child: analyzedCard,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: SizedBox(
-                height: rowCardHeight,
-                child: radarCard,
-              ),
-            ),
-          ],
-        );
-      },
+    return _buildLiveSeriesCard(
+      context,
+      title: 'Analyzed Live Data',
+      icon: Icons.psychology_alt_outlined,
+      xData: _analyzedRollData,
+      yData: _analyzedPitchData,
+      zData: _analyzedTiltData,
+      xLabel: 'Roll',
+      yLabel: 'Pitch',
+      zLabel: 'Tilt',
+      yAxisLabel: 'Analyzed angle (°)',
+      xAxisLabel: 'Analyzed sample index',
     );
   }
 

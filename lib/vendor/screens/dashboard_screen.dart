@@ -593,8 +593,8 @@ class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen> {
       (db.sites as List).map((item) => item.createdAt as DateTime),
       days: 30,
     );
-    final userSeries = _dailySpotsFromDates(
-      (db.users as List).map((item) => item.createdAt as DateTime),
+    final deviceSeries = _dailySpotsFromDates(
+      (db.devices as List).map((item) => item.installedAt as DateTime),
       days: 30,
     );
     final criticalSeries = _dailySpotsFromDates(
@@ -644,10 +644,10 @@ class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen> {
             icon: Icons.sensors,
             xData: orgSeries,
             yData: siteSeries,
-            zData: userSeries,
+            zData: deviceSeries,
             xLabel: 'Clients',
             yLabel: 'Sites',
-            zLabel: 'Vendor Users',
+            zLabel: 'Devices',
             yAxisLabel: 'Entities per day',
             xAxisLabel: 'Last 30 days',
           ),
@@ -668,8 +668,6 @@ class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen> {
           const SizedBox(height: 18),
           _buildKinematicsRow(context),
           const SizedBox(height: 18),
-          _buildAnalyzedRow(context),
-          const SizedBox(height: 18),
           _buildAnalyticsGrid(context, db),
           const SizedBox(height: 18),
           _buildScatterCard(context),
@@ -677,8 +675,6 @@ class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen> {
           _buildSensorReadingsCard(context),
           const SizedBox(height: 18),
           _buildBottomLiveStats(context, db),
-          const SizedBox(height: 18),
-          _buildTiltRangeDistribution(context, db),
           const SizedBox(height: 18),
           _buildTopTiltSensorsCard(context, db),
         ],
@@ -920,27 +916,7 @@ class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen> {
   }
 
   Widget _buildKinematicsRow(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final twoCols = constraints.maxWidth >= 1050;
-        if (!twoCols) {
-          return Column(
-            children: [
-              _buildVelocityCard(context),
-              const SizedBox(height: 16),
-              _buildAccelerationTrendCard(context),
-            ],
-          );
-        }
-        return Row(
-          children: [
-            Expanded(child: _buildVelocityCard(context)),
-            const SizedBox(width: 16),
-            Expanded(child: _buildAccelerationTrendCard(context)),
-          ],
-        );
-      },
-    );
+    return _buildVelocityCard(context);
   }
 
   Widget _buildAnalyzedRow(BuildContext context) {

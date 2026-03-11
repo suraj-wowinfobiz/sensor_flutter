@@ -19,6 +19,27 @@ class _SitesScreenState extends State<SitesScreen> {
   String _location = '';
   String _organizationId = '';
 
+  Future<bool> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirm delete'),
+        content: const Text('Are you sure you want to delete this site?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -134,6 +155,8 @@ class _SitesScreenState extends State<SitesScreen> {
           onAdd: () => _showSiteModal(),
           onEdit: (index) => _showSiteModal(site: db.sites[index]),
           onDelete: (index) async {
+            final confirm = await _confirmDelete(context);
+            if (!confirm || !context.mounted) return;
             try {
               await db.delete('sites', db.sites[index].id);
             } catch (e) {
