@@ -1927,7 +1927,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   _tableHeading(context, 'Zone'),
                   _tableHeading(context, 'Installed'),
                 ],
-                rows: recentRows.map((r) {
+                rows: (recentRows.isEmpty
+                        ? const [
+                            ['--', '--', '--', '--', '--', '--']
+                          ]
+                        : recentRows)
+                    .map((r) {
                   return DataRow(cells: [
                     DataCell(Text(r[0])),
                     DataCell(Text(r[1])),
@@ -1940,14 +1945,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
             ),
           ),
-          if (recentRows.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text(
-                'No recent installations available.',
-                style: TextStyle(color: _mutedTextColor(context)),
-              ),
-            ),
         ],
       ),
     );

@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 
+import 'core/auth/global_login_screen.dart';
 import 'main_page.dart';
 import 'super_admin/core/providers/theme_riverpod_provider.dart';
 import 'super_admin/screens/super_admin_login_screen.dart';
@@ -119,6 +120,7 @@ class _AppRoot extends ConsumerWidget {
         },
         home: const MainPage(),
         routes: {
+          '/login': (context) => const GlobalLoginScreen(),
           '/login/user': (context) => const UserLoginScreen(),
           '/login/user-admin': (context) => const UserAdminLoginScreen(),
           '/login/engineer': (context) => const EngineerLoginScreen(),

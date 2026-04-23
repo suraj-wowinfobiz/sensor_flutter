@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../main_page.dart';
+import '../../core/auth/app_session.dart';
 import '../core/responsive/responsive_extensions.dart';
 import '../providers/super_admin_riverpod_provider.dart';
 import '../widgets/nav_bar.dart';
@@ -63,10 +63,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
   }
 
   void _logout() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const MainPage()),
-      (route) => false,
-    );
+    AppSession.logoutToLanding(context);
   }
 
   void _setCurrentView(String view) {

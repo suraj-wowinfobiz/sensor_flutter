@@ -1,0 +1,13 @@
+services:
+  flutter_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        ADMIN_API_BASE_URL: ${ADMIN_API_BASE_URL:-http://103.211.202.145:8091}
+        USER_API_BASE_URL: ${USER_API_BASE_URL:-http://103.211.202.145:8091}
+        USER_ADMIN_API_BASE_URL: ${USER_ADMIN_API_BASE_URL:-http://103.211.202.145:8091}
+        ENGINEER_API_BASE_URL: ${ENGINEER_API_BASE_URL:-http://195.250.21.120:8091}
+        VENDOR_API_BASE_URL: ${VENDOR_API_BASE_URL:-http://195.250.21.120:8091}
+    ports:
+      - "${APP_PORT:-9008}:80"

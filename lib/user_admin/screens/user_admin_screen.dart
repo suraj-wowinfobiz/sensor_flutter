@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/app_session.dart';
 import '../../super_admin/core/responsive/responsive_extensions.dart';
 import '../providers/user_admin_riverpod_provider.dart';
 import '../widgets/nav_bar.dart';
@@ -11,7 +12,6 @@ import 'analytics_screen.dart';
 import 'dashboard_screen.dart';
 import 'organizations_screen.dart';
 import 'settings_screen.dart';
-import 'user_admin_login_screen.dart';
 import 'users_screen.dart';
 
 class UserAdminScreen extends ConsumerStatefulWidget {
@@ -60,10 +60,7 @@ class _UserAdminScreenState extends ConsumerState<UserAdminScreen>
   }
 
   void _logout() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const UserAdminLoginScreen()),
-      (route) => false,
-    );
+    AppSession.logoutToLanding(context);
   }
 
   void _setCurrentView(String view) {

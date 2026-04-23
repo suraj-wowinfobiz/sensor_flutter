@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/app_session.dart';
 import '../../super_admin/core/responsive/responsive_extensions.dart';
 import '../providers/engineer_riverpod_provider.dart';
 import '../widgets/nav_bar.dart';
@@ -11,7 +12,6 @@ import 'analytics_screen.dart';
 import 'settings_screen.dart';
 import 'dashboard_screen.dart';
 import 'devices_screen.dart';
-import 'engineer_login_screen.dart';
 import 'sensors_screen.dart';
 
 class EngineerScreen extends ConsumerStatefulWidget {
@@ -74,10 +74,7 @@ class _EngineerScreenState extends ConsumerState<EngineerScreen>
   }
 
   void _logout() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const EngineerLoginScreen()),
-      (route) => false,
-    );
+    AppSession.logoutToLanding(context);
   }
 
   void _setCurrentView(String view) {

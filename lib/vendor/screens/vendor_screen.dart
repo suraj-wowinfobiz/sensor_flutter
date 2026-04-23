@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as p;
 
+import '../../core/auth/app_session.dart';
 import '../../super_admin/core/responsive/responsive_extensions.dart';
 import '../../super_admin/core/theme/custom_theme_tokens.dart';
 import '../../super_admin/providers/super_admin_backend_provider.dart';
@@ -14,7 +15,6 @@ import '../providers/vendor_riverpod_provider.dart';
 import 'dashboard_screen.dart';
 import 'map_screen.dart';
 import 'settings_screen.dart';
-import 'vendor_login_screen.dart';
 
 class VendorScreen extends ConsumerStatefulWidget {
   const VendorScreen({super.key});
@@ -53,10 +53,7 @@ class _VendorScreenState extends ConsumerState<VendorScreen>
   }
 
   void _logout() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const VendorLoginScreen()),
-      (route) => false,
-    );
+    AppSession.logoutToLanding(context);
   }
 
   void _setCurrentView(String view) {

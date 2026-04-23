@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/auth/app_session.dart';
 import '../../super_admin/providers/theme_provider.dart';
 import '../providers/engineer_database_provider.dart';
-import '../screens/engineer_login_screen.dart';
 import '../api/thresholds_api.dart';
 import '../api/users_api.dart';
 import '../../super_admin/widgets/crud_modal.dart';
@@ -906,13 +906,8 @@ class _EngineerAccountSettingsPanelState
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFE54C4C),
               ),
-              onPressed: () {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(
-                    builder: (_) => const EngineerLoginScreen(),
-                  ),
-                  (route) => false,
-                );
+              onPressed: () async {
+                await AppSession.logoutToLanding(context);
               },
               icon: const Icon(Icons.logout),
               label: const Text('Logout'),

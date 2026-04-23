@@ -558,6 +558,14 @@ class _UserAdminDashboardScreenState
     return '${minutes}m ago';
   }
 
+  String _shortDate(DateTime? when) {
+    if (when == null) return '--';
+    final yyyy = when.year.toString().padLeft(4, '0');
+    final mm = when.month.toString().padLeft(2, '0');
+    final dd = when.day.toString().padLeft(2, '0');
+    return '$yyyy-$mm-$dd';
+  }
+
   String _safeText(dynamic value, {String fallback = '--'}) {
     final text = value?.toString().trim() ?? '';
     return text.isEmpty ? fallback : text;
@@ -935,7 +943,7 @@ class _UserAdminDashboardScreenState
   }
 
   Widget _buildKinematicsRow(BuildContext context) {
-    return _buildVelocityCard(context);
+    return const SizedBox.shrink();
   }
 
   // Widget _buildAnalyzedRow(BuildContext context) {
@@ -1000,141 +1008,6 @@ class _UserAdminDashboardScreenState
   //     },
   //   );
   // }
-
-  Widget _buildVelocityCard(BuildContext context) {
-    final db = ref.watch(userAdminDatabaseChangeNotifierProvider);
-    final deviceSpots = _dailySpotsFromDates(
-      (db.devices as List).map((item) => item.installedAt as DateTime),
-      days: 14,
-    );
-    final sensorSpots = _dailySpotsFromDates(
-      (db.sensors as List).map((item) => item.installedAt as DateTime),
-      days: 14,
-    );
-    final all = [...deviceSpots, ...sensorSpots];
-    final hasData = all.isNotEmpty;
-    final maxY = hasData ? max(1.0, all.map((e) => e.y).reduce(max) + 1) : 1.0;
-
-    return _DashboardPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _panelTitle(context, 'Asset Install Momentum', Icons.speed_outlined),
-          const SizedBox(height: 8),
-          Text(
-            'Daily device vs sensor installs across the platform.',
-            style: TextStyle(fontSize: 12, color: _mutedTextColor(context)),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 300,
-            child: hasData
-                ? LineChart(
-                    LineChartData(
-                      minY: 0,
-                      maxY: maxY,
-                      gridData: FlGridData(
-                        show: true,
-                        drawVerticalLine: false,
-                        getDrawingHorizontalLine: (_) =>
-                            const FlLine(color: Color(0xFFd2dbe0)),
-                      ),
-                      borderData: FlBorderData(
-                        show: true,
-                        border: Border(
-                          left: BorderSide(color: Colors.blueGrey.shade200),
-                          bottom: BorderSide(color: Colors.blueGrey.shade200),
-                          top: BorderSide.none,
-                          right: BorderSide.none,
-                        ),
-                      ),
-                      titlesData: FlTitlesData(
-                        topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        leftTitles: AxisTitles(
-                          axisNameWidget: Text(
-                            'Installs',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: _mutedTextColor(context),
-                            ),
-                          ),
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 40,
-                            getTitlesWidget: (value, _) => Text(
-                              value.toStringAsFixed(2),
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  color: _mutedTextColor(context)),
-                            ),
-                          ),
-                        ),
-                        bottomTitles: AxisTitles(
-                          axisNameWidget: Text(
-                            'Day index',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: _mutedTextColor(context),
-                            ),
-                          ),
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 24,
-                            interval: 10,
-                            getTitlesWidget: (value, _) => Text(
-                              value.toInt().toString(),
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  color: _mutedTextColor(context)),
-                            ),
-                          ),
-                        ),
-                      ),
-                      lineBarsData: [
-                        LineChartBarData(
-                          spots: deviceSpots,
-                          isCurved: true,
-                          color: const Color(0xFF0f9ca0),
-                          barWidth: 2.5,
-                          dotData: const FlDotData(show: false),
-                        ),
-                        LineChartBarData(
-                          spots: sensorSpots,
-                          isCurved: true,
-                          color: const Color(0xFFF59E0B),
-                          barWidth: 2.0,
-                          dotData: const FlDotData(show: false),
-                        ),
-                      ],
-                    ),
-                  )
-                : Center(
-                    child: Text(
-                      'No install activity yet.',
-                      style: TextStyle(color: _mutedTextColor(context)),
-                    ),
-                  ),
-          ),
-          const SizedBox(height: 8),
-          const Wrap(
-            spacing: 12,
-            runSpacing: 6,
-            children: [
-              _LegendItem(color: Color(0xFF0f9ca0), label: 'Devices'),
-              _LegendItem(color: Color(0xFFF59E0B), label: 'Sensors'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildAccelerationTrendCard(BuildContext context) {
     final db = ref.watch(userAdminDatabaseChangeNotifierProvider);
@@ -1297,8 +1170,6 @@ class _UserAdminDashboardScreenState
               _statusDistributionCard(context, db),
               const SizedBox(height: 16),
               _tiltPatternCard(context),
-              const SizedBox(height: 16),
-              _thresholdMonitoringCard(context, db),
             ],
           );
         }
@@ -1315,121 +1186,11 @@ class _UserAdminDashboardScreenState
             Row(
               children: [
                 Expanded(child: _tiltPatternCard(context)),
-                const SizedBox(width: 16),
-                Expanded(child: _thresholdMonitoringCard(context, db)),
               ],
             ),
           ],
         );
       },
-    );
-  }
-
-  Widget _buildAnalyzedRadarCard(BuildContext context) {
-    final db = ref.watch(userAdminDatabaseChangeNotifierProvider);
-    final organizations = (db.organizations as List).length.toDouble();
-    final sites = (db.sites as List).length.toDouble();
-    final zones = (db.zones as List).length.toDouble();
-    final users = (db.users as List).length.toDouble();
-    final devices = (db.devices as List).length.toDouble();
-    final sensors = (db.sensors as List).length.toDouble();
-    final activeAlerts = (db.alerts as List)
-        .where((item) => item.resolvedAt == null)
-        .length
-        .toDouble();
-    final maxScale = max<double>(
-      1.0,
-      [organizations, sites, zones, users, devices, sensors, activeAlerts]
-          .reduce(max),
-    );
-    return _DashboardPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _panelTitle(
-            context,
-            'Platform Composition Profile',
-            Icons.radar_outlined,
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 300,
-            child: RadarChart(
-              RadarChartData(
-                radarShape: RadarShape.polygon,
-                tickCount: 5,
-                titlePositionPercentageOffset: 0.16,
-                titleTextStyle: TextStyle(
-                  color: _mutedTextColor(context),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-                ticksTextStyle: TextStyle(
-                  color: _mutedTextColor(context),
-                  fontSize: 10,
-                ),
-                tickBorderData: BorderSide(
-                  color: Theme.of(context).dividerColor,
-                  width: 1,
-                ),
-                gridBorderData: BorderSide(
-                  color: Theme.of(context).dividerColor,
-                  width: 1,
-                ),
-                getTitle: (index, angle) {
-                  const titles = [
-                    'Orgs',
-                    'Sites',
-                    'Zones',
-                    'Users',
-                    'Devices',
-                    'Sensors',
-                    'Alerts',
-                  ];
-                  return RadarChartTitle(
-                    text: titles[index],
-                    angle: angle,
-                  );
-                },
-                dataSets: [
-                  RadarDataSet(
-                    fillColor: Theme.of(context).colorScheme.primary.withValues(
-                          alpha: 0.20,
-                        ),
-                    borderColor: Theme.of(context).colorScheme.primary,
-                    borderWidth: 2.2,
-                    entryRadius: 3.2,
-                    dataEntries: [
-                      RadarEntry(value: _radarScale(organizations, maxScale)),
-                      RadarEntry(value: _radarScale(sites, maxScale)),
-                      RadarEntry(value: _radarScale(zones, maxScale)),
-                      RadarEntry(value: _radarScale(users, maxScale)),
-                      RadarEntry(value: _radarScale(devices, maxScale)),
-                      RadarEntry(value: _radarScale(sensors, maxScale)),
-                      RadarEntry(value: _radarScale(activeAlerts, maxScale)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              _valueChip(context, 'Orgs', organizations.toStringAsFixed(0)),
-              _valueChip(context, 'Sites', sites.toStringAsFixed(0)),
-              _valueChip(context, 'Zones', zones.toStringAsFixed(0)),
-              _valueChip(context, 'Users', users.toStringAsFixed(0)),
-              _valueChip(context, 'Devices', devices.toStringAsFixed(0)),
-              _valueChip(context, 'Sensors', sensors.toStringAsFixed(0)),
-              _valueChip(
-                  context, 'Active Alerts', activeAlerts.toStringAsFixed(0)),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -1745,140 +1506,6 @@ class _UserAdminDashboardScreenState
     );
   }
 
-  Widget _thresholdMonitoringCard(BuildContext context, dynamic db) {
-    final organizations = (db.organizations as List).length;
-    final sites = (db.sites as List).length;
-    final zones = (db.zones as List).length;
-    final sensors = (db.sensors as List).length;
-    final devices = (db.devices as List).length;
-    final thresholdValues = (db.thresholdValues as List).length;
-    final mappedSites = (db.sites as List)
-        .where((item) => (item.organizationId as String).trim().isNotEmpty)
-        .length;
-    final mappedSensors = (db.sensors as List)
-        .where((item) => (item.deviceId as String).trim().isNotEmpty)
-        .length;
-    final bars = <({String label, int value, int total})>[
-      (
-        label: 'Organizations',
-        value: organizations,
-        total: max(1, organizations)
-      ),
-      (label: 'Sites Mapped', value: mappedSites, total: max(1, sites)),
-      (label: 'Zones', value: zones, total: max(1, zones)),
-      (label: 'Devices', value: devices, total: max(1, devices)),
-      (label: 'Sensors Mapped', value: mappedSensors, total: max(1, sensors)),
-      (label: 'Thresholds', value: thresholdValues, total: max(1, sensors)),
-    ];
-    final maxBar = max<double>(
-        1.0, bars.map((item) => item.value.toDouble()).reduce(max) + 1);
-
-    return _DashboardPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _panelTitle(
-              context, 'Governance Coverage', Icons.warning_amber_rounded),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 280,
-            child: BarChart(
-              BarChartData(
-                minY: 0,
-                maxY: maxBar,
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  horizontalInterval: (maxBar / 5).clamp(0.5, 20.0),
-                  getDrawingHorizontalLine: (_) =>
-                      const FlLine(color: Color(0xFFd2dbe0)),
-                ),
-                borderData: FlBorderData(
-                  show: true,
-                  border: Border(
-                    left: BorderSide(color: Colors.blueGrey.shade200),
-                    bottom: BorderSide(color: Colors.blueGrey.shade200),
-                    top: BorderSide.none,
-                    right: BorderSide.none,
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  leftTitles: const AxisTitles(
-                    axisNameWidget: Text(
-                      'Count',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1E2930),
-                      ),
-                    ),
-                    sideTitles: SideTitles(showTitles: true, reservedSize: 34),
-                  ),
-                  bottomTitles: AxisTitles(
-                    axisNameWidget: const Text(
-                      'Control metrics',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1E2930),
-                      ),
-                    ),
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) => Transform.rotate(
-                        angle: -0.7,
-                        child: Text(
-                          () {
-                            final i = value.toInt();
-                            if (i < 0 || i >= bars.length) return '--';
-                            final label = bars[i].label;
-                            return label.length > 9
-                                ? '${label.substring(0, 9)}…'
-                                : label;
-                          }(),
-                          style: TextStyle(
-                              fontSize: 10, color: _mutedTextColor(context)),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                extraLinesData: const ExtraLinesData(horizontalLines: []),
-                barGroups: List.generate(bars.length, (i) {
-                  final value = bars[i].value.toDouble();
-                  final ratio =
-                      bars[i].total == 0 ? 0.0 : value / bars[i].total;
-                  final color = ratio < 0.5
-                      ? const Color(0xFFea3e43)
-                      : ratio < 0.85
-                          ? const Color(0xFFd39a00)
-                          : const Color(0xFF0ca15f);
-                  return BarChartGroupData(
-                    x: i,
-                    barRods: [
-                      BarChartRodData(
-                        toY: value,
-                        width: 26,
-                        color: color,
-                        borderRadius: BorderRadius.circular(0),
-                      ),
-                    ],
-                  );
-                }),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildScatterCard(BuildContext context) {
     final db = ref.watch(userAdminDatabaseChangeNotifierProvider);
     final points = <ScatterSpot>[];
@@ -2018,23 +1645,42 @@ class _UserAdminDashboardScreenState
     final sites = List.of(db.sites as List);
     final zones = List.of(db.zones as List);
     final organizations = List.of(db.organizations as List);
-    final alerts = List.of(db.alerts as List)
-      ..sort((a, b) =>
-          (b.triggeredAt as DateTime).compareTo(a.triggeredAt as DateTime));
-    final rows = alerts.take(8).map((alert) {
-      final sensorId = (alert.sensorId as String).trim();
-      final shortId =
-          sensorId.length > 12 ? '${sensorId.substring(0, 12)}…' : sensorId;
-      final sensor = sensors
-          .where((item) => (item.id as String).trim() == sensorId)
+    final rows = <List<String>>[];
+    for (final device in devices) {
+      final site = sites
+          .where((item) =>
+              (item.id as String).trim() ==
+              (device.siteId as String).trim())
           .firstOrNull;
-      final device = sensor == null
+      final zone = zones
+          .where((item) =>
+              (item.id as String).trim() ==
+              (device.zoneId as String).trim())
+          .firstOrNull;
+      final organization = site == null
           ? null
-          : devices
+          : organizations
               .where((item) =>
                   (item.id as String).trim() ==
-                  (sensor.deviceId as String).trim())
+                  (site.organizationId as String).trim())
               .firstOrNull;
+      rows.add([
+        'Device',
+        (device.deviceCode as String?)?.trim().isNotEmpty == true
+            ? device.deviceCode as String
+            : (device.serialNumber as String? ?? device.id as String),
+        organization?.name ?? '--',
+        site?.name ?? '--',
+        zone?.name ?? '--',
+        _shortDate(device.installedAt as DateTime?),
+      ]);
+    }
+    for (final sensor in sensors) {
+      final device = devices
+          .where((item) =>
+              (item.id as String).trim() ==
+              (sensor.deviceId as String).trim())
+          .firstOrNull;
       final site = device == null
           ? null
           : sites
@@ -2056,23 +1702,19 @@ class _UserAdminDashboardScreenState
                   (item.id as String).trim() ==
                   (site.organizationId as String).trim())
               .firstOrNull;
-      final level = (alert.alertLevel as String).trim().toLowerCase();
-      final status = level.contains('critical') || level.contains('high')
-          ? 'critical'
-          : level.contains('warn')
-              ? 'warning'
-              : 'normal';
-      return [
-        shortId,
-        '${organization?.name ?? '--'} / ${site?.name ?? '--'}',
+      rows.add([
+        'Sensor',
+        (sensor.serialNumber as String?)?.trim().isNotEmpty == true
+            ? sensor.serialNumber as String
+            : (sensor.id as String),
+        organization?.name ?? '--',
+        site?.name ?? '--',
         zone?.name ?? '--',
-        (alert.alertLevel as String),
-        (alert.status as String).isEmpty ? '--' : (alert.status as String),
-        (alert.message as String),
-        status,
-        _agoLabel(alert.triggeredAt as DateTime),
-      ];
-    }).toList();
+        _shortDate(sensor.installedAt as DateTime?),
+      ]);
+    }
+    rows.sort((a, b) => b[5].compareTo(a[5]));
+    final recentRows = rows.take(8).toList();
 
     return _DashboardPanel(
       child: Column(
@@ -2085,8 +1727,8 @@ class _UserAdminDashboardScreenState
             children: [
               _panelTitle(
                 context,
-                'Recent Processed Events - Live Feed',
-                Icons.show_chart_outlined,
+                'Recent Installations',
+                Icons.inventory_2_outlined,
               ),
               _chip(context, 'Export', icon: Icons.upload_outlined),
             ],
@@ -2110,19 +1752,19 @@ class _UserAdminDashboardScreenState
                 horizontalMargin: 10,
                 columnSpacing: 26,
                 columns: [
-                  _tableHeading(context, 'Source ID'),
-                  _tableHeading(context, 'Tenant / Site'),
+                  _tableHeading(context, 'Type'),
+                  _tableHeading(context, 'Asset'),
+                  _tableHeading(context, 'Organization'),
+                  _tableHeading(context, 'Site'),
                   _tableHeading(context, 'Zone'),
-                  _tableHeading(context, 'Severity'),
-                  _tableHeading(context, 'Alert Status'),
-                  _tableHeading(context, 'Message'),
-                  _tableHeading(context, 'Risk'),
-                  _tableHeading(context, 'Last Update'),
+                  _tableHeading(context, 'Installed'),
                 ],
-                rows: rows.map((r) {
-                  final status = r[6];
-                  final isWarning = status == 'warning';
-                  final isCritical = status == 'critical';
+                rows: (recentRows.isEmpty
+                        ? const [
+                            ['--', '--', '--', '--', '--', '--']
+                          ]
+                        : recentRows)
+                    .map((r) {
                   return DataRow(cells: [
                     DataCell(Text(r[0])),
                     DataCell(Text(r[1])),
@@ -2130,50 +1772,11 @@ class _UserAdminDashboardScreenState
                     DataCell(Text(r[3])),
                     DataCell(Text(r[4])),
                     DataCell(Text(r[5])),
-                    DataCell(Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: isCritical
-                            ? const Color(0xFFf7d3d6)
-                            : isWarning
-                                ? const Color(0xFFf9edc9)
-                                : const Color(0xFFd7f2df),
-                        border: Border.all(
-                          color: isCritical
-                              ? const Color(0xFFe35b63)
-                              : isWarning
-                                  ? const Color(0xFFd9a21d)
-                                  : const Color(0xFF2eaf61),
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Text(
-                        status,
-                        style: TextStyle(
-                          color: isCritical
-                              ? const Color(0xFFb2262e)
-                              : isWarning
-                                  ? const Color(0xFFb38200)
-                                  : const Color(0xFF0d9a4d),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    )),
-                    DataCell(Text(r[7])),
                   ]);
                 }).toList(),
               ),
             ),
           ),
-          if (rows.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text(
-                'No recent alert records available.',
-                style: TextStyle(color: _mutedTextColor(context)),
-              ),
-            ),
         ],
       ),
     );

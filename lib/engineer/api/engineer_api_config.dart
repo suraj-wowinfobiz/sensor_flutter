@@ -1,5 +1,7 @@
+import '../../core/config/app_api_endpoints.dart';
+
 class EngineerApiConfig {
   EngineerApiConfig._();
 
-  static const String baseUrl = 'http://195.250.21.120:8091';
+  static const String baseUrl = AppApiEndpoints.engineerBaseUrl;
 }

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/app_session.dart';
 import '../../super_admin/core/responsive/responsive_extensions.dart';
 import '../../user/widgets/nav_bar.dart';
 import '../providers/analytics_riverpod_provider.dart';
-import 'analytics_login_screen.dart';
 import 'dashboard_screen.dart';
 import 'settings_screen.dart';
 
@@ -46,10 +46,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
   }
 
   void _logout() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const AnalyticsLoginScreen()),
-      (route) => false,
-    );
+    AppSession.logoutToLanding(context);
   }
 
   void _setCurrentView(String view) {

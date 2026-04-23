@@ -11,8 +11,8 @@ class UsersScreen extends StatefulWidget {
 
   const UsersScreen({
     super.key,
-    this.createDefaultRole = 'engineer',
-    this.selectableRoles = const ['engineer', 'admin', 'vendor'],
+    this.createDefaultRole = 'admin',
+    this.selectableRoles = const ['admin', 'vendor'],
   });
 
   @override
@@ -121,8 +121,6 @@ class _UsersScreenState extends State<UsersScreen> {
         switch (role) {
           case 'vendor_engineer':
             return 'Vendor Engineer';
-          case 'engineer':
-            return 'Engineer';
           case 'admin':
             return 'User Admin';
           case 'vendor':
@@ -1690,11 +1688,6 @@ class _UsersScreenState extends State<UsersScreen> {
                             DropdownMenuItem(
                                 value: 'admin', child: Text('User Admin')),
                             DropdownMenuItem(
-                                value: 'engineer', child: Text('Engineer')),
-                            DropdownMenuItem(
-                                value: 'vendor_engineer',
-                                child: Text('Vendor Engineer')),
-                            DropdownMenuItem(
                                 value: 'vendor', child: Text('Vendor')),
                           ],
                           onChanged: (value) =>
@@ -1754,11 +1747,6 @@ class _UsersScreenState extends State<UsersScreen> {
                                     value: 'all', child: Text('All Roles')),
                                 DropdownMenuItem(
                                     value: 'admin', child: Text('User Admin')),
-                                DropdownMenuItem(
-                                    value: 'engineer', child: Text('Engineer')),
-                                DropdownMenuItem(
-                                    value: 'vendor_engineer',
-                                    child: Text('Vendor Engineer')),
                                 DropdownMenuItem(
                                     value: 'vendor', child: Text('Vendor')),
                               ],
