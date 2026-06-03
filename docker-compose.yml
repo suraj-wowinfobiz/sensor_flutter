@@ -1,5 +1,6 @@
 services:
-  flutter_app:
+  sensorfrontend:
+    image: sensorfrontend:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -10,4 +11,4 @@ services:
         ENGINEER_API_BASE_URL: ${ENGINEER_API_BASE_URL:-http://195.250.21.120:8091}
         VENDOR_API_BASE_URL: ${VENDOR_API_BASE_URL:-http://195.250.21.120:8091}
     ports:
-      - "${APP_PORT:-9008}:80"
+      - "${APP_PORT:-8093}:80"

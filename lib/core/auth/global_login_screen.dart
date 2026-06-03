@@ -225,14 +225,17 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
 
     switch (_selectedRole) {
       case AppLoginRole.user:
-        final response = await UserLoginApi.login(email: email, password: password);
+        final response =
+            await UserLoginApi.login(email: email, password: password);
         if (response.status.toUpperCase() != 'SUCCESS') {
           throw response.message;
         }
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_selectedRole.principalKey, response.body.principalId.trim());
+        await prefs.setString(
+            _selectedRole.principalKey, response.body.principalId.trim());
         await user_api_client.ApiClient.setAuthToken(response.body.token);
-        await super_admin_api_client.ApiClient.setAuthToken(response.body.token);
+        await super_admin_api_client.ApiClient.setAuthToken(
+            response.body.token);
         await AppSession.saveSession(
           token: response.body.token,
           username: email,
@@ -241,12 +244,14 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
         await _pushHome(const UserPage());
         return;
       case AppLoginRole.userAdmin:
-        final response = await UserAdminLoginApi.login(email: email, password: password);
+        final response =
+            await UserAdminLoginApi.login(email: email, password: password);
         if (response.status.toUpperCase() != 'SUCCESS') {
           throw response.message;
         }
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_selectedRole.principalKey, response.body.principalId.trim());
+        await prefs.setString(
+            _selectedRole.principalKey, response.body.principalId.trim());
         await user_admin_api_client.ApiClient.setAuthToken(response.body.token);
         await AppSession.saveSession(
           token: response.body.token,
@@ -256,12 +261,14 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
         await _pushHome(const UserAdminPage());
         return;
       case AppLoginRole.engineer:
-        final response = await EngineerLoginApi.login(email: email, password: password);
+        final response =
+            await EngineerLoginApi.login(email: email, password: password);
         if (response.status.toUpperCase() != 'SUCCESS') {
           throw response.message;
         }
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_selectedRole.principalKey, response.body.principalId.trim());
+        await prefs.setString(
+            _selectedRole.principalKey, response.body.principalId.trim());
         await engineer_api_client.ApiClient.setAuthToken(response.body.token);
         await AppSession.saveSession(
           token: response.body.token,
@@ -271,14 +278,17 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
         await _pushHome(const EngineerPage());
         return;
       case AppLoginRole.vendor:
-        final response = await VendorLoginApi.login(email: email, password: password);
+        final response =
+            await VendorLoginApi.login(email: email, password: password);
         if (response.status.toUpperCase() != 'SUCCESS') {
           throw response.message;
         }
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_selectedRole.principalKey, response.body.principalId.trim());
+        await prefs.setString(
+            _selectedRole.principalKey, response.body.principalId.trim());
         await vendor_api_client.ApiClient.setAuthToken(response.body.token);
-        await super_admin_api_client.ApiClient.setAuthToken(response.body.token);
+        await super_admin_api_client.ApiClient.setAuthToken(
+            response.body.token);
         await AppSession.saveSession(
           token: response.body.token,
           username: email,
@@ -289,11 +299,14 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
       case AppLoginRole.analytics:
         if (email == 'analytics' && password == '123456') {
           try {
-            final response = await AnalyticsLoginApi.login(email: email, password: password);
+            final response =
+                await AnalyticsLoginApi.login(email: email, password: password);
             if (response.status.toUpperCase() == 'SUCCESS') {
               final prefs = await SharedPreferences.getInstance();
-              await prefs.setString(_selectedRole.principalKey, response.body.principalId.trim());
-              await super_admin_api_client.ApiClient.setAuthToken(response.body.token);
+              await prefs.setString(
+                  _selectedRole.principalKey, response.body.principalId.trim());
+              await super_admin_api_client.ApiClient.setAuthToken(
+                  response.body.token);
               await AppSession.saveSession(
                 token: response.body.token,
                 username: email,
@@ -311,13 +324,16 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
           return;
         }
 
-        final response = await AnalyticsLoginApi.login(email: email, password: password);
+        final response =
+            await AnalyticsLoginApi.login(email: email, password: password);
         if (response.status.toUpperCase() != 'SUCCESS') {
           throw response.message;
         }
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_selectedRole.principalKey, response.body.principalId.trim());
-        await super_admin_api_client.ApiClient.setAuthToken(response.body.token);
+        await prefs.setString(
+            _selectedRole.principalKey, response.body.principalId.trim());
+        await super_admin_api_client.ApiClient.setAuthToken(
+            response.body.token);
         await AppSession.saveSession(
           token: response.body.token,
           username: email,
@@ -326,13 +342,16 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
         await _pushHome(const AnalyticsPage());
         return;
       case AppLoginRole.superAdmin:
-        final response = await SuperAdminLoginApi.login(email: email, password: password);
+        final response =
+            await SuperAdminLoginApi.login(email: email, password: password);
         if (response.status.toUpperCase() != 'SUCCESS') {
           throw response.message;
         }
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_selectedRole.principalKey, response.body.principalId.trim());
-        await super_admin_api_client.ApiClient.setAuthToken(response.body.token);
+        await prefs.setString(
+            _selectedRole.principalKey, response.body.principalId.trim());
+        await super_admin_api_client.ApiClient.setAuthToken(
+            response.body.token);
         await AppSession.saveSession(
           token: response.body.token,
           username: email,
@@ -417,16 +436,19 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Expanded(flex: 12, child: _buildBrandPanel(context)),
-                              Expanded(flex: 10, child: _buildFormPanel(context)),
+                              Expanded(
+                                  flex: 12, child: _buildBrandPanel(context)),
+                              Expanded(
+                                flex: 10,
+                                child:
+                                    _buildFormPanel(context, isMobile: false),
+                              ),
                             ],
                           ),
                         )
-                      : Column(
-                          children: [
-                            _buildBrandPanel(context),
-                            _buildFormPanel(context),
-                          ],
+                      : Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: _buildFormPanel(context, isMobile: true),
                         ),
                 ),
               ),
@@ -516,31 +538,57 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
     );
   }
 
-  Widget _buildFormPanel(BuildContext context) {
+  Widget _buildFormPanel(
+    BuildContext context, {
+    required bool isMobile,
+  }) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.all(48),
+      padding: EdgeInsets.all(isMobile ? 24 : 48),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text(
-            'Login',
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF0A0A0A),
+          Center(
+            child: Column(
+              children: [
+                Container(
+                  width: isMobile ? 52 : 60,
+                  height: isMobile ? 52 : 60,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1A1A1A), Color(0xFFF5A623)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(
+                    Icons.construction,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Login',
+                  style: TextStyle(
+                    fontSize: isMobile ? 26 : 32,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF0A0A0A),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Access your dashboard to monitor construction sites',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF6B6B6B),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Access your dashboard to monitor construction sites',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF6B6B6B),
-            ),
-          ),
-          const SizedBox(height: 32),
+          SizedBox(height: isMobile ? 24 : 32),
           Form(
             key: _formKey,
             child: Column(
@@ -559,22 +607,27 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                   controller: _emailController,
                   decoration: InputDecoration(
                     hintText: _selectedRole.emailHint,
-                    prefixIcon: const Icon(Icons.person_outline, color: Color(0xFFF5A623)),
+                    prefixIcon: const Icon(Icons.person_outline,
+                        color: Color(0xFFF5A623)),
                     filled: true,
                     fillColor: Colors.white,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(48),
-                      borderSide: const BorderSide(color: Color(0xFFE8EAED), width: 1.5),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFE8EAED), width: 1.5),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(48),
-                      borderSide: const BorderSide(color: Color(0xFFE8EAED), width: 1.5),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFE8EAED), width: 1.5),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(48),
-                      borderSide: const BorderSide(color: Color(0xFFF5A623), width: 1.5),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFF5A623), width: 1.5),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -584,7 +637,6 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
-             
                 const Text(
                   'Password',
                   style: TextStyle(
@@ -599,13 +651,16 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     hintText: 'Enter your password',
-                    prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFFF5A623)),
+                    prefixIcon: const Icon(Icons.lock_outline,
+                        color: Color(0xFFF5A623)),
                     suffixIcon: IconButton(
                       onPressed: () {
                         setState(() => _obscurePassword = !_obscurePassword);
                       },
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        _obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
                         color: const Color(0xFF6B6B6B),
                       ),
                     ),
@@ -613,17 +668,21 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                     fillColor: Colors.white,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(48),
-                      borderSide: const BorderSide(color: Color(0xFFE8EAED), width: 1.5),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFE8EAED), width: 1.5),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(48),
-                      borderSide: const BorderSide(color: Color(0xFFE8EAED), width: 1.5),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFE8EAED), width: 1.5),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(48),
-                      borderSide: const BorderSide(color: Color(0xFFF5A623), width: 1.5),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFF5A623), width: 1.5),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -633,7 +692,7 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
-                  const Text(
+                const Text(
                   'Login as',
                   style: TextStyle(
                     fontSize: 14,
@@ -643,7 +702,7 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<AppLoginRole>(
-                  value: _selectedRole,
+                  initialValue: _selectedRole,
                   decoration: InputDecoration(
                     prefixIcon: Icon(
                       _selectedRole.icon,
@@ -653,17 +712,21 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                     fillColor: Colors.white,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(48),
-                      borderSide: const BorderSide(color: Color(0xFFE8EAED), width: 1.5),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFE8EAED), width: 1.5),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(48),
-                      borderSide: const BorderSide(color: Color(0xFFE8EAED), width: 1.5),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFE8EAED), width: 1.5),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(48),
-                      borderSide: const BorderSide(color: Color(0xFFF5A623), width: 1.5),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFF5A623), width: 1.5),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
                   ),
                   items: AppLoginRole.values
                       .map(
@@ -679,50 +742,55 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: Checkbox(
-                            value: _rememberMe,
-                            onChanged: (value) {
-                              setState(() => _rememberMe = value ?? false);
-                            },
-                            activeColor: const Color(0xFFF5A623),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                if (!isMobile) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: Checkbox(
+                              value: _rememberMe,
+                              onChanged: (value) {
+                                setState(() => _rememberMe = value ?? false);
+                              },
+                              activeColor: const Color(0xFFF5A623),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4)),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Remember me',
-                          style: TextStyle(fontSize: 14),
-                        ),
-                      ],
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Password reset link sent to your email'),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Remember me',
+                            style: TextStyle(fontSize: 14),
                           ),
-                        );
-                      },
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFFF5A623),
-                        textStyle: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        ],
                       ),
-                      child: const Text('Forgot your password?'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 28),
+                      TextButton(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Password reset link sent to your email'),
+                            ),
+                          );
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFFF5A623),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        child: const Text('Forgot your password?'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
+                ] else
+                  const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
                   height: 52,
@@ -746,7 +814,8 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0A0A0A)),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF0A0A0A)),
                             ),
                           )
                         : Row(
@@ -759,35 +828,37 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                           ),
                   ),
                 ),
-                const SizedBox(height: 28),
-                Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'Don\'t have any account? ',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF6B6B6B),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => AppSession.logoutToLanding(context),
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFFF5A623),
-                          padding: EdgeInsets.zero,
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          textStyle: const TextStyle(
+                if (!isMobile) ...[
+                  const SizedBox(height: 28),
+                  Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'Don\'t have any account? ',
+                          style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF6B6B6B),
                           ),
                         ),
-                        child: const Text('Sign Up'),
-                      ),
-                    ],
+                        TextButton(
+                          onPressed: () => AppSession.logoutToLanding(context),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFFF5A623),
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            textStyle: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          child: const Text('Sign Up'),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'user_admin_api_config.dart';
 
@@ -97,7 +98,11 @@ class AuthApi {
           'Login failed (${response.statusCode}): ${response.body}');
     } on TimeoutException {
       throw AuthApiException(
-        'CORS timeout. Run: flutter run -d chrome --web-browser-flag "--disable-web-security"',
+        'Request timed out. Please check your internet connection and server URL.',
+      );
+    } on SocketException catch (e) {
+      throw AuthApiException(
+        'Network connection failed: ${e.message}. If you are on Android, make sure the server allows HTTP traffic.',
       );
     } on http.ClientException catch (e) {
       throw AuthApiException('Network error: ${e.message}');

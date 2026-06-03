@@ -201,21 +201,9 @@ class _MainPageState extends State<MainPage> {
                   onTap: () => _scrollToSection('contact'),
                 ),
                 const SizedBox(width: 8),
-                OutlinedButton(
-                  onPressed: _openLogin,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFF5A623),
-                    side: const BorderSide(color: Color(0xFFF5A623)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(48),
-                    ),
-                  ),
-                  child: const Text('Login'),
-                ),
-                const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: _openLogin,
-                  child: const Text('Request Demo'),
+                  child: const Text('Login'),
                 ),
                 const SizedBox(width: 20),
               ],
@@ -274,6 +262,7 @@ class _MainPageState extends State<MainPage> {
             ),
           // Hero Section
           SliverToBoxAdapter(
+            key: _sectionKeys['home'],
             child: Container(
               height: 550,
               decoration: BoxDecoration(
@@ -283,9 +272,7 @@ class _MainPageState extends State<MainPage> {
                   colors: [Colors.black87, Colors.black54],
                 ),
                 image: DecorationImage(
-                  image: const NetworkImage(
-                    'https://images.unsplash.com/photo-1541888946425-d81bb19240f5?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80',
-                  ),
+                  image: const AssetImage('assets/images/construction.jpg'),
                   fit: BoxFit.cover,
                   colorFilter: ColorFilter.mode(
                     Colors.black.withValues(alpha: 0.5),
@@ -348,6 +335,7 @@ class _MainPageState extends State<MainPage> {
           ),
           // What It Helps With Section
           SliverToBoxAdapter(
+            key: _sectionKeys['features'],
             child: _SectionBlock(
               title: 'What It Helps With',
               subtitle: 'Real-time monitoring for complete site safety',
@@ -393,6 +381,7 @@ class _MainPageState extends State<MainPage> {
           ),
           // Use Cases Section
           SliverToBoxAdapter(
+            key: _sectionKeys['useCases'],
             child: _SectionBlock(
               title: 'Use Cases',
               subtitle: 'Trusted across the construction industry',
@@ -502,6 +491,7 @@ class _MainPageState extends State<MainPage> {
           ),
           // Final CTA Section
           SliverToBoxAdapter(
+            key: _sectionKeys['contact'],
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
               child: Container(
@@ -606,7 +596,7 @@ class _NavAction extends StatelessWidget {
       onPressed: onTap,
       child: Text(
         label,
-        style: const TextStyle(fontWeight: FontWeight.w600),
+        style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black),
       ),
     );
   }
@@ -979,10 +969,6 @@ class _Footer extends StatelessWidget {
                     _FooterColumn(
                       title: 'Quick Links',
                       links: ['Home', 'Features', 'Use Cases', 'Login'],
-                    ),
-                    _FooterColumn(
-                      title: 'Contact',
-                      contacts: ['+1 (800) 555-0199', 'hello@siteguardian.com', '4120 Industrial Ave, Houston, TX'],
                     ),
                     _FooterColumn(
                       title: 'Resources',
