@@ -49,7 +49,8 @@ class SiteGuardianApp extends StatelessWidget {
             borderRadius: BorderRadius.circular(28),
             borderSide: const BorderSide(color: Color(0xFFF5A623), width: 1.5),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
@@ -60,7 +61,8 @@ class SiteGuardianApp extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(48),
             ),
-            textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            textStyle:
+                const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
@@ -319,7 +321,8 @@ class _MainPageState extends State<MainPage> {
                             OutlinedButton(
                               onPressed: () => _scrollToSection('contact'),
                               style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Colors.white, width: 2),
+                                side: const BorderSide(
+                                    color: Colors.white, width: 2),
                                 foregroundColor: Colors.white,
                               ),
                               child: const Text('Contact Us'),
@@ -342,17 +345,20 @@ class _MainPageState extends State<MainPage> {
               child: Wrap(
                 spacing: 20,
                 runSpacing: 20,
-                children: _helpCards.map((card) => SizedBox(
-                  width: (MediaQuery.of(context).size.width >= 1100) ? 280 :
-                         (MediaQuery.of(context).size.width >= 640) ? 
-                         (MediaQuery.of(context).size.width - 88) / 2 : 
-                         MediaQuery.of(context).size.width - 48,
-                  child: _FeatureCard(
-                    icon: card['icon'],
-                    title: card['title'],
-                    description: card['description'],
-                  ),
-                )).toList(),
+                children: _helpCards
+                    .map((card) => SizedBox(
+                          width: (MediaQuery.of(context).size.width >= 1100)
+                              ? 280
+                              : (MediaQuery.of(context).size.width >= 640)
+                                  ? (MediaQuery.of(context).size.width - 88) / 2
+                                  : MediaQuery.of(context).size.width - 48,
+                          child: _FeatureCard(
+                            icon: card['icon'],
+                            title: card['title'],
+                            description: card['description'],
+                          ),
+                        ))
+                    .toList(),
               ),
             ),
           ),
@@ -365,17 +371,20 @@ class _MainPageState extends State<MainPage> {
               child: Wrap(
                 spacing: 20,
                 runSpacing: 20,
-                children: _featureCards.map((card) => SizedBox(
-                  width: (MediaQuery.of(context).size.width >= 1100) ? 280 :
-                         (MediaQuery.of(context).size.width >= 640) ? 
-                         (MediaQuery.of(context).size.width - 88) / 2 : 
-                         MediaQuery.of(context).size.width - 48,
-                  child: _FeatureCard(
-                    icon: card['icon'],
-                    title: card['title'],
-                    description: card['description'],
-                  ),
-                )).toList(),
+                children: _featureCards
+                    .map((card) => SizedBox(
+                          width: (MediaQuery.of(context).size.width >= 1100)
+                              ? 280
+                              : (MediaQuery.of(context).size.width >= 640)
+                                  ? (MediaQuery.of(context).size.width - 88) / 2
+                                  : MediaQuery.of(context).size.width - 48,
+                          child: _FeatureCard(
+                            icon: card['icon'],
+                            title: card['title'],
+                            description: card['description'],
+                          ),
+                        ))
+                    .toList(),
               ),
             ),
           ),
@@ -388,17 +397,20 @@ class _MainPageState extends State<MainPage> {
               child: Wrap(
                 spacing: 20,
                 runSpacing: 20,
-                children: _useCases.map((card) => SizedBox(
-                  width: (MediaQuery.of(context).size.width >= 1100) ? 280 :
-                         (MediaQuery.of(context).size.width >= 640) ? 
-                         (MediaQuery.of(context).size.width - 88) / 2 : 
-                         MediaQuery.of(context).size.width - 48,
-                  child: _FeatureCard(
-                    icon: card['icon'],
-                    title: card['title'],
-                    description: card['description'],
-                  ),
-                )).toList(),
+                children: _useCases
+                    .map((card) => SizedBox(
+                          width: (MediaQuery.of(context).size.width >= 1100)
+                              ? 280
+                              : (MediaQuery.of(context).size.width >= 640)
+                                  ? (MediaQuery.of(context).size.width - 88) / 2
+                                  : MediaQuery.of(context).size.width - 48,
+                          child: _FeatureCard(
+                            icon: card['icon'],
+                            title: card['title'],
+                            description: card['description'],
+                          ),
+                        ))
+                    .toList(),
               ),
             ),
           ),
@@ -411,9 +423,12 @@ class _MainPageState extends State<MainPage> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final isRow = constraints.maxWidth >= 768;
-                  final children = _steps.map((step) => _StepTile(step: step)).toList();
+                  final children =
+                      _steps.map((step) => _StepTile(step: step)).toList();
                   return isRow
-                      ? Row(children: children.map((e) => Expanded(child: e)).toList())
+                      ? Row(
+                          children:
+                              children.map((e) => Expanded(child: e)).toList())
                       : Column(children: children);
                 },
               ),
@@ -447,7 +462,10 @@ class _MainPageState extends State<MainPage> {
                     icon: Icons.warning_amber,
                     value: '2 active alerts',
                     showChart: false,
-                    alerts: ['10:32 AM - Dust level high', '09:15 AM - Noise exceedance'],
+                    alerts: [
+                      '10:32 AM - Dust level high',
+                      '09:15 AM - Noise exceedance'
+                    ],
                   ),
                 ],
               ),
@@ -503,7 +521,8 @@ class _MainPageState extends State<MainPage> {
                   ),
                   borderRadius: BorderRadius.circular(48),
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 32),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 60, horizontal: 32),
                 child: Column(
                   children: [
                     Text(
@@ -530,7 +549,8 @@ class _MainPageState extends State<MainPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 40, vertical: 14),
                       ),
                       child: const Text('Get Started →'),
                     ),
@@ -549,38 +569,118 @@ class _MainPageState extends State<MainPage> {
   }
 
   final List<Map<String, dynamic>> _helpCards = [
-    {'icon': Icons.air, 'title': 'Track dust & air quality', 'description': 'Real-time particulate monitoring for respiratory safety.'},
-    {'icon': Icons.volume_up, 'title': 'Monitor noise levels', 'description': 'Ensure compliance and protect hearing health.'},
-    {'icon': Icons.warning_amber, 'title': 'Detect unsafe conditions', 'description': 'Gas leaks, vibrations, structural risks instantly.'},
-    {'icon': Icons.construction, 'title': 'Improve worker safety', 'description': 'Proactive alerts reduce accidents.'},
+    {
+      'icon': Icons.air,
+      'title': 'Track dust & air quality',
+      'description': 'Real-time particulate monitoring for respiratory safety.'
+    },
+    {
+      'icon': Icons.volume_up,
+      'title': 'Monitor noise levels',
+      'description': 'Ensure compliance and protect hearing health.'
+    },
+    {
+      'icon': Icons.warning_amber,
+      'title': 'Detect unsafe conditions',
+      'description': 'Gas leaks, vibrations, structural risks instantly.'
+    },
+    {
+      'icon': Icons.construction,
+      'title': 'Improve worker safety',
+      'description': 'Proactive alerts reduce accidents.'
+    },
   ];
 
   final List<Map<String, dynamic>> _featureCards = [
-    {'icon': Icons.notifications_active, 'title': 'Real-time alerts', 'description': 'Instant push notifications to safety managers.'},
-    {'icon': Icons.power, 'title': 'Easy setup', 'description': 'Plug-and-play sensors, ready in minutes.'},
-    {'icon': Icons.engineering, 'title': 'Works in harsh environments', 'description': 'Dust-proof, water-resistant, wide temp range.'},
-    {'icon': Icons.dashboard, 'title': 'Mobile-friendly dashboard', 'description': 'Access live data from any device.'},
+    {
+      'icon': Icons.notifications_active,
+      'title': 'Real-time alerts',
+      'description': 'Instant push notifications to safety managers.'
+    },
+    {
+      'icon': Icons.power,
+      'title': 'Easy setup',
+      'description': 'Plug-and-play sensors, ready in minutes.'
+    },
+    {
+      'icon': Icons.engineering,
+      'title': 'Works in harsh environments',
+      'description': 'Dust-proof, water-resistant, wide temp range.'
+    },
+    {
+      'icon': Icons.dashboard,
+      'title': 'Mobile-friendly dashboard',
+      'description': 'Access live data from any device.'
+    },
   ];
 
   final List<Map<String, dynamic>> _useCases = [
-    {'icon': Icons.apartment, 'title': 'Building construction', 'description': 'Multi-story sites benefit from dust & noise control.'},
-    {'icon': Icons.route, 'title': 'Road projects', 'description': 'Monitor heavy machinery vibration and air quality.'},
-    {'icon': Icons.architecture, 'title': 'Infrastructure sites', 'description': 'Tunnels and bridges get structural monitoring.'},
-    {'icon': Icons.terrain, 'title': 'Mining areas', 'description': 'Track hazardous gases and particulate levels.'},
+    {
+      'icon': Icons.apartment,
+      'title': 'Building construction',
+      'description': 'Multi-story sites benefit from dust & noise control.'
+    },
+    {
+      'icon': Icons.route,
+      'title': 'Road projects',
+      'description': 'Monitor heavy machinery vibration and air quality.'
+    },
+    {
+      'icon': Icons.architecture,
+      'title': 'Infrastructure sites',
+      'description': 'Tunnels and bridges get structural monitoring.'
+    },
+    {
+      'icon': Icons.terrain,
+      'title': 'Mining areas',
+      'description': 'Track hazardous gases and particulate levels.'
+    },
   ];
 
   final List<Map<String, String>> _steps = [
-    {'number': '1', 'title': 'Place sensors', 'description': 'Deploy wireless sensors across key zones.'},
-    {'number': '2', 'title': 'Sensors collect data', 'description': 'Continuous monitoring of air, noise, vibration.'},
-    {'number': '3', 'title': 'Get alerts on phone', 'description': 'Instant SMS, email or app alerts.'},
-    {'number': '4', 'title': 'Take action', 'description': 'Respond quickly and prevent incidents.'},
+    {
+      'number': '1',
+      'title': 'Place sensors',
+      'description': 'Deploy wireless sensors across key zones.'
+    },
+    {
+      'number': '2',
+      'title': 'Sensors collect data',
+      'description': 'Continuous monitoring of air, noise, vibration.'
+    },
+    {
+      'number': '3',
+      'title': 'Get alerts on phone',
+      'description': 'Instant SMS, email or app alerts.'
+    },
+    {
+      'number': '4',
+      'title': 'Take action',
+      'description': 'Respond quickly and prevent incidents.'
+    },
   ];
 
   final List<Map<String, dynamic>> _benefits = [
-    {'icon': Icons.engineering, 'title': 'Built for construction sites', 'description': 'Rugged and reliable.'},
-    {'icon': Icons.thumb_up, 'title': 'Easy to use', 'description': 'Intuitive interface.'},
-    {'icon': Icons.shield, 'title': 'Reliable in tough conditions', 'description': 'IP67 rated.'},
-    {'icon': Icons.assignment, 'title': 'Helps meet safety standards', 'description': 'OSHA & ISO compliant.'},
+    {
+      'icon': Icons.engineering,
+      'title': 'Built for construction sites',
+      'description': 'Rugged and reliable.'
+    },
+    {
+      'icon': Icons.thumb_up,
+      'title': 'Easy to use',
+      'description': 'Intuitive interface.'
+    },
+    {
+      'icon': Icons.shield,
+      'title': 'Reliable in tough conditions',
+      'description': 'IP67 rated.'
+    },
+    {
+      'icon': Icons.assignment,
+      'title': 'Helps meet safety standards',
+      'description': 'OSHA & ISO compliant.'
+    },
   ];
 }
 
@@ -596,7 +696,8 @@ class _NavAction extends StatelessWidget {
       onPressed: onTap,
       child: Text(
         label,
-        style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black),
+        style:
+            const TextStyle(fontWeight: FontWeight.w600, color: Colors.black),
       ),
     );
   }
@@ -838,11 +939,14 @@ class _DashboardCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Container(width: 35, height: 42, color: const Color(0xFFF5A623)),
+                  Container(
+                      width: 35, height: 42, color: const Color(0xFFF5A623)),
                   const SizedBox(width: 8),
-                  Container(width: 35, height: 68, color: const Color(0xFFF5A623)),
+                  Container(
+                      width: 35, height: 68, color: const Color(0xFFF5A623)),
                   const SizedBox(width: 8),
-                  Container(width: 35, height: 52, color: const Color(0xFFF5A623)),
+                  Container(
+                      width: 35, height: 52, color: const Color(0xFFF5A623)),
                 ],
               ),
             ),
@@ -875,20 +979,29 @@ class _DashboardCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Column(
-                children: alerts!.map((alert) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.circle, size: 8, color: Color(0xFFF5A623)),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(alert, style: const TextStyle(fontSize: 12))),
-                    ],
-                  ),
-                )).toList(),
+                children: alerts!
+                    .map((alert) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.circle,
+                                  size: 8, color: Color(0xFFF5A623)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                  child: Text(alert,
+                                      style: const TextStyle(fontSize: 12))),
+                            ],
+                          ),
+                        ))
+                    .toList(),
               ),
             ),
           const SizedBox(height: 12),
-          Text(value, style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.grey.shade700)),
+          Text(value,
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey.shade700)),
         ],
       ),
     );
@@ -963,7 +1076,8 @@ class _Footer extends StatelessWidget {
                   final children = [
                     _FooterColumn(
                       title: 'WowGuardian',
-                      content: 'Smart sensor solutions for modern construction safety.',
+                      content:
+                          'Smart sensor solutions for modern construction safety.',
                       showSocial: true,
                     ),
                     _FooterColumn(
@@ -976,7 +1090,9 @@ class _Footer extends StatelessWidget {
                     ),
                   ];
                   return isRow
-                      ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: children)
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: children)
                       : Column(children: children);
                 },
               ),
@@ -1041,28 +1157,27 @@ class _FooterColumn extends StatelessWidget {
               ),
             if (links != null)
               ...links!.map((link) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  link,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
-                    color: Colors.grey.shade400,
-                  ),
-                ),
-              )),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      link,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                  )),
             if (contacts != null)
               ...contacts!.map((contact) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  contact,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
-                    color: Colors.grey.shade400,
-                  ),
-                ),
-              )),
-            if (showSocial)
-              const SizedBox(height: 16),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      contact,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                  )),
+            if (showSocial) const SizedBox(height: 16),
             if (showSocial)
               const Row(
                 children: [
@@ -1111,7 +1226,8 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     // Demo authentication
-    if ((email == 'demo@sitesafe.com' || email == 'admin@siteguardian.com') && password == 'demo123') {
+    if ((email == 'demo@sitesafe.com' || email == 'admin@siteguardian.com') &&
+        password == 'Suraj@123') {
       _showSnackbar('Login successful! Welcome to WowGuardian dashboard.');
       Future.delayed(const Duration(seconds: 1), () {
         if (mounted) {
@@ -1119,7 +1235,8 @@ class _LoginPageState extends State<LoginPage> {
         }
       });
     } else {
-      _showSnackbar('Invalid credentials. Use demo@sitesafe.com / demo123', isError: true);
+      _showSnackbar('Invalid credentials. Use demo@sitesafe.com / Suraj@123',
+          isError: true);
     }
   }
 
@@ -1127,7 +1244,8 @@ class _LoginPageState extends State<LoginPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red.shade700 : const Color(0xFF1A1A1A),
+        backgroundColor:
+            isError ? Colors.red.shade700 : const Color(0xFF1A1A1A),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -1151,7 +1269,8 @@ class _LoginPageState extends State<LoginPage> {
           padding: const EdgeInsets.all(24),
           child: Card(
             elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),
             child: Padding(
               padding: const EdgeInsets.all(32),
               child: Column(
@@ -1232,10 +1351,13 @@ class _LoginPageState extends State<LoginPage> {
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                          _isPasswordVisible
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                         ),
                         onPressed: () {
-                          setState(() => _isPasswordVisible = !_isPasswordVisible);
+                          setState(
+                              () => _isPasswordVisible = !_isPasswordVisible);
                         },
                       ),
                     ),
@@ -1259,7 +1381,8 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       TextButton(
                         onPressed: () {
-                          _showSnackbar('Password reset link sent to your email');
+                          _showSnackbar(
+                              'Password reset link sent to your email');
                         },
                         child: const Text(
                           'Forgot password?',
@@ -1277,7 +1400,8 @@ class _LoginPageState extends State<LoginPage> {
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      child: const Text('Sign In', style: TextStyle(fontSize: 16)),
+                      child:
+                          const Text('Sign In', style: TextStyle(fontSize: 16)),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -1292,30 +1416,35 @@ class _LoginPageState extends State<LoginPage> {
                       children: [
                         const Text(
                           'Demo Access',
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 12),
                         ),
                         const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(40),
                                 border: Border.all(color: Colors.grey.shade200),
                               ),
-                              child: const Text('demo@sitesafe.com', style: TextStyle(fontSize: 12)),
+                              child: const Text('demo@sitesafe.com',
+                                  style: TextStyle(fontSize: 12)),
                             ),
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(40),
                                 border: Border.all(color: Colors.grey.shade200),
                               ),
-                              child: const Text('demo123', style: TextStyle(fontSize: 12)),
+                              child: const Text('Suraj@123',
+                                  style: TextStyle(fontSize: 12)),
                             ),
                           ],
                         ),

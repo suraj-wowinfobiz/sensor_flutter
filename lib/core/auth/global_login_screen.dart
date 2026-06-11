@@ -171,7 +171,7 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
     setState(() {
       _rememberMe = rememberMe;
       _useApiAuth = useApiAuth;
-      if (rememberMe) {
+      if (rememberMe && rememberedEmail.isNotEmpty) {
         _emailController.text = rememberedEmail;
       }
       if (widget.initialRole == AppLoginRole.user && matchedRole != null) {

@@ -1,6 +1,6 @@
-name: industrial_tilt_admin
-description: Industrial Tilt Monitoring Admin Dashboard
-version: 1.0.0+1
+name: wowguardian
+description: WowGuardian construction safety monitoring app
+version: 1.0.1+4
 publish_to: none
 
 environment:

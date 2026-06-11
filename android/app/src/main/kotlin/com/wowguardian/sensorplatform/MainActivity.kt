@@ -1,4 +1,4 @@
-package com.example.sensor_platform_flutter
+package com.wowguardian.sensorplatform
 
 import io.flutter.embedding.android.FlutterActivity
 

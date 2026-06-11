@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:industrial_tilt_admin/main.dart';
+import 'package:wowguardian/main.dart';
 import 'package:flutter/material.dart';
-import 'package:industrial_tilt_admin/main_page.dart';
+import 'package:wowguardian/main_page.dart';
 
 void main() {
   testWidgets('app shows login screen', (WidgetTester tester) async {

@@ -104,7 +104,7 @@ class AuthApi {
       );
     } on SocketException catch (e) {
       throw AuthApiException(
-        'Network connection failed: ${e.message}. If you are on Android, make sure the server allows HTTP traffic.',
+        'Network connection failed: ${e.message}. On Android release builds, the API must be reachable and allowed by the app network security policy.',
       );
     } on http.ClientException catch (e) {
       throw AuthApiException('Network error: ${e.message}');
