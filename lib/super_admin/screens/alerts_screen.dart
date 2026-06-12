@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/ops_theme.dart';
 import '../api/alerts_api.dart';
 import '../api/sensor_api.dart';
 import '../models/alert.dart';
@@ -704,7 +705,6 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
   }
 
   Widget _buildThresholdManagementSection(BuildContext context, dynamic db) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
     final profileNameById = <String, String>{
       for (final profile in db.thresholdProfiles) profile.id: profile.name,
     };
@@ -718,9 +718,9 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: OpsColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: OpsColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -735,22 +735,18 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                 children: [
                   Text(
                     'Threshold Management',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: isLight
-                          ? const Color(0xFF132733)
-                          : const Color(0xFFD8E8F5),
+                      color: OpsColors.text,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '${db.thresholdProfiles.length} profiles · ${db.thresholdValues.length} values',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 13,
-                      color: isLight
-                          ? const Color(0xFF60717c)
-                          : const Color(0xFF9FB4C6),
+                      color: OpsColors.muted,
                     ),
                   ),
                 ],
@@ -776,100 +772,94 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
           const SizedBox(height: 14),
           Text(
             'Profiles',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color:
-                  isLight ? const Color(0xFF1a303c) : const Color(0xFFD8E8F5),
+              color: OpsColors.text,
             ),
           ),
           const SizedBox(height: 8),
           if (db.thresholdProfiles.isEmpty)
             Text(
               'No threshold profiles available',
-              style: TextStyle(
-                color:
-                    isLight ? const Color(0xFF60717c) : const Color(0xFF9FB4C6),
-              ),
+              style: const TextStyle(color: OpsColors.muted),
             )
           else
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('Name')),
-                  DataColumn(label: Text('Description')),
-                  DataColumn(label: Text('Actions')),
-                ],
-                rows: db.thresholdProfiles.map<DataRow>((profile) {
-                  return DataRow(
-                    cells: [
-                      DataCell(
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 220),
-                          child: Text(
-                            profile.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+              child: _tableFrame(
+                DataTable(
+                  columns: const [
+                    DataColumn(label: Text('NAME')),
+                    DataColumn(label: Text('DESCRIPTION')),
+                    DataColumn(label: Text('ACTIONS')),
+                  ],
+                  rows: db.thresholdProfiles.map<DataRow>((profile) {
+                    return DataRow(
+                      cells: [
+                        DataCell(
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 220),
+                            child: Text(
+                              profile.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
-                      ),
-                      DataCell(
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 340),
-                          child: Text(
-                            profile.description.trim().isEmpty
-                                ? '--'
-                                : profile.description,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                        DataCell(
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 340),
+                            child: Text(
+                              profile.description.trim().isEmpty
+                                  ? '--'
+                                  : profile.description,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
-                      ),
-                      DataCell(
-                        IconButton(
-                          tooltip: 'Delete profile',
-                          onPressed: () =>
-                              _deleteThresholdProfile(context, profile.id),
-                          icon: const Icon(Icons.delete_outline),
+                        DataCell(
+                          IconButton(
+                            tooltip: 'Delete profile',
+                            onPressed: () =>
+                                _deleteThresholdProfile(context, profile.id),
+                            icon: const Icon(Icons.delete_outline),
+                          ),
                         ),
-                      ),
-                    ],
-                  );
-                }).toList(),
+                      ],
+                    );
+                  }).toList(),
+                ),
               ),
             ),
           const SizedBox(height: 18),
           Text(
             'Threshold Values',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color:
-                  isLight ? const Color(0xFF1a303c) : const Color(0xFFD8E8F5),
+              color: OpsColors.text,
             ),
           ),
           const SizedBox(height: 8),
           if (db.thresholdValues.isEmpty)
             Text(
               'No threshold values configured',
-              style: TextStyle(
-                color:
-                    isLight ? const Color(0xFF60717c) : const Color(0xFF9FB4C6),
-              ),
+              style: const TextStyle(color: OpsColors.muted),
             )
           else
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: DataTable(
+              child: _tableFrame(DataTable(
                 columns: const [
-                  DataColumn(label: Text('Profile')),
-                  DataColumn(label: Text('Sensor Parameter')),
-                  DataColumn(label: Text('Min')),
-                  DataColumn(label: Text('Max')),
-                  DataColumn(label: Text('Warning')),
-                  DataColumn(label: Text('Critical')),
-                  DataColumn(label: Text('Actions')),
+                  DataColumn(label: Text('PROFILE')),
+                  DataColumn(label: Text('SENSOR PARAMETER')),
+                  DataColumn(label: Text('MIN')),
+                  DataColumn(label: Text('MAX')),
+                  DataColumn(label: Text('WARNING')),
+                  DataColumn(label: Text('CRITICAL')),
+                  DataColumn(label: Text('ACTIONS')),
                 ],
                 rows: db.thresholdValues.map<DataRow>((value) {
                   final profileName =
@@ -915,16 +905,27 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                     ],
                   );
                 }).toList(),
-              ),
+              )),
             ),
         ],
       ),
     );
   }
 
+  Widget _tableFrame(Widget child) {
+    return Container(
+      decoration: BoxDecoration(
+        color: OpsColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: OpsColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: child,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
     final db = ref.watch(superAdminBackendChangeNotifierProvider);
     final alertsAsync = ref.watch(superAdminAlertsApiProvider);
     final apiAlerts = alertsAsync.maybeWhen(
@@ -943,27 +944,24 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
         .length;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+      padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Alert Management',
             style: TextStyle(
               fontSize: 34,
               fontWeight: FontWeight.w800,
-              color: Theme.of(context).brightness == Brightness.light
-                  ? const Color(0xFF0f202d)
-                  : const Color(0xFFd4e4ef),
+              color: OpsColors.text,
             ),
           ),
           const SizedBox(height: 2),
-          Text(
+          const Text(
             'Monitor and manage system alerts',
             style: TextStyle(
               fontSize: 15,
-              color:
-                  isLight ? const Color(0xFF4e6473) : const Color(0xFF9db7d2),
+              color: OpsColors.muted,
             ),
           ),
           const SizedBox(height: 12),
@@ -1068,7 +1066,6 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
     String value,
     Color valueColor,
   ) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
     return LayoutBuilder(
       builder: (context, constraints) {
         final veryCompact = constraints.maxHeight < 68;
@@ -1079,14 +1076,14 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
             vertical: veryCompact ? 6 : (compact ? 8 : 12),
           ),
           decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Theme.of(context).dividerColor),
+            color: OpsColors.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: OpsColors.border),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: isLight ? 0.04 : 0.16),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
               ),
             ],
           ),
@@ -1101,9 +1098,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                 style: TextStyle(
                   fontSize: veryCompact ? 12 : (compact ? 13 : 15),
                   fontWeight: FontWeight.w700,
-                  color: isLight
-                      ? const Color(0xFF1a303c)
-                      : const Color(0xFFD8E8F5),
+                  color: OpsColors.muted,
                 ),
               ),
               SizedBox(height: veryCompact ? 1 : (compact ? 2 : 4)),
@@ -1138,25 +1133,23 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
     required Future<void> Function(Alert alert) onEdit,
     required Future<void> Function(Alert alert) onDelete,
   }) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: OpsColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: OpsColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Alerts',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color:
-                  isLight ? const Color(0xFF132733) : const Color(0xFFD8E8F5),
+              color: OpsColors.text,
             ),
           ),
           const SizedBox(height: 14),
@@ -1165,11 +1158,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Text(
                 'No alerts found',
-                style: TextStyle(
-                  color: isLight
-                      ? const Color(0xFF60717c)
-                      : const Color(0xFF9FB4C6),
-                ),
+                style: const TextStyle(color: OpsColors.muted),
               ),
             ),
           ...alerts.map((alert) {
@@ -1195,10 +1184,9 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color:
-                    isLight ? const Color(0xFFF2F6F8) : const Color(0xFF223B4E),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Theme.of(context).dividerColor),
+                color: OpsColors.surfaceLow,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: OpsColors.border),
               ),
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -1247,9 +1235,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
-                                  color: isLight
-                                      ? const Color(0xFF1a2f3b)
-                                      : const Color(0xFFE2EDF8),
+                                  color: OpsColors.text,
                                 ),
                               ),
                             ),
@@ -1260,9 +1246,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                           'Triggered: ${_formatDate(alert.triggeredAt)}',
                           style: TextStyle(
                             fontSize: 13,
-                            color: isLight
-                                ? const Color(0xFF506775)
-                                : const Color(0xFF9FB4C6),
+                            color: OpsColors.muted,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -1270,9 +1254,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                           'Status: $statusText',
                           style: TextStyle(
                             fontSize: 13,
-                            color: isLight
-                                ? const Color(0xFF506775)
-                                : const Color(0xFF9FB4C6),
+                            color: OpsColors.muted,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -1280,9 +1262,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                           'Sensor: $sensorText | Parameter: $sensorParameterText',
                           style: TextStyle(
                             fontSize: 13,
-                            color: isLight
-                                ? const Color(0xFF506775)
-                                : const Color(0xFF9FB4C6),
+                            color: OpsColors.muted,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -1290,9 +1270,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                           'Assigned To: $assignedToText',
                           style: TextStyle(
                             fontSize: 13,
-                            color: isLight
-                                ? const Color(0xFF506775)
-                                : const Color(0xFF9FB4C6),
+                            color: OpsColors.muted,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -1300,9 +1278,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                           'Acknowledged: $acknowledgedText | Resolved: $resolvedText',
                           style: TextStyle(
                             fontSize: 13,
-                            color: isLight
-                                ? const Color(0xFF506775)
-                                : const Color(0xFF9FB4C6),
+                            color: OpsColors.muted,
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -1364,9 +1340,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
-                                color: isLight
-                                    ? const Color(0xFF1a2f3b)
-                                    : const Color(0xFFE2EDF8),
+                                color: OpsColors.text,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -1374,9 +1348,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                               'Triggered: ${_formatDate(alert.triggeredAt)}',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isLight
-                                    ? const Color(0xFF506775)
-                                    : const Color(0xFF9FB4C6),
+                                color: OpsColors.muted,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -1384,9 +1356,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                               'Status: $statusText',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isLight
-                                    ? const Color(0xFF506775)
-                                    : const Color(0xFF9FB4C6),
+                                color: OpsColors.muted,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -1394,9 +1364,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                               'Sensor: $sensorText | Parameter: $sensorParameterText',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isLight
-                                    ? const Color(0xFF506775)
-                                    : const Color(0xFF9FB4C6),
+                                color: OpsColors.muted,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -1404,9 +1372,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                               'Assigned To: $assignedToText',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isLight
-                                    ? const Color(0xFF506775)
-                                    : const Color(0xFF9FB4C6),
+                                color: OpsColors.muted,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -1414,9 +1380,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                               'Acknowledged: $acknowledgedText | Resolved: $resolvedText',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isLight
-                                    ? const Color(0xFF506775)
-                                    : const Color(0xFF9FB4C6),
+                                color: OpsColors.muted,
                               ),
                             ),
                             const SizedBox(height: 10),
@@ -1469,22 +1433,21 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
     required String label,
     required VoidCallback onTap,
   }) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isLight ? const Color(0xFFE7EFF3) : const Color(0xFF243E52),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Theme.of(context).dividerColor),
+          color: OpsColors.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: OpsColors.border),
         ),
         child: Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 13,
-            color: isLight ? const Color(0xFF203845) : const Color(0xFFD8E8F5),
+            color: OpsColors.text,
             fontWeight: FontWeight.w700,
           ),
         ),

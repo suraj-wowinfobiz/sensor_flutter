@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/app_session.dart';
+import '../../core/theme/ops_theme.dart';
 import '../core/responsive/responsive_extensions.dart';
 import '../providers/super_admin_riverpod_provider.dart';
 import '../widgets/nav_bar.dart';
@@ -168,10 +169,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
                             showCloseButton: false,
                           ),
                           Expanded(
-                            child: Align(
-                              alignment: Alignment.topLeft,
-                              child: _buildContent(_currentView),
-                            ),
+                            child: _buildContent(_currentView),
                           ),
                         ],
                       )
@@ -235,21 +233,10 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
       'config',
     ];
     final index = views.indexOf(currentView);
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final selectedColor = Theme.of(context).colorScheme.primary;
-    final unselectedColor =
-        isLight ? const Color(0xFF6D7E89) : const Color(0xFF9CB0C0);
-
     return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isLight ? 0.08 : 0.18),
-            blurRadius: 18,
-            offset: const Offset(0, -4),
-          ),
-        ],
+      decoration: const BoxDecoration(
+        color: OpsColors.surface,
+        border: Border(top: BorderSide(color: OpsColors.border)),
       ),
       child: SafeArea(
         top: false,
@@ -259,10 +246,9 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
           child: BottomNavigationBar(
             type: BottomNavigationBarType.fixed,
             elevation: 0,
-            backgroundColor:
-                isLight ? const Color(0xFFF7FAFC) : const Color(0xFF1E3446),
-            selectedItemColor: selectedColor,
-            unselectedItemColor: unselectedColor,
+            backgroundColor: OpsColors.surface,
+            selectedItemColor: OpsColors.primary,
+            unselectedItemColor: OpsColors.muted,
             selectedLabelStyle: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/ops_theme.dart';
 import '../core/responsive/responsive_extensions.dart';
 
 class SideMenu extends StatelessWidget {
@@ -24,7 +25,7 @@ class SideMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final menuWidth =
-        context.narrowerThan(420) ? context.screenWidth * 0.88 : 312.0;
+        context.narrowerThan(420) ? context.screenWidth * 0.88 : 240.0;
 
     return IgnorePointer(
       ignoring: !isOpen,
@@ -39,49 +40,57 @@ class SideMenu extends StatelessWidget {
         child: Container(
           width: menuWidth,
           height: double.infinity,
-          decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.light
-                ? Colors.white.withValues(alpha: 0.9)
-                : const Color(0xFF1a3148).withValues(alpha: 0.95),
-            border: Border(
-              right:
-                  BorderSide(color: Theme.of(context).dividerColor, width: 2),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 20,
-                offset: const Offset(4, 0),
-              ),
-            ],
+          decoration: const BoxDecoration(
+            color: OpsColors.surfaceLow,
+            border: Border(right: BorderSide(color: OpsColors.border)),
           ),
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
+                padding: const EdgeInsets.fromLTRB(24, 24, 16, 20),
+                decoration: const BoxDecoration(
                   border: Border(
-                    bottom: BorderSide(
-                        color: Theme.of(context).dividerColor, width: 2),
+                    bottom: BorderSide(color: OpsColors.border),
                   ),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.memory,
-                        color: Theme.of(context).colorScheme.primary, size: 26),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: OpsColors.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.analytics_rounded,
+                          color: Colors.white, size: 22),
+                    ),
                     const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Super Admin Panel',
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color:
-                              Theme.of(context).brightness == Brightness.light
-                                  ? const Color(0xFF1e3a5a)
-                                  : const Color(0xFFc0d6f0),
-                        ),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'L&T',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: OpsColors.text,
+                              height: 1,
+                            ),
+                          ),
+                          Text(
+                            'SENSOR ANALYTICS',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: OpsColors.muted,
+                              letterSpacing: .3,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     if (showCloseButton) const SizedBox(width: 8),
@@ -92,13 +101,9 @@ class SideMenu extends StatelessWidget {
                           width: 34,
                           height: 34,
                           decoration: BoxDecoration(
-                            color:
-                                Theme.of(context).brightness == Brightness.light
-                                    ? const Color(0xFFf0f5fd)
-                                    : const Color(0xFF203a54),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: Theme.of(context).dividerColor),
+                            color: OpsColors.surface,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: OpsColors.border),
                           ),
                           child: const Icon(Icons.close, size: 18),
                         ),
@@ -108,9 +113,9 @@ class SideMenu extends StatelessWidget {
               ),
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   children: [
-                    _buildMenuSection(context, 'Main', [
+                    _buildMenuSection(context, 'Main Menu', [
                       _buildMenuItem(
                           context, 'Dashboard', Icons.dashboard, 'dashboard'),
                       _buildMenuItem(
@@ -143,31 +148,23 @@ class SideMenu extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 11),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.light
-                          ? const Color(0xFFf0f5fd)
-                          : const Color(0xFF203a54),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Theme.of(context).dividerColor),
+                      color: OpsColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: OpsColors.border),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Icons.logout,
                           size: 16,
-                          color:
-                              Theme.of(context).brightness == Brightness.light
-                                  ? const Color(0xFF4a6b8a)
-                                  : const Color(0xFF8aaac9),
+                          color: OpsColors.muted,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           'Logout',
                           style: TextStyle(
                             fontSize: 12.5,
-                            color:
-                                Theme.of(context).brightness == Brightness.light
-                                    ? const Color(0xFF1e3a5a)
-                                    : const Color(0xFFc0d6f0),
+                            color: OpsColors.text,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -196,9 +193,7 @@ class SideMenu extends StatelessWidget {
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
               decoration: TextDecoration.none,
-              color: Theme.of(context).brightness == Brightness.light
-                  ? const Color(0xFF4a6b8a)
-                  : const Color(0xFF8aaac9),
+              color: OpsColors.outline,
               letterSpacing: 0.5,
             ),
           ),
@@ -218,21 +213,15 @@ class SideMenu extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isActive
-              ? Theme.of(context).colorScheme.primary
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: isActive ? OpsColors.primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           children: [
             Icon(
               icon,
               size: 16,
-              color: isActive
-                  ? Colors.white
-                  : Theme.of(context).brightness == Brightness.light
-                      ? const Color(0xFF4a6b8a)
-                      : const Color(0xFF8aaac9),
+              color: isActive ? Colors.white : OpsColors.muted,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -240,14 +229,10 @@ class SideMenu extends StatelessWidget {
                 title,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 12,
                   decoration: TextDecoration.none,
-                  color: isActive
-                      ? Colors.white
-                      : Theme.of(context).brightness == Brightness.light
-                          ? const Color(0xFF1e3a5a)
-                          : const Color(0xFFc0d6f0),
-                  fontWeight: FontWeight.w600,
+                  color: isActive ? Colors.white : OpsColors.text,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),

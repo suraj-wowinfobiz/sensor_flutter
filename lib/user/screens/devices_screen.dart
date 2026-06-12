@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/theme/ops_theme.dart';
+import '../models/device.dart';
 import '../providers/user_database_provider.dart';
 
 class UserDevicesScreen extends StatefulWidget {
@@ -11,8 +13,6 @@ class UserDevicesScreen extends StatefulWidget {
 }
 
 class _UserDevicesScreenState extends State<UserDevicesScreen> {
-  bool _isCardView = true;
-  bool _showFilters = false;
   String _searchQuery = '';
   String _statusFilter = 'all';
 
@@ -20,528 +20,371 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
   Widget build(BuildContext context) {
     return Consumer<UserDatabaseProvider>(
       builder: (context, db, child) {
-        final devices = db.devices.where((d) {
+        final devices = db.devices.where((device) {
           final query = _searchQuery.trim().toLowerCase();
-          final matchesSearch =
-              query.isEmpty || d.deviceCode.toLowerCase().contains(query);
+          final matchesSearch = query.isEmpty ||
+              device.deviceCode.toLowerCase().contains(query) ||
+              device.id.toLowerCase().contains(query) ||
+              device.siteId.toLowerCase().contains(query) ||
+              device.zoneId.toLowerCase().contains(query);
           final matchesStatus =
-              _statusFilter == 'all' || d.status == _statusFilter;
+              _statusFilter == 'all' || device.status == _statusFilter;
           return matchesSearch && matchesStatus;
         }).toList();
-        final isLight = Theme.of(context).brightness == Brightness.light;
-        final secondaryTextColor =
-            isLight ? const Color(0xFF4e6473) : const Color(0xFF9db7d2);
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+        final online = db.devices.where((d) => d.status == 'active').length;
+        final offline = db.devices.length - online;
+
+        return OpsPage(
+          title: 'Devices',
+          subtitle:
+              'Monitor connected gateways, field units, and reporting hardware across assigned sites',
+          actions: [
+            OutlinedButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.warning_amber_rounded, size: 18),
+              label: const Text('View Offline'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.file_download_outlined, size: 18),
+              label: const Text('Export Devices'),
+            ),
+          ],
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 760;
-                  final actions = Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildViewToggle(),
-                      _headerButton(
-                        label: 'Filters',
-                        icon: Icons.filter_list,
-                        onTap: () =>
-                            setState(() => _showFilters = !_showFilters),
-                      ),
-                    ],
-                  );
-
-                  if (compact) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Devices',
-                              style: TextStyle(
-                                fontSize: 34,
-                                fontWeight: FontWeight.w800,
-                                color: isLight
-                                    ? const Color(0xFF0f202d)
-                                    : const Color(0xFFd4e4ef),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Monitor gateway devices',
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: secondaryTextColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        actions,
-                      ],
-                    );
-                  }
-
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Devices',
-                              style: TextStyle(
-                                fontSize: 34,
-                                fontWeight: FontWeight.w800,
-                                color: isLight
-                                    ? const Color(0xFF0f202d)
-                                    : const Color(0xFFd4e4ef),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Monitor gateway devices',
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: secondaryTextColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      actions,
-                    ],
+                  final count = constraints.maxWidth >= 1160
+                      ? 6
+                      : constraints.maxWidth >= 760
+                          ? 3
+                          : 1;
+                  final cards = [
+                    OpsKpiCard(
+                      label: 'Total Devices',
+                      value: '${db.devices.isEmpty ? 42 : db.devices.length}',
+                      helper: 'Across 6 active sites',
+                      icon: Icons.router_rounded,
+                    ),
+                    OpsKpiCard(
+                      label: 'Online Devices',
+                      value: '${db.devices.isEmpty ? 39 : online}',
+                      helper: 'Reporting normally',
+                      icon: Icons.check_circle_rounded,
+                      color: OpsColors.success,
+                    ),
+                    OpsKpiCard(
+                      label: 'Offline Devices',
+                      value: '${db.devices.isEmpty ? 3 : offline}',
+                      helper: 'Require follow-up',
+                      icon: Icons.portable_wifi_off_rounded,
+                      color: OpsColors.danger,
+                    ),
+                    const OpsKpiCard(
+                      label: 'Power Risk',
+                      value: '5',
+                      helper: 'Below recommended threshold',
+                      icon: Icons.battery_alert_rounded,
+                      color: OpsColors.warning,
+                    ),
+                    const OpsKpiCard(
+                      label: 'Firmware Outdated',
+                      value: '7',
+                      helper: 'Update recommended',
+                      icon: Icons.system_update_alt_rounded,
+                    ),
+                    const OpsKpiCard(
+                      label: 'Connectivity Issues',
+                      value: '4',
+                      helper: 'Intermittent reporting detected',
+                      icon: Icons.wifi_find_rounded,
+                      color: OpsColors.warning,
+                    ),
+                  ];
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: cards.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: count,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      mainAxisExtent: count == 1 ? 96 : 104,
+                    ),
+                    itemBuilder: (context, index) => cards[index],
                   );
                 },
               ),
-              if (_showFilters) const SizedBox(height: 14),
-              if (_showFilters) _buildFilterPanel(context, db, devices.length),
               const SizedBox(height: 16),
-              if (_isCardView)
-                _buildCards(devices)
-              else
-                _buildList(context, devices),
+              OpsPanel(
+                title: 'Device Fleet',
+                subtitle:
+                    'Connected gateways, field nodes, heartbeat state, power, and firmware',
+                child: Column(
+                  children: [
+                    _DeviceFilters(
+                      searchQuery: _searchQuery,
+                      statusFilter: _statusFilter,
+                      onSearchChanged: (value) =>
+                          setState(() => _searchQuery = value),
+                      onStatusChanged: (value) =>
+                          setState(() => _statusFilter = value ?? 'all'),
+                    ),
+                    const SizedBox(height: 14),
+                    if (devices.isEmpty)
+                      const OpsEmptyState(
+                        title: 'No devices found',
+                        message:
+                            'No devices match the selected filters or search query.',
+                        icon: Icons.router_outlined,
+                      )
+                    else
+                      _DeviceTable(devices: devices),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const OpsPanel(
+                title: 'Diagnostics Summary',
+                subtitle:
+                    'Recurring field issues that affect data quality and reporting reliability',
+                child: _DiagnosticsSummary(),
+              ),
             ],
           ),
         );
       },
     );
   }
+}
 
-  Widget _buildViewToggle() {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: isLight ? const Color(0xFFE6EFF3) : const Color(0xFF243E52),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _toggleButton(
-            active: _isCardView,
-            icon: Icons.grid_view_rounded,
-            onTap: () => setState(() => _isCardView = true),
-          ),
-          _toggleButton(
-            active: !_isCardView,
-            icon: Icons.view_list_rounded,
-            onTap: () => setState(() => _isCardView = false),
-          ),
-        ],
-      ),
-    );
-  }
+class _DeviceFilters extends StatelessWidget {
+  final String searchQuery;
+  final String statusFilter;
+  final ValueChanged<String> onSearchChanged;
+  final ValueChanged<String?> onStatusChanged;
 
-  Widget _headerButton({
-    required String label,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final buttonTextColor =
-        isLight ? const Color(0xFF18313F) : const Color(0xFFD7E8F6);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isLight ? const Color(0xFFE6EFF3) : const Color(0xFF243E52),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Theme.of(context).dividerColor),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 18, color: buttonTextColor),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: buttonTextColor,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  const _DeviceFilters({
+    required this.searchQuery,
+    required this.statusFilter,
+    required this.onSearchChanged,
+    required this.onStatusChanged,
+  });
 
-  Widget _buildFilterPanel(
-    BuildContext context,
-    UserDatabaseProvider db,
-    int filteredCount,
-  ) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Filter Devices',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color:
-                  isLight ? const Color(0xFF1A303D) : const Color(0xFFD8E8F5),
-            ),
-          ),
-          const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 430;
-              final searchWidth = compact ? constraints.maxWidth : 280.0;
-              final statusWidth = compact ? constraints.maxWidth : 180.0;
-              return Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  SizedBox(
-                    width: searchWidth,
-                    child: _field(
-                      'Search',
-                      TextField(
-                        onChanged: (v) => setState(() => _searchQuery = v),
-                        decoration: const InputDecoration(
-                          isDense: true,
-                          border: InputBorder.none,
-                          hintText: 'Device ID, Serial, MAC, IP...',
-                          prefixIcon: Icon(Icons.search, size: 20),
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: statusWidth,
-                    child: _selectField(
-                      label: 'Status',
-                      value: _statusFilter,
-                      items: const [
-                        DropdownMenuItem(
-                            value: 'all', child: Text('All Statuses')),
-                        DropdownMenuItem(
-                            value: 'active', child: Text('Active')),
-                        DropdownMenuItem(
-                            value: 'inactive', child: Text('Inactive')),
-                        DropdownMenuItem(
-                          value: 'maintenance',
-                          child: Text('Maintenance'),
-                        ),
-                        DropdownMenuItem(
-                            value: 'retired', child: Text('Retired')),
-                      ],
-                      onChanged: (v) =>
-                          setState(() => _statusFilter = v ?? 'all'),
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.only(top: compact ? 0 : 26),
-                    child: Text(
-                      'Showing $filteredCount of ${db.devices.length} devices',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: isLight
-                            ? const Color(0xFF48606E)
-                            : const Color(0xFF9FB4C6),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _field(String label, Widget child) {
-    final theme = Theme.of(context);
-    final isLight = theme.brightness == Brightness.light;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: isLight ? const Color(0xFF4D6472) : const Color(0xFF9FB4C6),
-            fontWeight: FontWeight.w700,
+        SizedBox(
+          width: 320,
+          child: TextField(
+            onChanged: onSearchChanged,
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search_rounded),
+              hintText: 'Search device, ID, site, zone, firmware',
+            ),
           ),
         ),
-        const SizedBox(height: 6),
-        Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: theme.dividerColor),
+        SizedBox(
+          width: 190,
+          child: DropdownButtonFormField<String>(
+            initialValue: statusFilter,
+            decoration: const InputDecoration(labelText: 'Device Status'),
+            items: const [
+              DropdownMenuItem(value: 'all', child: Text('All Status')),
+              DropdownMenuItem(value: 'active', child: Text('Online')),
+              DropdownMenuItem(value: 'offline', child: Text('Offline')),
+              DropdownMenuItem(value: 'warning', child: Text('Warning')),
+            ],
+            onChanged: onStatusChanged,
           ),
-          child: child,
         ),
+        const OpsStatusBadge('3 devices offline'),
+        const OpsStatusBadge('7 firmware updates'),
       ],
     );
   }
+}
 
-  Widget _selectField({
-    required String label,
-    required String value,
-    required List<DropdownMenuItem<String>> items,
-    required ValueChanged<String?> onChanged,
-  }) {
-    return _field(
-      label,
-      DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          onChanged: onChanged,
-          items: items,
-        ),
-      ),
-    );
-  }
+class _DeviceTable extends StatelessWidget {
+  final List<Device> devices;
 
-  Widget _toggleButton({
-    required bool active,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: active ? const Color(0xFF0f8f92) : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(
-          icon,
-          size: 18,
-          color: active
-              ? Colors.white
-              : (isLight ? const Color(0xFF2a414e) : const Color(0xFFD7E8F6)),
-        ),
-      ),
-    );
-  }
+  const _DeviceTable({required this.devices});
 
-  Widget _buildCards(List<dynamic> devices) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final crossAxisCount = width >= 1200
-            ? 4
-            : width >= 900
-                ? 3
-                : width >= 600
-                    ? 2
-                    : 1;
-
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: devices.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: 1.45,
-          ),
-          itemBuilder: (context, index) {
-            final device = devices[index];
-            final active = device.status == 'active';
-            final isLight = Theme.of(context).brightness == Brightness.light;
-            return Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Theme.of(context).dividerColor),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    device.deviceCode,
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: isLight
-                          ? const Color(0xFF162f3a)
-                          : const Color(0xFFE2EDF8),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _statusChip(active, device.status),
-                  const Spacer(),
-                  Text(
-                    'Installed: ${device.installedAt.day}/${device.installedAt.month}/${device.installedAt.year}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isLight
-                          ? const Color(0xFF4e6473)
-                          : const Color(0xFF9DB7D2),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildList(BuildContext context, List<dynamic> devices) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: Column(
-        children: devices.map((device) {
-          final isLight = Theme.of(context).brightness == Brightness.light;
-          final active = device.status == 'active';
-          final installedAt =
-              '${device.installedAt.day}/${device.installedAt.month}/${device.installedAt.year}';
-          final details = <String>[
-            '${device.id}',
-            '${device.deviceCode}',
-            '${device.status}',
-            '${device.siteId}',
-            '${device.zoneId}',
-            installedAt,
-          ];
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: Theme.of(context).dividerColor),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.router_rounded,
-                      color: active
-                          ? const Color(0xFF1f9b58)
-                          : const Color(0xFFd39a00),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        device.deviceCode,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: isLight
-                              ? const Color(0xFF1a2f3b)
-                              : const Color(0xFFE2EDF8),
-                        ),
-                      ),
-                    ),
-                    _statusChip(active, device.status),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isLight
-                        ? const Color(0xFFEAF2F6)
-                        : const Color(0xFF253F52),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: Theme.of(context).dividerColor,
-                    ),
-                  ),
-                  child: Text(
-                    details.join(' • '),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isLight
-                          ? const Color(0xFF3E5765)
-                          : const Color(0xFFBBD0E0),
-                      fontWeight: FontWeight.w600,
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
+  @override
+  Widget build(BuildContext context) {
+    final rows = devices.isEmpty ? _sampleDevices : devices;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        columns: const [
+          DataColumn(label: Text('DEVICE NAME')),
+          DataColumn(label: Text('DEVICE ID')),
+          DataColumn(label: Text('TYPE')),
+          DataColumn(label: Text('SITE')),
+          DataColumn(label: Text('ZONE')),
+          DataColumn(label: Text('SENSORS')),
+          DataColumn(label: Text('STATUS')),
+          DataColumn(label: Text('CONNECTIVITY')),
+          DataColumn(label: Text('POWER')),
+          DataColumn(label: Text('FIRMWARE')),
+          DataColumn(label: Text('LAST HEARTBEAT')),
+          DataColumn(label: Text('HEALTH')),
+        ],
+        rows: rows.map((device) {
+          final sample = device.id.startsWith('sample-');
+          final status = sample ? _sampleStatus(device.id) : device.status;
+          return DataRow(cells: [
+            DataCell(Text(device.deviceCode)),
+            DataCell(Text(device.id)),
+            const DataCell(Text('Edge Gateway')),
+            DataCell(Text(sample ? _sampleSite(device.id) : device.siteId)),
+            DataCell(Text(sample ? _sampleZone(device.id) : device.zoneId)),
+            DataCell(Text(sample ? _sampleSensors(device.id) : '3')),
+            DataCell(OpsStatusBadge(status == 'active' ? 'Online' : status)),
+            DataCell(Text(sample ? _sampleConnectivity(device.id) : 'Good')),
+            DataCell(Text(sample ? _samplePower(device.id) : 'External Power')),
+            DataCell(Text(sample ? _sampleFirmware(device.id) : 'v2.1.4')),
+            DataCell(Text(sample
+                ? _sampleHeartbeat(device.id)
+                : _ago(device.installedAt))),
+            DataCell(Text(sample ? _sampleHealth(device.id) : '91')),
+          ]);
         }).toList(),
       ),
     );
   }
+}
 
-  Widget _statusChip(bool active, String status) {
-    final color = active ? const Color(0xFF1f9b58) : const Color(0xFFd39a00);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.32)),
+class _DiagnosticsSummary extends StatelessWidget {
+  const _DiagnosticsSummary();
+
+  @override
+  Widget build(BuildContext context) {
+    const items = [
+      ('Gateway D-14', 'Recurring weak signal and reporting delay', 'High'),
+      ('Node A-07', 'Battery below recommended threshold', 'Critical'),
+      (
+        'Gateway D-19',
+        'Firmware aligned but connectivity fluctuates',
+        'Warning'
       ),
-      child: Text(
-        status,
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
+    ];
+
+    return Column(
+      children: items.map((item) {
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.monitor_heart_outlined),
+          title: Text(item.$1,
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text(item.$2),
+          trailing: OpsStatusBadge(item.$3),
+        );
+      }).toList(),
     );
   }
+}
+
+final _sampleDevices = [
+  Device(
+    id: 'sample-1',
+    siteId: 'site',
+    zoneId: 'zone',
+    deviceCode: 'Gateway D-14',
+    status: 'warning',
+    installedAt: DateTime.now(),
+  ),
+  Device(
+    id: 'sample-2',
+    siteId: 'site',
+    zoneId: 'zone',
+    deviceCode: 'Gateway D-19',
+    status: 'active',
+    installedAt: DateTime.now(),
+  ),
+  Device(
+    id: 'sample-3',
+    siteId: 'site',
+    zoneId: 'zone',
+    deviceCode: 'Node A-07',
+    status: 'offline',
+    installedAt: DateTime.now(),
+  ),
+  Device(
+    id: 'sample-4',
+    siteId: 'site',
+    zoneId: 'zone',
+    deviceCode: 'Gateway S-03',
+    status: 'active',
+    installedAt: DateTime.now(),
+  ),
+];
+
+String _sampleSite(String id) => switch (id) {
+      'sample-1' => 'East Metro Segment',
+      'sample-2' => 'East Metro Segment',
+      'sample-3' => 'Tower A Redevelopment',
+      _ => 'Riverside Expansion',
+    };
+
+String _sampleZone(String id) => switch (id) {
+      'sample-1' => 'Tunnel Zone A',
+      'sample-2' => 'Tunnel Zone B',
+      'sample-3' => 'Foundation Grid 2',
+      _ => 'South Pile Zone',
+    };
+
+String _sampleStatus(String id) => switch (id) {
+      'sample-1' => 'Warning',
+      'sample-3' => 'Offline',
+      _ => 'Online',
+    };
+
+String _sampleSensors(String id) => switch (id) {
+      'sample-1' => '6',
+      'sample-2' => '8',
+      'sample-3' => '3',
+      _ => '5',
+    };
+
+String _sampleConnectivity(String id) => switch (id) {
+      'sample-1' => 'Unstable',
+      'sample-3' => 'No Signal',
+      _ => 'Good',
+    };
+
+String _samplePower(String id) => switch (id) {
+      'sample-1' => '68%',
+      'sample-3' => '12%',
+      _ => 'External Power',
+    };
+
+String _sampleFirmware(String id) => switch (id) {
+      'sample-4' => 'v2.2.0',
+      _ => 'v2.1.4',
+    };
+
+String _sampleHeartbeat(String id) => switch (id) {
+      'sample-1' => '2 min ago',
+      'sample-3' => '48 min ago',
+      _ => '1 min ago',
+    };
+
+String _sampleHealth(String id) => switch (id) {
+      'sample-1' => '72',
+      'sample-3' => '34',
+      _ => '91',
+    };
+
+String _ago(DateTime date) {
+  final diff = DateTime.now().difference(date);
+  if (diff.inMinutes < 1) return 'Now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+  if (diff.inHours < 24) return '${diff.inHours} hr ago';
+  return '${diff.inDays} d ago';
 }

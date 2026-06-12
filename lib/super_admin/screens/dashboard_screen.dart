@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/ops_theme.dart';
 import '../providers/super_admin_api_riverpod_provider.dart';
 import '../providers/super_admin_riverpod_provider.dart';
 import '../services/analytics_sse_service.dart';
@@ -654,7 +655,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       days: 14,
     );
     final content = Padding(
-      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+      padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1817,13 +1818,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     for (final device in devices) {
       final site = sites
           .where((item) =>
-              (item.id as String).trim() ==
-              (device.siteId as String).trim())
+              (item.id as String).trim() == (device.siteId as String).trim())
           .firstOrNull;
       final zone = zones
           .where((item) =>
-              (item.id as String).trim() ==
-              (device.zoneId as String).trim())
+              (item.id as String).trim() == (device.zoneId as String).trim())
           .firstOrNull;
       final organization = site == null
           ? null
@@ -1846,8 +1845,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     for (final sensor in sensors) {
       final device = devices
           .where((item) =>
-              (item.id as String).trim() ==
-              (sensor.deviceId as String).trim())
+              (item.id as String).trim() == (sensor.deviceId as String).trim())
           .firstOrNull;
       final site = device == null
           ? null
@@ -1906,19 +1904,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             scrollDirection: Axis.horizontal,
             child: Container(
               decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFFc5d2d8)),
-                borderRadius: BorderRadius.circular(12),
+                color: OpsColors.surface,
+                border: Border.all(color: OpsColors.border),
+                borderRadius: BorderRadius.circular(8),
               ),
+              clipBehavior: Clip.antiAlias,
               child: DataTable(
-                headingRowColor: WidgetStateProperty.all(
-                  Theme.of(context).brightness == Brightness.light
-                      ? const Color(0xFFe3eaee)
-                      : const Color(0xFF2A4154),
-                ),
-                dataRowMinHeight: 54,
-                dataRowMaxHeight: 54,
-                horizontalMargin: 10,
-                columnSpacing: 26,
                 columns: [
                   _tableHeading(context, 'Type'),
                   _tableHeading(context, 'Asset'),
@@ -1951,14 +1942,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   DataColumn _tableHeading(BuildContext context, String label) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
     return DataColumn(
       label: Text(
-        label,
-        style: TextStyle(
-          fontWeight: FontWeight.w700,
-          color: isLight ? const Color(0xFF203845) : const Color(0xFFD8E8F5),
-        ),
+        label.toUpperCase(),
       ),
     );
   }
@@ -1966,16 +1952,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget _buildBottomLiveStats(BuildContext context, dynamic db) {
     final now = DateTime.now();
     final devicesLast30d = (db.devices as List)
-        .where((item) =>
-            now.difference(item.installedAt as DateTime).inDays <= 30)
+        .where(
+            (item) => now.difference(item.installedAt as DateTime).inDays <= 30)
         .length;
     final sensorsLast30d = (db.sensors as List)
-        .where((item) =>
-            now.difference(item.installedAt as DateTime).inDays <= 30)
+        .where(
+            (item) => now.difference(item.installedAt as DateTime).inDays <= 30)
         .length;
     final sitesLast30d = (db.sites as List)
-        .where((item) =>
-            now.difference(item.createdAt as DateTime).inDays <= 30)
+        .where(
+            (item) => now.difference(item.createdAt as DateTime).inDays <= 30)
         .length;
     final activeOrganizationsCount = (db.organizations as List)
         .where(
@@ -2720,17 +2706,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _chip(BuildContext context, String label,
       {IconData? icon, bool selected = false}) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final bg = selected
-        ? (isLight ? const Color(0xFFdbe6ea) : const Color(0xFF2A4052))
-        : (isLight ? const Color(0xFFd6e1e6) : const Color(0xFF23394A));
-    final fg = isLight ? const Color(0xFF20333e) : const Color(0xFFD8E8F5);
+    final bg = selected ? OpsColors.primary : OpsColors.surfaceLow;
+    final fg = selected ? Colors.white : OpsColors.text;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(8),
+        border:
+            Border.all(color: selected ? OpsColors.primary : OpsColors.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2959,19 +2943,18 @@ class _DashboardPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: OpsColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: OpsColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isLight ? 0.04 : 0.16),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
@@ -3005,13 +2988,8 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final onDark = data.isHighlight
-        ? Colors.white
-        : (isLight ? const Color(0xFF1e3039) : const Color(0xFFE3EEF8));
-    final sub = data.isHighlight
-        ? const Color(0xFFb5dbef)
-        : (isLight ? data.tint : data.tint.withValues(alpha: 0.9));
+    final onDark = data.isHighlight ? Colors.white : OpsColors.text;
+    final sub = data.isHighlight ? const Color(0xFFb5dbef) : data.tint;
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact =
@@ -3019,15 +2997,15 @@ class _MetricCard extends StatelessWidget {
         return Container(
           padding: EdgeInsets.all(compact ? 10 : 14),
           decoration: BoxDecoration(
-            color: data.isHighlight ? data.tint : Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: Theme.of(context).dividerColor),
+            color: data.isHighlight ? data.tint : OpsColors.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: OpsColors.border),
             boxShadow: [
               BoxShadow(
                 color: Colors.black
-                    .withValues(alpha: data.isHighlight ? 0.12 : 0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                    .withValues(alpha: data.isHighlight ? 0.12 : 0.05),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
               ),
             ],
           ),
@@ -3040,7 +3018,7 @@ class _MetricCard extends StatelessWidget {
                   color: data.isHighlight
                       ? Colors.white.withValues(alpha: 0.22)
                       : data.tint.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   data.icon,
@@ -3107,8 +3085,8 @@ class _LegendItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).brightness == Brightness.light
-        ? const Color(0xFF566872)
-        : const Color(0xFF9FB4C6);
+        ? OpsColors.muted
+        : OpsColors.muted;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -3155,18 +3133,12 @@ class _MiniStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final titleColor =
-        isLight ? const Color(0xFF4d616d) : const Color(0xFFB8CBDA);
-    final valueColor =
-        isLight ? const Color(0xFF11212d) : const Color(0xFFE3EEF8);
-    final unitColor =
-        isLight ? const Color(0xFF5f707a) : const Color(0xFFA8BDCE);
-    final detailColor =
-        isLight ? const Color(0xFF60717c) : const Color(0xFF9FB4C6);
-    final badgeBg = isLight ? const Color(0xFFd7f2df) : const Color(0xFF1E4736);
-    final badgeBorder =
-        isLight ? const Color(0xFF9edbb2) : const Color(0xFF2E8E61);
+    final titleColor = OpsColors.muted;
+    final valueColor = OpsColors.text;
+    final unitColor = OpsColors.muted;
+    final detailColor = OpsColors.muted;
+    final badgeBg = OpsColors.success.withValues(alpha: .10);
+    final badgeBorder = OpsColors.success.withValues(alpha: .24);
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact =

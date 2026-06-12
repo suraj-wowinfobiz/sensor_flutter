@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/app_session.dart';
+import '../../core/theme/ops_theme.dart';
 import '../../super_admin/core/responsive/responsive_extensions.dart';
 import '../providers/user_riverpod_provider.dart';
 import '../widgets/nav_bar.dart';
@@ -10,8 +11,6 @@ import '../widgets/side_menu.dart';
 import 'alerts_screen.dart';
 import 'analytics_screen.dart';
 import 'dashboard_screen.dart';
-import 'devices_screen.dart';
-import 'sensors_screen.dart';
 import 'settings_screen.dart';
 
 class UserScreen extends ConsumerStatefulWidget {
@@ -41,8 +40,11 @@ class _UserScreenState extends ConsumerState<UserScreen>
       if (!mounted) return;
       final db = ref.read(userDatabaseChangeNotifierProvider);
       try {
-        await db.loadDevices();
-        await db.loadSensors();
+        await Future.wait([
+          db.loadDevices(),
+          db.loadSensors(),
+          db.loadAlerts(),
+        ]);
       } catch (_) {
         // Keep UI responsive even if one endpoint fails during bootstrap.
       }
@@ -80,6 +82,7 @@ class _UserScreenState extends ConsumerState<UserScreen>
       ref.read(userDatabaseChangeNotifierProvider).loadAlerts();
     }
     setState(() => _currentView = normalized);
+    if (!context.isDesktopLayout) closeMenu();
   }
 
   bool _onScroll(UserScrollNotification notification) {
@@ -130,60 +133,81 @@ class _UserScreenState extends ConsumerState<UserScreen>
       showMenuButton: false,
       onTopSettingsTap: () => _setCurrentView('settings'),
       onLogoutTap: _logout,
+      currentView: _currentView,
       notifications: notifications,
       hasNotifications: hasNotifications,
     );
 
-    final scaffold = Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return Scaffold(
+      backgroundColor: OpsColors.background,
       body: SafeArea(
-        child: Column(
-          children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 280),
-              switchInCurve: Curves.easeOutQuart,
-              switchOutCurve: Curves.easeInQuart,
-              transitionBuilder: (child, animation) {
-                final slide = Tween<Offset>(
-                  begin: const Offset(0, -0.08),
-                  end: Offset.zero,
-                ).animate(animation);
-                return SizeTransition(
-                  sizeFactor: animation,
-                  axisAlignment: -1,
-                  child: FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(position: slide, child: child),
-                  ),
-                );
-              },
-              child: (isDesktop || _showTopNav)
-                  ? navBar
-                  : const SizedBox.shrink(key: ValueKey('hidden-user-nav')),
-            ),
-            Expanded(
-              child: NotificationListener<UserScrollNotification>(
-                onNotification: _onScroll,
-                child: isDesktop
-                    ? Row(
+        child: NotificationListener<UserScrollNotification>(
+          onNotification: _onScroll,
+          child: isDesktop
+              ? Row(
+                  children: [
+                    UserSideMenu(
+                      animation: const AlwaysStoppedAnimation<double>(1.0),
+                      isOpen: true,
+                      currentView: _currentView,
+                      onViewChanged: _setCurrentView,
+                      onClose: closeMenu,
+                      onLogout: _logout,
+                      showCloseButton: false,
+                    ),
+                    Expanded(
+                      child: Column(
                         children: [
-                          UserSideMenu(
-                            animation:
-                                const AlwaysStoppedAnimation<double>(1.0),
-                            isOpen: true,
-                            currentView: _currentView,
-                            onViewChanged: _setCurrentView,
-                            onClose: () {},
-                            onLogout: _logout,
-                            showCloseButton: false,
-                          ),
+                          navBar,
                           Expanded(child: _buildContent(_currentView)),
                         ],
-                      )
-                    : _buildContent(_currentView),
-              ),
-            ),
-          ],
+                      ),
+                    ),
+                  ],
+                )
+              : Stack(
+                  children: [
+                    Column(
+                      children: [
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          child: _showTopNav
+                              ? UserNavBar(
+                                  key: const ValueKey('mobile-user-nav'),
+                                  onMenuToggle: toggleMenu,
+                                  isMenuOpen: _isMenuOpen,
+                                  showMenuButton: true,
+                                  onTopSettingsTap: () =>
+                                      _setCurrentView('settings'),
+                                  onLogoutTap: _logout,
+                                  currentView: _currentView,
+                                  notifications: notifications,
+                                  hasNotifications: hasNotifications,
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                        Expanded(child: _buildContent(_currentView)),
+                      ],
+                    ),
+                    if (_isMenuOpen)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          onTap: closeMenu,
+                          child: Container(
+                            color: Colors.black.withValues(alpha: .24),
+                          ),
+                        ),
+                      ),
+                    UserSideMenu(
+                      animation: _menuController,
+                      isOpen: _isMenuOpen,
+                      currentView: _currentView,
+                      onViewChanged: _setCurrentView,
+                      onClose: closeMenu,
+                      onLogout: _logout,
+                    ),
+                  ],
+                ),
         ),
       ),
       bottomNavigationBar: isDesktop
@@ -220,8 +244,6 @@ class _UserScreenState extends ConsumerState<UserScreen>
                     ),
             ),
     );
-
-    return scaffold;
   }
 
   Widget _buildBottomNav({
@@ -230,69 +252,42 @@ class _UserScreenState extends ConsumerState<UserScreen>
   }) {
     const views = ['dashboard', 'alerts', 'analytics', 'settings'];
     final index = views.indexOf(currentView);
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final selectedColor = Theme.of(context).colorScheme.primary;
-    final unselectedColor =
-        isLight ? const Color(0xFF6D7E89) : const Color(0xFF9CB0C0);
-
     return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isLight ? 0.08 : 0.18),
-            blurRadius: 18,
-            offset: const Offset(0, -4),
-          ),
-        ],
+      decoration: const BoxDecoration(
+        color: OpsColors.surface,
+        border: Border(top: BorderSide(color: OpsColors.border)),
       ),
       child: SafeArea(
         top: false,
         minimum: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: BottomNavigationBar(
-            type: BottomNavigationBarType.fixed,
-            elevation: 0,
-            backgroundColor:
-                isLight ? const Color(0xFFF7FAFC) : const Color(0xFF1E3446),
-            selectedItemColor: selectedColor,
-            unselectedItemColor: unselectedColor,
-            selectedLabelStyle: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+        child: NavigationBar(
+          height: 64,
+          selectedIndex: index < 0 ? 0 : index,
+          backgroundColor: OpsColors.surface,
+          indicatorColor: OpsColors.primary.withValues(alpha: .10),
+          onDestinationSelected: (i) => onViewChanged(views[i]),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard_rounded),
+              label: 'Home',
             ),
-            unselectedLabelStyle: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
+            NavigationDestination(
+              icon: Icon(Icons.warning_amber_outlined),
+              selectedIcon: Icon(Icons.warning_amber_rounded),
+              label: 'Alerts',
             ),
-            showSelectedLabels: false,
-            showUnselectedLabels: false,
-            currentIndex: index < 0 ? 0 : index,
-            onTap: (i) => onViewChanged(views[i]),
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.dashboard_outlined),
-                activeIcon: Icon(Icons.dashboard_rounded),
-                label: '',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.warning_amber_outlined),
-                activeIcon: Icon(Icons.warning_amber_rounded),
-                label: '',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.analytics_outlined),
-                activeIcon: Icon(Icons.analytics),
-                label: '',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.settings_outlined),
-                activeIcon: Icon(Icons.settings),
-                label: '',
-              ),
-            ],
-          ),
+            NavigationDestination(
+              icon: Icon(Icons.analytics_outlined),
+              selectedIcon: Icon(Icons.analytics),
+              label: 'Analytics',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings),
+              label: 'Settings',
+            ),
+          ],
         ),
       ),
     );
@@ -317,10 +312,6 @@ class _UserScreenState extends ConsumerState<UserScreen>
         return const UserAlertsScreen();
       case 'analytics':
         return const UserAnalyticsScreen();
-      case 'devices':
-        return const UserDevicesScreen();
-      case 'sensors':
-        return const UserSensorsScreen();
       case 'settings':
         return const UserSettingsScreen();
       default:

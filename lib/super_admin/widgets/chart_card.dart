@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/ops_theme.dart';
+
 class ChartCard extends StatefulWidget {
   final String title;
   final IconData icon;
@@ -43,14 +45,14 @@ class _ChartCardState extends State<ChartCard>
       height: compact ? 250 : 300,
       padding: EdgeInsets.all(compact ? 16 : 24),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: OpsColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: OpsColors.border),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
@@ -64,7 +66,7 @@ class _ChartCardState extends State<ChartCard>
                   children: [
                     Icon(
                       widget.icon,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: OpsColors.primary,
                       size: compact ? 16 : 18,
                     ),
                     const SizedBox(width: 6),
@@ -75,11 +77,8 @@ class _ChartCardState extends State<ChartCard>
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: compact ? 13 : 14,
-                          fontWeight: FontWeight.w600,
-                          color:
-                              Theme.of(context).brightness == Brightness.light
-                                  ? const Color(0xFF1e3a5a)
-                                  : const Color(0xFFc0d6f0),
+                          fontWeight: FontWeight.w800,
+                          color: OpsColors.text,
                         ),
                       ),
                     ),
@@ -95,10 +94,10 @@ class _ChartCardState extends State<ChartCard>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
+                        color: OpsColors.danger.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(999),
                         border: Border.all(
-                          color: Colors.red.withValues(alpha: 0.3),
+                          color: OpsColors.danger.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Row(
@@ -108,11 +107,11 @@ class _ChartCardState extends State<ChartCard>
                             width: 7,
                             height: 7,
                             decoration: BoxDecoration(
-                              color: Colors.red,
+                              color: OpsColors.danger,
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.red.withValues(
+                                  color: OpsColors.danger.withValues(
                                       alpha:
                                           0.5 + _pulseController!.value * 0.3),
                                   blurRadius: 4,
@@ -126,7 +125,7 @@ class _ChartCardState extends State<ChartCard>
                             const Text(
                               'LIVE',
                               style: TextStyle(
-                                color: Colors.red,
+                                color: OpsColors.danger,
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                               ),

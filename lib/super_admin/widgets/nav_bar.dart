@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/ops_theme.dart';
 import '../core/responsive/responsive_extensions.dart';
 
 class AdminNotificationItem {
@@ -35,29 +36,16 @@ class NavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
     final isCompact = context.narrowerThan(900);
     final isMobile = context.narrowerThan(700);
 
-    final barColor = isLight
-        ? Theme.of(context).colorScheme.primary
-        : const Color(0xFF0f2a42);
-    const barTextColor = Color(0xFFEAF3FF);
-
     return Container(
-      height: isCompact ? 58 : 66,
+      height: isCompact ? 58 : 72,
       margin: EdgeInsets.zero,
-      padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 14),
-      decoration: BoxDecoration(
-        color: barColor,
-        borderRadius: BorderRadius.zero,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 32),
+      decoration: const BoxDecoration(
+        color: OpsColors.surface,
+        border: Border(bottom: BorderSide(color: OpsColors.border)),
       ),
       child: Row(
         children: [
@@ -69,14 +57,13 @@ class NavBar extends StatelessWidget {
                 width: isCompact ? 36 : 42,
                 height: isCompact ? 36 : 42,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border:
-                      Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                  color: OpsColors.surfaceLow,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: OpsColors.border),
                 ),
                 child: Icon(
                   isMenuOpen ? Icons.close : Icons.menu,
-                  color: barTextColor,
+                  color: OpsColors.text,
                   size: isCompact ? 20 : 24,
                 ),
               ),
@@ -87,11 +74,11 @@ class NavBar extends StatelessWidget {
             width: isCompact ? 32 : 40,
             height: isCompact ? 32 : 40,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(12),
+              color: OpsColors.primary,
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
-              Icons.speed,
+              Icons.analytics_rounded,
               color: Colors.white,
               size: isCompact ? 17 : 20,
             ),
@@ -103,24 +90,24 @@ class NavBar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'MONITORING SYSTEM',
+                  'L&T',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: barTextColor,
-                    fontSize: isCompact ? 14 : 18,
-                    fontWeight: FontWeight.w800,
+                    color: OpsColors.text,
+                    fontSize: isCompact ? 18 : 22,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 if (!isCompact)
-                  Text(
-                    'INDUSTRIAL SENSOR MONITORING PORTAL',
+                  const Text(
+                    'SENSOR ANALYTICS',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: barTextColor.withValues(alpha: 0.82),
+                      color: OpsColors.muted,
                       fontSize: 11,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: 0.4,
                     ),
                   ),
@@ -191,8 +178,8 @@ class NavBar extends StatelessWidget {
             child: Stack(
               children: [
                 Icon(
-                  Icons.notifications_active_outlined,
-                  color: barTextColor,
+                  Icons.notifications_none_rounded,
+                  color: OpsColors.text,
                   size: isCompact ? 20 : 23,
                 ),
                 if (hasNotifications)
@@ -203,7 +190,7 @@ class NavBar extends StatelessWidget {
                       width: 8,
                       height: 8,
                       decoration: const BoxDecoration(
-                        color: Color(0xFFE54C4C),
+                        color: OpsColors.danger,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -213,9 +200,31 @@ class NavBar extends StatelessWidget {
           ),
           SizedBox(width: isCompact ? 6 : 10),
           PopupMenuButton<String>(
-            tooltip: 'Profile Menu',
-            onSelected: (_) {},
-            itemBuilder: (context) => const [],
+            tooltip: 'Profile menu',
+            onSelected: (value) {
+              if (value == 'settings') onSettingsTap();
+              if (value == 'logout') onLogoutTap();
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem<String>(
+                value: 'profile',
+                enabled: false,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('suraj.tiwari'),
+                  subtitle: Text('Super Admin'),
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem<String>(
+                value: 'settings',
+                child: Text('Settings'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'logout',
+                child: Text('Logout'),
+              ),
+            ],
             child: Row(
               children: [
                 if (!isCompact)
@@ -226,7 +235,7 @@ class NavBar extends StatelessWidget {
                       const Text(
                         'suraj.tiwari',
                         style: TextStyle(
-                          color: barTextColor,
+                          color: OpsColors.text,
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                         ),
@@ -234,9 +243,9 @@ class NavBar extends StatelessWidget {
                       Text(
                         'Super Admin',
                         style: TextStyle(
-                          color: barTextColor.withValues(alpha: 0.84),
+                          color: OpsColors.muted,
                           fontSize: 11,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
@@ -246,14 +255,14 @@ class NavBar extends StatelessWidget {
                   width: isMobile ? 34 : 40,
                   height: isMobile ? 34 : 40,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
+                    color: OpsColors.primaryContainer,
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     'F',
                     style: TextStyle(
-                      color: barTextColor,
+                      color: Colors.white,
                       fontSize: isMobile ? 12 : 14,
                       fontWeight: FontWeight.w700,
                     ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/theme/ops_theme.dart';
 import '../api/users_api.dart';
 import '../models/user.dart';
 import '../providers/super_admin_backend_provider.dart';
@@ -1592,11 +1593,10 @@ class _UsersScreenState extends State<UsersScreen> {
   Widget build(BuildContext context) {
     return Consumer<SuperAdminBackendProvider>(
       builder: (context, db, child) {
-        final isLight = Theme.of(context).brightness == Brightness.light;
         final users = _applyFilters(db.users);
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+          padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1608,25 +1608,20 @@ class _UsersScreenState extends State<UsersScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'User Management',
                         style: TextStyle(
                           fontSize: 34,
                           fontWeight: FontWeight.w800,
-                          color:
-                              Theme.of(context).brightness == Brightness.light
-                                  ? const Color(0xFF0f202d)
-                                  : const Color(0xFFd4e4ef),
+                          color: OpsColors.text,
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
+                      const Text(
                         'Manage users and their access control permissions',
                         style: TextStyle(
                           fontSize: 15,
-                          color: isLight
-                              ? const Color(0xFF4e6473)
-                              : const Color(0xFF9db7d2),
+                          color: OpsColors.muted,
                         ),
                       ),
                     ],
@@ -1804,25 +1799,22 @@ class _UsersScreenState extends State<UsersScreen> {
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: Theme.of(context).dividerColor),
+                      color: OpsColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: OpsColors.border),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         CircleAvatar(
                           radius: 22,
-                          backgroundColor: isLight
-                              ? const Color(0xFFDCE7ED)
-                              : const Color(0xFF2A475A),
+                          backgroundColor:
+                              OpsColors.primary.withValues(alpha: .10),
                           child: Text(
                             _shortName(user.name),
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontWeight: FontWeight.w700,
-                              color: isLight
-                                  ? const Color(0xFF203845)
-                                  : const Color(0xFFDDEAF6),
+                              color: OpsColors.primary,
                             ),
                           ),
                         ),
@@ -1839,10 +1831,7 @@ class _UsersScreenState extends State<UsersScreen> {
                                       style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.w800,
-                                        color: Theme.of(context).brightness ==
-                                                Brightness.light
-                                            ? const Color(0xFF102632)
-                                            : const Color(0xFFE2EDF8),
+                                        color: OpsColors.text,
                                       ),
                                     ),
                                   ),
@@ -1855,9 +1844,7 @@ class _UsersScreenState extends State<UsersScreen> {
                                 user.email,
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: isLight
-                                      ? const Color(0xFF516875)
-                                      : const Color(0xFFBBD0E0),
+                                  color: OpsColors.muted,
                                 ),
                               ),
                               const SizedBox(height: 8),

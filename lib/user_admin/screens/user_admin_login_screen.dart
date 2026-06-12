@@ -7,6 +7,9 @@ class UserAdminLoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const GlobalLoginScreen(initialRole: AppLoginRole.userAdmin);
+    return const GlobalLoginScreen(
+      initialRole: AppLoginRole.userAdmin,
+      allowRoleSelection: false,
+    );
   }
 }

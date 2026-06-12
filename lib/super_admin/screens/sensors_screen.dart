@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider;
 
+import '../../core/theme/ops_theme.dart';
 import '../api/sensor_parameter_api.dart';
 import '../models/sensor.dart';
 import '../providers/super_admin_backend_provider.dart';
@@ -1060,7 +1061,7 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
             allSensors.where((s) => _matchesFilters(db, s)).toList();
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+          padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1082,7 +1083,6 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
     return Wrap(
       alignment: WrapAlignment.spaceBetween,
       runSpacing: 12,
@@ -1092,23 +1092,20 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Sensor Management',
               style: TextStyle(
                 fontSize: 34,
                 fontWeight: FontWeight.w800,
-                color: Theme.of(context).brightness == Brightness.light
-                    ? const Color(0xFF0f202d)
-                    : const Color(0xFFd4e4ef),
+                color: OpsColors.text,
               ),
             ),
             const SizedBox(height: 2),
-            Text(
+            const Text(
               'Configure and monitor sensors',
               style: TextStyle(
                 fontSize: 15,
-                color:
-                    isLight ? const Color(0xFF4e6473) : const Color(0xFF9db7d2),
+                color: OpsColors.muted,
               ),
             ),
           ],
@@ -1693,14 +1690,14 @@ class _SensorCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: OpsColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: OpsColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isLight ? 0.04 : 0.16),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
@@ -1713,14 +1710,12 @@ class _SensorCard extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: isLight
-                      ? const Color(0xFFdfe3ef)
-                      : const Color(0xFF2A3F54),
-                  borderRadius: BorderRadius.circular(14),
+                  color: OpsColors.primary.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   icon,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: OpsColors.primary,
                   size: 26,
                 ),
               ),
@@ -1736,18 +1731,14 @@ class _SensorCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 30 > 22 ? 30 - 8 : 22,
                         fontWeight: FontWeight.w800,
-                        color: isLight
-                            ? const Color(0xFF152733)
-                            : const Color(0xFFE2EDF8),
+                        color: OpsColors.text,
                       ),
                     ),
                     Text(
                       sensorType,
                       style: TextStyle(
                         fontSize: 14,
-                        color: isLight
-                            ? const Color(0xFF60717c)
-                            : const Color(0xFF9FB4C6),
+                        color: OpsColors.muted,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1789,16 +1780,15 @@ class _SensorCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color:
-                  isLight ? const Color(0xFFe9f0f4) : const Color(0xFF233C4F),
-              borderRadius: BorderRadius.circular(10),
+              color: OpsColors.surfaceLow,
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               children: [
                 Icon(
                   Icons.location_on_outlined,
                   size: 18,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: OpsColors.primary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -1807,9 +1797,7 @@ class _SensorCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: isLight
-                          ? const Color(0xFF2c404d)
-                          : const Color(0xFFD3E4F2),
+                      color: OpsColors.text,
                       fontSize: 13,
                     ),
                   ),

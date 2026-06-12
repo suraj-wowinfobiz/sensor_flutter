@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/ops_theme.dart';
 import '../core/responsive/adaptive_text.dart';
 import '../core/responsive/responsive_extensions.dart';
 import '../core/responsive/responsive_values.dart';
@@ -63,7 +64,7 @@ class _CrudTableState extends State<CrudTable>
       large: 164,
     );
     final outerGap = ResponsiveValues.gap(context);
-    final cardRadius = ResponsiveValues.cardRadius(context) * 2;
+    const cardRadius = 8.0;
 
     return FadeTransition(
       opacity: _fadeAnimation,
@@ -72,14 +73,14 @@ class _CrudTableState extends State<CrudTable>
         margin: EdgeInsets.all(outerGap),
         padding: EdgeInsets.all(outerGap * 1.4),
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
+          color: OpsColors.surface,
           borderRadius: BorderRadius.circular(cardRadius),
-          border: Border.all(color: Theme.of(context).dividerColor),
+          border: Border.all(color: OpsColors.border),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              blurRadius: 3,
+              offset: const Offset(0, 1),
             ),
           ],
         ),
@@ -99,12 +100,10 @@ class _CrudTableState extends State<CrudTable>
                     SizedBox(width: outerGap),
                     AdaptiveText(
                       widget.title,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Theme.of(context).brightness == Brightness.light
-                            ? const Color(0xFF1e3a5a)
-                            : const Color(0xFFc0d6f0),
+                        color: OpsColors.text,
                       ),
                     ),
                   ],
@@ -119,7 +118,7 @@ class _CrudTableState extends State<CrudTable>
                         color: Theme.of(context).colorScheme.primary,
                         borderRadius: BorderRadius.circular(40),
                       ),
-                      child: Row(
+                      child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.add, color: Colors.white, size: 16),
@@ -151,47 +150,42 @@ class _CrudTableState extends State<CrudTable>
                           constraints: BoxConstraints(minWidth: minTableWidth),
                           child: Container(
                             decoration: BoxDecoration(
-                              border: Border.all(
-                                  color: Theme.of(context).dividerColor),
-                              borderRadius:
-                                  BorderRadius.circular(cardRadius - 8),
+                              border: Border.all(color: OpsColors.border),
+                              borderRadius: BorderRadius.circular(cardRadius),
                             ),
+                            clipBehavior: Clip.antiAlias,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 16),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context).brightness ==
-                                            Brightness.light
-                                        ? const Color(0xFFf0f5fd)
-                                        : const Color(0xFF203a54),
-                                    borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(24),
-                                      topRight: Radius.circular(24),
+                                      horizontal: 24, vertical: 16),
+                                  decoration: const BoxDecoration(
+                                    color: OpsColors.surfaceLow,
+                                    border: Border(
+                                      bottom:
+                                          BorderSide(color: OpsColors.border),
                                     ),
                                   ),
                                   child: Row(
                                     children: [
-                                      ...widget.columns.map((column) =>
-                                          Container(
-                                            width: tableColumnWidth,
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 8),
-                                            child: Text(
-                                              column,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
-                                                color: Theme.of(context)
-                                                            .brightness ==
-                                                        Brightness.light
-                                                    ? const Color(0xFF1e3a5a)
-                                                    : const Color(0xFFc0d6f0),
-                                              ),
-                                            ),
-                                          )),
+                                      ...widget.columns
+                                          .map((column) => Container(
+                                                width: tableColumnWidth,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 8),
+                                                child: Text(
+                                                  column.toUpperCase(),
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    height: 16 / 12,
+                                                    fontWeight: FontWeight.w800,
+                                                    letterSpacing: .45,
+                                                    color: OpsColors.outline,
+                                                  ),
+                                                ),
+                                              )),
                                       const SizedBox(
                                         child: SizedBox.shrink(),
                                       ),
@@ -201,10 +195,14 @@ class _CrudTableState extends State<CrudTable>
                                           padding: EdgeInsets.symmetric(
                                               horizontal: 8),
                                           child: Text(
-                                            'Actions',
+                                            'ACTIONS',
                                             style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold),
+                                              fontSize: 12,
+                                              height: 16 / 12,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: .45,
+                                              color: OpsColors.outline,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -213,11 +211,11 @@ class _CrudTableState extends State<CrudTable>
                                 ),
                                 ...List.generate(widget.data.length, (index) {
                                   return Container(
-                                    decoration: BoxDecoration(
+                                    decoration: const BoxDecoration(
                                       border: Border(
                                         bottom: BorderSide(
-                                            color:
-                                                Theme.of(context).dividerColor),
+                                          color: OpsColors.border,
+                                        ),
                                       ),
                                     ),
                                     child: Row(
@@ -231,14 +229,12 @@ class _CrudTableState extends State<CrudTable>
                                                   ? cell
                                                   : Text(
                                                       cell.toString(),
-                                                      style: TextStyle(
-                                                        color: Theme.of(context)
-                                                                    .brightness ==
-                                                                Brightness.light
-                                                            ? const Color(
-                                                                0xFF0a1a2a)
-                                                            : const Color(
-                                                                0xFFe8f1fc),
+                                                      style: const TextStyle(
+                                                        fontSize: 14,
+                                                        height: 20 / 14,
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                        color: OpsColors.text,
                                                       ),
                                                     ),
                                             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/theme/ops_theme.dart';
 import '../providers/super_admin_backend_provider.dart';
 
 class StatsGrid extends StatelessWidget {
@@ -34,13 +35,13 @@ class StatsGrid extends StatelessWidget {
         ];
 
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+          padding: const EdgeInsets.fromLTRB(32, 28, 32, 16),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final width = constraints.maxWidth;
-              final crossAxisCount = width >= 1200
+              final crossAxisCount = width >= 1180
                   ? 4
-                  : width >= 900
+                  : width >= 760
                       ? 2
                       : 1;
 
@@ -50,15 +51,9 @@ class StatsGrid extends StatelessWidget {
                 itemCount: items.length,
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: 14,
-                  mainAxisSpacing: 14,
-                  childAspectRatio: width >= 1100
-                      ? 2.1
-                      : width >= 700
-                          ? 2.6
-                          : width >= 430
-                              ? 3.2
-                              : 2.6,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  mainAxisExtent: 116,
                 ),
                 itemBuilder: (context, index) {
                   final item = items[index];
@@ -86,21 +81,29 @@ class StatsGrid extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: OpsColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: OpsColors.border),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
       child: Row(
         children: [
-          Icon(icon, size: 26, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 10),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: OpsColors.primary.withValues(alpha: .10),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 22, color: OpsColors.primary),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -110,23 +113,22 @@ class StatsGrid extends StatelessWidget {
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).brightness == Brightness.light
-                        ? const Color(0xFF0a1a2a)
-                        : const Color(0xFFe8f1fc),
+                  style: const TextStyle(
+                    fontSize: 28,
+                    height: 32 / 28,
+                    fontWeight: FontWeight.w700,
+                    color: OpsColors.text,
                   ),
                 ),
                 Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).brightness == Brightness.light
-                        ? const Color(0xFF4a6b8a)
-                        : const Color(0xFF8aaac9),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: OpsColors.muted,
+                    letterSpacing: .4,
                   ),
                 ),
               ],

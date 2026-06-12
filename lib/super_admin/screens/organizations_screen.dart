@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/ops_theme.dart';
 import '../models/organization.dart';
 import '../models/site.dart';
 import '../models/zone.dart';
@@ -374,7 +375,6 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    final isLight = Theme.of(context).brightness == Brightness.light;
     _ensureSelections(db);
     final viewportHeight = MediaQuery.of(context).size.height;
     final desktopCardHeight =
@@ -387,7 +387,7 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
         .toList();
     final zones = db.zones.where((z) => z.siteId == selectedSiteId).toList();
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+      padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -399,24 +399,20 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Organization Hierarchy',
                     style: TextStyle(
                       fontSize: 34,
                       fontWeight: FontWeight.w800,
-                      color: Theme.of(context).brightness == Brightness.light
-                          ? const Color(0xFF0f202d)
-                          : const Color(0xFFd4e4ef),
+                      color: OpsColors.text,
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
+                  const Text(
                     'Manage organizations, sites, and zones',
                     style: TextStyle(
                       fontSize: 15,
-                      color: isLight
-                          ? const Color(0xFF4e6473)
-                          : const Color(0xFF9db7d2),
+                      color: OpsColors.muted,
                     ),
                   ),
                 ],
@@ -522,18 +518,17 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
     required Widget child,
     VoidCallback? onAdd,
   }) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: OpsColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: OpsColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isLight ? 0.07 : 0.16),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
@@ -542,15 +537,10 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color:
-                  isLight ? const Color(0xFFF5FAFD) : const Color(0xFF1f3342),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(18),
-                topRight: Radius.circular(18),
-              ),
+            decoration: const BoxDecoration(
+              color: OpsColors.surfaceLow,
               border: Border(
-                bottom: BorderSide(color: Theme.of(context).dividerColor),
+                bottom: BorderSide(color: OpsColors.border),
               ),
             ),
             child: Row(
@@ -559,17 +549,13 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
                   width: 30,
                   height: 30,
                   decoration: BoxDecoration(
-                    color: isLight
-                        ? const Color(0xFFDBEDF8)
-                        : const Color(0xFF315066),
-                    borderRadius: BorderRadius.circular(9),
+                    color: OpsColors.primary.withValues(alpha: .10),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     icon,
                     size: 17,
-                    color: isLight
-                        ? const Color(0xFF1271a0)
-                        : const Color(0xFFD7E8F6),
+                    color: OpsColors.primary,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -579,9 +565,7 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
                     style: TextStyle(
                       fontSize: 20 > 18 ? 20 - 2 : 18,
                       fontWeight: FontWeight.w800,
-                      color: isLight
-                          ? const Color(0xFF132733)
-                          : const Color(0xFFD8E8F5),
+                      color: OpsColors.text,
                     ),
                   ),
                 ),
@@ -593,18 +577,13 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
                       width: 34,
                       height: 34,
                       decoration: BoxDecoration(
-                        color: isLight
-                            ? const Color(0xFFE6EFF3)
-                            : const Color(0xFF243E52),
-                        borderRadius: BorderRadius.circular(10),
-                        border:
-                            Border.all(color: Theme.of(context).dividerColor),
+                        color: OpsColors.surface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: OpsColors.border),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.add,
-                        color: isLight
-                            ? const Color(0xFF203845)
-                            : const Color(0xFFD7E8F6),
+                        color: OpsColors.text,
                       ),
                     ),
                   ),
@@ -744,20 +723,19 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
   }
 
   Widget _infoChip(String label) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: isLight ? const Color(0xFFF3F8FC) : const Color(0xFF243E52),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: OpsColors.surfaceLow,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: OpsColors.border),
       ),
       child: Text(
         label,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w700,
-          color: isLight ? const Color(0xFF2B404D) : const Color(0xFFD7E8F6),
+          color: OpsColors.text,
         ),
       ),
     );

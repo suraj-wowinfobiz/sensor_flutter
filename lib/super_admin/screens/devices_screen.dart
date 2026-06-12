@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider;
 import 'dart:convert';
 
+import '../../core/theme/ops_theme.dart';
 import '../api/device_api.dart';
 import '../models/device.dart';
 import '../providers/super_admin_backend_provider.dart';
@@ -858,7 +859,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
             allDevices.where((d) => _matchesFilters(db, d)).toList();
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+          padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -879,7 +880,6 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
     return Wrap(
       alignment: WrapAlignment.spaceBetween,
       runSpacing: 12,
@@ -889,23 +889,20 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Device Management',
               style: TextStyle(
                 fontSize: 34,
                 fontWeight: FontWeight.w800,
-                color: Theme.of(context).brightness == Brightness.light
-                    ? const Color(0xFF0f202d)
-                    : const Color(0xFFd4e4ef),
+                color: OpsColors.text,
               ),
             ),
             const SizedBox(height: 2),
-            Text(
+            const Text(
               'Configure and monitor sensor devices',
               style: TextStyle(
                 fontSize: 15,
-                color:
-                    isLight ? const Color(0xFF4e6473) : const Color(0xFF9db7d2),
+                color: OpsColors.muted,
               ),
             ),
           ],
@@ -1445,14 +1442,14 @@ class _DeviceCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: OpsColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: OpsColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isLight ? 0.04 : 0.18),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
@@ -1465,13 +1462,11 @@ class _DeviceCard extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: isLight
-                      ? const Color(0xFFdbe7ed)
-                      : const Color(0xFF2B4659),
-                  borderRadius: BorderRadius.circular(14),
+                  color: OpsColors.primary.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.memory,
-                    color: Theme.of(context).colorScheme.primary, size: 26),
+                child: const Icon(Icons.memory,
+                    color: OpsColors.primary, size: 26),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1485,18 +1480,14 @@ class _DeviceCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
-                        color: isLight
-                            ? const Color(0xFF152733)
-                            : const Color(0xFFD7E8F6),
+                        color: OpsColors.text,
                       ),
                     ),
                     Text(
                       serial,
                       style: TextStyle(
                         fontSize: 14,
-                        color: isLight
-                            ? const Color(0xFF60717c)
-                            : const Color(0xFFBBD0E0),
+                        color: OpsColors.muted,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1542,14 +1533,13 @@ class _DeviceCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color:
-                  isLight ? const Color(0xFFe9f0f4) : const Color(0xFF253F52),
-              borderRadius: BorderRadius.circular(10),
+              color: OpsColors.surfaceLow,
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               children: [
                 Icon(Icons.location_on_outlined,
-                    size: 18, color: Theme.of(context).colorScheme.primary),
+                    size: 18, color: OpsColors.primary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -1557,9 +1547,7 @@ class _DeviceCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: isLight
-                          ? const Color(0xFF2c404d)
-                          : const Color(0xFFD7E8F6),
+                      color: OpsColors.text,
                       fontSize: 13,
                     ),
                   ),
