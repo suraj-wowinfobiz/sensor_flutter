@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -151,6 +152,9 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   static const _rememberRoleKey = 'global_login_role';
   static const _rememberEnabledKey = 'global_login_remember';
   static const _apiEnabledKey = 'global_login_api_enabled';
+  static const _loginHeroAsset = 'assets/images/construction_line_art.jpg';
+  static const _loginHeroFallbackAsset = 'assets/images/construction.jpg';
+  static const _sensorLogoAsset = 'assets/icons/sensor_icon.png';
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -161,6 +165,7 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   bool _rememberMe = true;
   bool _useApiAuth = true;
   bool _isLoading = false;
+  bool _didPrecacheLoginAssets = false;
 
   @override
   void initState() {
@@ -194,6 +199,21 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
         _selectedRole = matchedRole;
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didPrecacheLoginAssets || widget.initialRole != AppLoginRole.user) {
+      return;
+    }
+    _didPrecacheLoginAssets = true;
+    precacheImage(const AssetImage(_loginHeroAsset), context)
+        .catchError((_) {});
+    precacheImage(const AssetImage(_loginHeroFallbackAsset), context)
+        .catchError((_) {});
+    precacheImage(const AssetImage(_sensorLogoAsset), context)
+        .catchError((_) {});
   }
 
   Future<void> _storePreferences() async {
@@ -719,42 +739,376 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
 
   Widget _buildUserHtmlLogin(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final stacked = width < 1080;
-    final pagePadding = width >= 1200
-        ? 32.0
-        : width >= 768
-            ? 24.0
+    final stacked = width < 960;
+    final pagePadding = width >= 1280
+        ? 48.0
+        : width >= 960
+            ? 28.0
             : 16.0;
 
     return Scaffold(
-      backgroundColor: OpsColors.background,
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              pagePadding,
-              24,
-              pagePadding,
-              24,
-            ),
+            padding: EdgeInsets.all(pagePadding),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1180),
-              child: Column(
+              constraints: const BoxConstraints(maxWidth: 1240),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: OpsColors.surface,
+                  borderRadius: BorderRadius.circular(26),
+                  border: Border.all(color: OpsColors.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 28,
+                      offset: const Offset(0, 18),
+                    ),
+                  ],
+                ),
+                child: stacked
+                    ? Column(
+                        children: [
+                          _buildUserInfoColumn(compact: true),
+                          _buildUserAuthCard(context, compact: true),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            flex: 11,
+                            child: _buildUserInfoColumn(compact: false),
+                          ),
+                          Expanded(
+                            flex: 7,
+                            child: _buildUserAuthCard(context, compact: false),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserAuthCard(BuildContext context, {required bool compact}) {
+    final sidePadding = compact ? 28.0 : 48.0;
+    final titleSize = compact ? 30.0 : 36.0;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        sidePadding,
+        compact ? 30 : 44,
+        sidePadding,
+        compact ? 28 : 44,
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Text(
+                'USER LOGIN',
+                style: TextStyle(
+                  color: OpsColors.primaryContainer,
+                  fontSize: compact ? 12 : 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+              ),
+            ),
+            SizedBox(height: compact ? 22 : 32),
+            Text(
+              'Access your operations workspace',
+              style: TextStyle(
+                color: OpsColors.text,
+                fontSize: titleSize,
+                fontWeight: FontWeight.w700,
+                height: 1.05,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              _selectedRole.description,
+              style: const TextStyle(
+                color: OpsColors.muted,
+                fontSize: 14,
+                height: 1.45,
+              ),
+            ),
+            SizedBox(height: compact ? 24 : 28),
+            _buildRefField(
+              controller: _emailController,
+              hintText: _selectedRole.emailHint,
+              prefixIcon: Icons.person_outline_rounded,
+              keyboardType: TextInputType.emailAddress,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter your username';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 14),
+            _buildRefField(
+              controller: _passwordController,
+              hintText: 'Password',
+              prefixIcon: Icons.lock_outline_rounded,
+              obscureText: _obscurePassword,
+              suffix: IconButton(
+                onPressed: () {
+                  setState(() => _obscurePassword = !_obscurePassword);
+                },
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: OpsColors.outline,
+                  size: 18,
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter your password';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<AppLoginRole>(
+              initialValue: _selectedRole,
+              decoration: InputDecoration(
+                hintText: 'Select login type',
+                fillColor: const Color(0xFFF1F4FF),
+                filled: true,
+                prefixIcon: Icon(
+                  _selectedRole.icon,
+                  color: OpsColors.primary,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  borderSide: const BorderSide(
+                    color: OpsColors.primary,
+                    width: 1.3,
+                  ),
+                ),
+              ),
+              items: AppLoginRole.values
+                  .map(
+                    (role) => DropdownMenuItem<AppLoginRole>(
+                      value: role,
+                      child: Text(role.label),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (role) {
+                if (role == null) return;
+                setState(() => _selectedRole = role);
+              },
+            ),
+            const SizedBox(height: 12),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return _buildRememberAndForgotRow(
+                  context,
+                  compact: constraints.maxWidth < 320,
+                  primary: OpsColors.primaryContainer,
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+            Center(
+              child: SizedBox(
+                width: compact ? double.infinity : 220,
+                height: 44,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFFDB6AAE),
+                        OpsColors.primaryContainer,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color:
+                            OpsColors.primaryContainer.withValues(alpha: 0.18),
+                        blurRadius: 18,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : const Text(
+                            'LOGIN',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.45,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserInfoColumn({required bool compact}) {
+    return Container(
+      constraints: BoxConstraints(minHeight: compact ? 320 : 560),
+      padding: EdgeInsets.fromLTRB(
+        compact ? 24 : 36,
+        compact ? 28 : 34,
+        compact ? 24 : 36,
+        compact ? 28 : 34,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: compact
+            ? const BorderRadius.only(
+                topLeft: Radius.circular(26),
+                topRight: Radius.circular(26),
+              )
+            : const BorderRadius.only(
+                topLeft: Radius.circular(26),
+                bottomLeft: Radius.circular(26),
+              ),
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: compact
+                  ? const BorderRadius.only(
+                      topLeft: Radius.circular(26),
+                      topRight: Radius.circular(26),
+                    )
+                  : const BorderRadius.only(
+                      topLeft: Radius.circular(26),
+                      bottomLeft: Radius.circular(26),
+                    ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  const _LoginHeroImage(
+                    primaryAsset: _loginHeroAsset,
+                    fallbackAsset: _loginHeroFallbackAsset,
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Colors.white.withValues(alpha: 0.95),
+                          Colors.white.withValues(alpha: 0.74),
+                          Colors.white.withValues(alpha: 0.16),
+                        ],
+                        stops: const [0, 0.42, 1],
+                      ),
+                    ),
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.white.withValues(alpha: 0.88),
+                          Colors.white.withValues(alpha: 0.06),
+                        ],
+                        stops: const [0, 0.58],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
                       Container(
-                        width: 48,
-                        height: 48,
+                        width: 54,
+                        height: 54,
                         decoration: BoxDecoration(
-                          color: OpsColors.primary,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.analytics_rounded,
                           color: Colors.white,
-                          size: 24,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 18,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Image.asset(
+                            _sensorLogoAsset,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: OpsColors.primaryContainer,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.grid_view_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -765,8 +1119,8 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                             'L&T',
                             style: TextStyle(
                               color: OpsColors.text,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
                               height: 1,
                             ),
                           ),
@@ -783,500 +1137,102 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 28),
-                  _buildUserPageHeader(),
-                  const SizedBox(height: 18),
-                  if (stacked) ...[
-                    _buildUserAuthCard(context),
-                    const SizedBox(height: 16),
-                    _buildUserInfoColumn(),
-                  ] else
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(flex: 8, child: _buildUserAuthCard(context)),
-                        const SizedBox(width: 16),
-                        SizedBox(width: 360, child: _buildUserInfoColumn()),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUserPageHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          _selectedRole.label,
-          style: const TextStyle(
-            color: OpsColors.text,
-            fontSize: 32,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.72,
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Log in to your account',
-          style: TextStyle(
-            color: OpsColors.muted,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          _selectedRole.description,
-          style: const TextStyle(
-            color: OpsColors.muted,
-            fontSize: 14,
-            height: 1.45,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildUserAuthCard(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: OpsColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: OpsColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 18, 24, 18),
-              child: Row(
-                children: [
-                  const Text(
-                    'USER LOGIN',
+                  SizedBox(height: compact ? 34 : 62),
+                  Text(
+                    'Welcome to\nsensor platform',
                     style: TextStyle(
-                      color: OpsColors.outline,
-                      fontSize: 11,
+                      color: OpsColors.text,
+                      fontSize: compact ? 34 : 44,
+                      height: 1.02,
                       fontWeight: FontWeight.w800,
-                      letterSpacing: 0.55,
+                      letterSpacing: 0,
                     ),
                   ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: OpsColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _selectedRole.icon,
-                          size: 15,
-                          color: OpsColors.primary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _selectedRole.label,
-                          style: const TextStyle(
-                            color: OpsColors.primary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: OpsColors.border),
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 4),
-                  _buildFormLabel('EMAIL'),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      hintText: _selectedRole.emailHint,
-                      fillColor: OpsColors.surfaceLow,
-                      filled: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: OpsColors.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: OpsColors.border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(
-                          color: OpsColors.primary,
-                          width: 1.4,
-                        ),
+                  const SizedBox(height: 14),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: const Text(
+                      'Monitor site operations, check live sensor telemetry, track alert response, and access role-based dashboards from one shared workspace.',
+                      style: TextStyle(
+                        color: OpsColors.muted,
+                        fontSize: 14,
+                        height: 1.55,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your username';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  _buildFormLabel('PASSWORD'),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    decoration: InputDecoration(
-                      hintText: '••••••••',
-                      fillColor: OpsColors.surfaceLow,
-                      filled: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: OpsColors.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: OpsColors.border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(
-                          color: OpsColors.primary,
-                          width: 1.4,
-                        ),
-                      ),
-                      suffixIcon: IconButton(
-                        onPressed: () {
-                          setState(() => _obscurePassword = !_obscurePassword);
-                        },
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined,
-                          color: OpsColors.outline,
-                        ),
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your password';
-                      }
-                      return null;
-                    },
-                  ),
-                  if (widget.allowRoleSelection) ...[
-                    const SizedBox(height: 20),
-                    _buildFormLabel('LOGIN AS'),
-                    const SizedBox(height: 10),
-                    DropdownButtonFormField<AppLoginRole>(
-                      initialValue: _selectedRole,
-                      decoration: InputDecoration(
-                        fillColor: OpsColors.surfaceLow,
-                        filled: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        prefixIcon: Icon(
-                          _selectedRole.icon,
-                          color: OpsColors.primary,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: OpsColors.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: OpsColors.border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: OpsColors.primary,
-                            width: 1.4,
-                          ),
-                        ),
-                      ),
-                      items: AppLoginRole.values
-                          .map(
-                            (role) => DropdownMenuItem<AppLoginRole>(
-                              value: role,
-                              child: Text(role.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (role) {
-                        if (role == null) return;
-                        setState(() => _selectedRole = role);
-                      },
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      return _buildRememberAndForgotRow(
-                        context,
-                        compact: constraints.maxWidth < 560,
-                        primary: OpsColors.primary,
-                      );
-                    },
                   ),
                   const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: OpsColors.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                  const Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      _LoginInfoChip(
+                        icon: Icons.sensors_outlined,
+                        label: 'Live telemetry',
                       ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                              ),
-                            )
-                          : const Text(
-                              'Log In',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                    ),
+                      _LoginInfoChip(
+                        icon: Icons.notifications_active_outlined,
+                        label: 'Alert visibility',
+                      ),
+                      _LoginInfoChip(
+                        icon: Icons.analytics_outlined,
+                        label: 'Operational analytics',
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
+              const _LoginTrustStrip(),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildUserInfoColumn() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildInfoCard(
-          eyebrow: 'ROLE-BASED ACCESS',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: OpsColors.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.analytics_rounded,
-                      color: OpsColors.primary,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'L&T',
-                          style: TextStyle(
-                            color: OpsColors.text,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            height: 1,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Sensor Analytics',
-                          style: TextStyle(
-                            color: OpsColors.muted,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                'Role-based operational access',
-                style: TextStyle(
-                  color: OpsColors.text,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.24,
-                ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'Sign in to monitor construction sites, inspect sensor health, review alert response, and manage operational visibility from one shared platform.',
-                style: TextStyle(
-                  color: OpsColors.muted,
-                  fontSize: 14,
-                  height: 1.45,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildInfoCard(
-          eyebrow: 'OPERATIONAL VISIBILITY',
-          child: const Column(
-            children: [
-              _UserLoginFeatureRow(
-                icon: Icons.sensors_outlined,
-                text: 'Real-time sensor telemetry and reporting intervals',
-              ),
-              SizedBox(height: 14),
-              _UserLoginFeatureRow(
-                icon: Icons.router_outlined,
-                text: 'Device heartbeat, firmware, and connectivity health',
-              ),
-              SizedBox(height: 14),
-              _UserLoginFeatureRow(
-                icon: Icons.notifications_active_outlined,
-                text: 'Critical alert response and escalation visibility',
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildInfoCard(
-          eyebrow: 'ACCESS NOTE',
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: OpsColors.surfaceLow,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.lightbulb_outline_rounded,
-                  color: OpsColors.primary,
-                  size: 20,
-                ),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Use the role assigned by your organization. Each role opens a different operations workspace.',
-                    style: TextStyle(
-                      color: OpsColors.muted,
-                      fontSize: 13,
-                      height: 1.45,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoCard({
-    required String eyebrow,
-    required Widget child,
+  Widget _buildRefField({
+    required TextEditingController controller,
+    required String hintText,
+    required IconData prefixIcon,
+    TextInputType? keyboardType,
+    bool obscureText = false,
+    Widget? suffix,
+    required String? Function(String?) validator,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: OpsColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: OpsColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 3,
-            offset: const Offset(0, 1),
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      validator: validator,
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: const TextStyle(
+          color: OpsColors.outline,
+          fontSize: 14,
+        ),
+        prefixIcon: Icon(prefixIcon, size: 18, color: OpsColors.outline),
+        suffixIcon: suffix,
+        fillColor: const Color(0xFFF1F4FF),
+        filled: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(999),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(999),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(999),
+          borderSide: const BorderSide(
+            color: OpsColors.primary,
+            width: 1.3,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            eyebrow,
-            style: const TextStyle(
-              color: OpsColors.outline,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.55,
-            ),
-          ),
-          const SizedBox(height: 18),
-          child,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFormLabel(String label) {
-    return Text(
-      label,
-      style: const TextStyle(
-        color: OpsColors.muted,
-        fontSize: 11,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 0.55,
+        ),
       ),
     );
   }
@@ -1357,41 +1313,175 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   }
 }
 
-class _UserLoginFeatureRow extends StatelessWidget {
-  final IconData icon;
-  final String text;
+class _LoginTrustStrip extends StatelessWidget {
+  const _LoginTrustStrip();
 
-  const _UserLoginFeatureRow({
-    required this.icon,
-    required this.text,
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: OpsColors.primaryContainer.withValues(alpha: 0.10),
+        ),
+      ),
+      child: const Wrap(
+        spacing: 18,
+        runSpacing: 10,
+        children: [
+          _TrustMetric(value: '128', label: 'Sensors'),
+          _TrustMetric(value: '96.2%', label: 'Online'),
+          _TrustMetric(value: '12', label: 'Open alerts'),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrustMetric extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _TrustMetric({
+    required this.value,
+    required this.label,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: OpsColors.surfaceLow,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, size: 18, color: OpsColors.primary),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              color: OpsColors.muted,
-              fontSize: 13,
-              height: 1.45,
+    return SizedBox(
+      width: 112,
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: OpsColors.primaryContainer,
+              shape: BoxShape.circle,
             ),
           ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: '$value ',
+                    style: const TextStyle(
+                      color: OpsColors.text,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  TextSpan(
+                    text: label,
+                    style: const TextStyle(
+                      color: OpsColors.muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoginHeroImage extends StatelessWidget {
+  final String primaryAsset;
+  final String fallbackAsset;
+
+  const _LoginHeroImage({
+    required this.primaryAsset,
+    required this.fallbackAsset,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final directWebAssetUrl = 'assets/$primaryAsset?v=20260612b';
+
+    if (kIsWeb) {
+      return Image.network(
+        directWebAssetUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildFallback();
+        },
+      );
+    }
+
+    return Image.asset(
+      primaryAsset,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => _buildFallback(),
+    );
+  }
+
+  Widget _buildFallback() {
+    return Image.asset(
+      fallbackAsset,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                OpsColors.primaryContainer.withValues(alpha: 0.16),
+                Colors.white,
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LoginInfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _LoginInfoChip({
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.86),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: OpsColors.primaryContainer.withValues(alpha: 0.12),
         ),
-      ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: OpsColors.primaryContainer),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: OpsColors.text,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

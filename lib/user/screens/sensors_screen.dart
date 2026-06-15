@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/ops_theme.dart';
 import '../models/sensor.dart';
 import '../providers/user_database_provider.dart';
+import '../widgets/ops_data_table.dart';
 
 class UserSensorsScreen extends StatefulWidget {
   const UserSensorsScreen({super.key});
@@ -53,68 +54,53 @@ class _UserSensorsScreenState extends State<UserSensorsScreen> {
           ],
           child: Column(
             children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final count = constraints.maxWidth >= 1160
-                      ? 6
-                      : constraints.maxWidth >= 760
-                          ? 3
-                          : 1;
-                  final cards = [
-                    OpsKpiCard(
-                      label: 'Total Sensors',
-                      value: '${db.sensors.isEmpty ? 128 : db.sensors.length}',
-                      helper: 'Across all assigned sites',
-                      icon: Icons.sensors_rounded,
-                    ),
-                    OpsKpiCard(
-                      label: 'Reporting Normally',
-                      value: '${db.sensors.isEmpty ? 112 : reporting}',
-                      helper: 'Within expected interval',
-                      icon: Icons.check_circle_rounded,
-                      color: OpsColors.success,
-                    ),
-                    OpsKpiCard(
-                      label: 'Warning State',
-                      value: '${db.sensors.isEmpty ? 11 : warning}',
-                      helper: 'Monitoring required',
-                      icon: Icons.warning_amber_rounded,
-                      color: OpsColors.warning,
-                    ),
-                    const OpsKpiCard(
-                      label: 'Offline / No Data',
-                      value: '5',
-                      helper: 'No recent readings',
-                      icon: Icons.signal_wifi_off_rounded,
-                      color: OpsColors.danger,
-                    ),
-                    const OpsKpiCard(
-                      label: 'Breaches Today',
-                      value: '14',
-                      helper: 'Warning and critical combined',
-                      icon: Icons.stacked_line_chart_rounded,
-                      color: OpsColors.warning,
-                    ),
-                    const OpsKpiCard(
-                      label: 'Calibration Due',
-                      value: '8',
-                      helper: 'Review accuracy schedule',
-                      icon: Icons.build_circle_outlined,
-                    ),
-                  ];
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: cards.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: count,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      mainAxisExtent: count == 1 ? 96 : 104,
-                    ),
-                    itemBuilder: (context, index) => cards[index],
-                  );
-                },
+              OpsKpiGrid(
+                maxColumns: 6,
+                minCardWidth: 145,
+                spacing: 12,
+                cardHeight: 126,
+                cards: [
+                  OpsKpiCard(
+                    label: 'Total Sensors',
+                    value: '${db.sensors.isEmpty ? 128 : db.sensors.length}',
+                    helper: 'Across all assigned sites',
+                    icon: Icons.sensors_rounded,
+                  ),
+                  OpsKpiCard(
+                    label: 'Reporting Normally',
+                    value: '${db.sensors.isEmpty ? 112 : reporting}',
+                    helper: 'Within expected interval',
+                    icon: Icons.check_circle_rounded,
+                    color: OpsColors.success,
+                  ),
+                  OpsKpiCard(
+                    label: 'Warning State',
+                    value: '${db.sensors.isEmpty ? 11 : warning}',
+                    helper: 'Monitoring required',
+                    icon: Icons.warning_amber_rounded,
+                    color: OpsColors.warning,
+                  ),
+                  const OpsKpiCard(
+                    label: 'Offline / No Data',
+                    value: '5',
+                    helper: 'No recent readings',
+                    icon: Icons.signal_wifi_off_rounded,
+                    color: OpsColors.danger,
+                  ),
+                  const OpsKpiCard(
+                    label: 'Breaches Today',
+                    value: '14',
+                    helper: 'Warning and critical combined',
+                    icon: Icons.stacked_line_chart_rounded,
+                    color: OpsColors.warning,
+                  ),
+                  const OpsKpiCard(
+                    label: 'Calibration Due',
+                    value: '8',
+                    helper: 'Review accuracy schedule',
+                    icon: Icons.build_circle_outlined,
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               OpsPanel(
@@ -210,45 +196,58 @@ class _SensorTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        columns: const [
-          DataColumn(label: Text('SENSOR NAME')),
-          DataColumn(label: Text('SENSOR ID')),
-          DataColumn(label: Text('TYPE')),
-          DataColumn(label: Text('SITE')),
-          DataColumn(label: Text('ZONE')),
-          DataColumn(label: Text('LINKED DEVICE')),
-          DataColumn(label: Text('LATEST READING')),
-          DataColumn(label: Text('UNIT')),
-          DataColumn(label: Text('STATUS')),
-          DataColumn(label: Text('THRESHOLD')),
-          DataColumn(label: Text('CALIBRATION')),
-          DataColumn(label: Text('HEALTH')),
-        ],
-        rows: sensors.map((sensor) {
-          final sample = sensor.id.startsWith('sample-');
-          final state = _sensorState(sensor.lastReading);
-          return DataRow(cells: [
-            DataCell(
-                Text(sample ? _sampleName(sensor.id) : sensor.serialNumber)),
-            DataCell(Text(sensor.id)),
-            DataCell(Text(sample ? _sampleType(sensor.id) : 'Telemetry')),
-            DataCell(Text(sample ? _sampleSite(sensor.id) : 'Project Alpha')),
-            DataCell(Text(sample ? _sampleZone(sensor.id) : 'Field Zone')),
-            DataCell(Text(sample ? _sampleDevice(sensor.id) : sensor.deviceId)),
-            DataCell(Text(sample
+    return OpsDataTable(
+      minWidth: 1280,
+      columns: const [
+        OpsTableColumnSpec('SENSOR NAME', flex: 2),
+        OpsTableColumnSpec('SENSOR ID'),
+        OpsTableColumnSpec('TYPE'),
+        OpsTableColumnSpec('SITE'),
+        OpsTableColumnSpec('ZONE'),
+        OpsTableColumnSpec('LINKED DEVICE', flex: 2),
+        OpsTableColumnSpec('LATEST READING', center: true),
+        OpsTableColumnSpec('UNIT', center: true),
+        OpsTableColumnSpec('STATUS', center: true),
+        OpsTableColumnSpec('THRESHOLD'),
+        OpsTableColumnSpec('CALIBRATION'),
+        OpsTableColumnSpec('HEALTH', center: true),
+      ],
+      rows: sensors.map((sensor) {
+        final sample = sensor.id.startsWith('sample-');
+        final state = _sensorState(sensor.lastReading);
+        return OpsTableRowSpec([
+          OpsTableCellSpec.text(
+            sample ? _sampleName(sensor.id) : sensor.serialNumber,
+            bold: true,
+          ),
+          OpsTableCellSpec.text(sensor.id),
+          OpsTableCellSpec.text(sample ? _sampleType(sensor.id) : 'Telemetry'),
+          OpsTableCellSpec.text(
+              sample ? _sampleSite(sensor.id) : 'Project Alpha'),
+          OpsTableCellSpec.text(sample ? _sampleZone(sensor.id) : 'Field Zone'),
+          OpsTableCellSpec.text(
+              sample ? _sampleDevice(sensor.id) : sensor.deviceId),
+          OpsTableCellSpec.text(
+            sample
                 ? _sampleReading(sensor.id)
-                : sensor.lastReading.toStringAsFixed(2))),
-            DataCell(Text(sample ? _sampleUnit(sensor.id) : 'unit')),
-            DataCell(OpsStatusBadge(state)),
-            DataCell(Text(state == 'Normal' ? 'Within Range' : 'Review')),
-            DataCell(Text(sample ? _sampleCalibration(sensor.id) : '24 days')),
-            DataCell(Text(sample ? _sampleHealth(sensor.id) : '90')),
-          ]);
-        }).toList(),
-      ),
+                : sensor.lastReading.toStringAsFixed(2),
+            center: true,
+            bold: true,
+          ),
+          OpsTableCellSpec.text(
+            sample ? _sampleUnit(sensor.id) : 'unit',
+            center: true,
+          ),
+          OpsTableCellSpec(center: true, child: OpsStatusBadge(state)),
+          OpsTableCellSpec.text(state == 'Normal' ? 'Within Range' : 'Review'),
+          OpsTableCellSpec.text(
+              sample ? _sampleCalibration(sensor.id) : '24 days'),
+          OpsTableCellSpec.text(
+            sample ? _sampleHealth(sensor.id) : '90',
+            center: true,
+          ),
+        ]);
+      }).toList(),
     );
   }
 }

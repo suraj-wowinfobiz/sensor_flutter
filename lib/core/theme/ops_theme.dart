@@ -4,9 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 class OpsColors {
   static const primary = Color(0xFF004AC6);
   static const primaryContainer = Color(0xFF2563EB);
-  static const background = Color(0xFFF7F9FB);
+  static const background = Color(0xFFF4F6FA);
   static const surface = Color(0xFFFFFFFF);
-  static const surfaceLow = Color(0xFFF2F4F6);
+  static const surfaceLow = Color(0xFFF7F9FB);
   static const surfaceHigh = Color(0xFFE6E8EA);
   static const border = Color(0xFFC3C6D7);
   static const outline = Color(0xFF737686);
@@ -118,9 +118,9 @@ class OpsTheme {
         dividerThickness: 1,
         horizontalMargin: 24,
         columnSpacing: 40,
-        headingRowHeight: 56,
-        dataRowMinHeight: 62,
-        dataRowMaxHeight: 74,
+        headingRowHeight: 48,
+        dataRowMinHeight: 52,
+        dataRowMaxHeight: 60,
         checkboxHorizontalMargin: 12,
         decoration: BoxDecoration(
           color: OpsColors.surface,
@@ -183,6 +183,8 @@ class OpsPage extends StatelessWidget {
   final String subtitle;
   final List<Widget> actions;
   final Widget child;
+  final TextStyle? titleStyle;
+  final TextStyle? subtitleStyle;
 
   const OpsPage({
     super.key,
@@ -190,12 +192,14 @@ class OpsPage extends StatelessWidget {
     required this.subtitle,
     required this.child,
     this.actions = const [],
+    this.titleStyle,
+    this.subtitleStyle,
   });
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(36, 34, 36, 32),
+      padding: const EdgeInsets.all(32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -205,14 +209,19 @@ class OpsPage extends StatelessWidget {
               final heading = Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: Theme.of(context).textTheme.displayMedium),
+                  Text(
+                    title,
+                    style:
+                        titleStyle ?? Theme.of(context).textTheme.displayMedium,
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(color: OpsColors.muted),
+                    style: subtitleStyle ??
+                        Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(color: OpsColors.muted),
                   ),
                 ],
               );
@@ -223,8 +232,8 @@ class OpsPage extends StatelessWidget {
                   children: [
                     heading,
                     if (actions.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Wrap(spacing: 10, runSpacing: 10, children: actions),
+                      const SizedBox(height: 12),
+                      Wrap(spacing: 12, runSpacing: 12, children: actions),
                     ],
                   ],
                 );
@@ -239,8 +248,8 @@ class OpsPage extends StatelessWidget {
                       constraints: const BoxConstraints(maxWidth: 520),
                       child: Wrap(
                         alignment: WrapAlignment.end,
-                        spacing: 10,
-                        runSpacing: 10,
+                        spacing: 12,
+                        runSpacing: 12,
                         children: actions,
                       ),
                     ),
@@ -248,7 +257,7 @@ class OpsPage extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           child,
         ],
       ),
@@ -406,16 +415,16 @@ class OpsKpiCard extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final compact = constraints.maxHeight < 140;
+          final compact = constraints.maxHeight < 165;
           final padding = compact ? 16.0 : 24.0;
           final iconSize = compact ? 34.0 : 40.0;
-          final gap = compact ? 10.0 : 16.0;
-          final valueSize = compact ? 26.0 : 28.0;
+          final valueSize = compact ? 24.0 : 26.0;
 
           return Padding(
             padding: EdgeInsets.all(padding),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
@@ -447,49 +456,131 @@ class OpsKpiCard extends StatelessWidget {
                       ),
                   ],
                 ),
-                SizedBox(height: gap),
-                Text(
-                  label.toUpperCase(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontSize: 11,
-                        color: OpsColors.muted,
-                      ),
-                ),
-                const SizedBox(height: 2),
-                RichText(
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: value,
-                        style: TextStyle(
-                          fontSize: valueSize,
-                          height: 32 / valueSize,
-                          fontWeight: FontWeight.w700,
-                          color: OpsColors.text,
-                        ),
-                      ),
-                      if (valueSuffix != null) const TextSpan(text: ' '),
-                      if (valueSuffix != null)
-                        TextSpan(
-                          text: valueSuffix,
-                          style: TextStyle(
-                            fontSize: compact ? 12 : 13,
-                            height: 18 / (compact ? 12 : 13),
-                            fontWeight: FontWeight.w400,
-                            color: OpsColors.text,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontSize: 10.5,
+                            color: OpsColors.muted,
                           ),
+                    ),
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: RichText(
+                        maxLines: 1,
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: value,
+                              style: TextStyle(
+                                fontSize: valueSize,
+                                height: 1.12,
+                                fontWeight: FontWeight.w700,
+                                color: OpsColors.text,
+                              ),
+                            ),
+                            if (valueSuffix != null) const TextSpan(text: ' '),
+                            if (valueSuffix != null)
+                              TextSpan(
+                                text: valueSuffix,
+                                style: TextStyle(
+                                  fontSize: compact ? 12 : 13,
+                                  height: 1.2,
+                                  fontWeight: FontWeight.w400,
+                                  color: OpsColors.text,
+                                ),
+                              ),
+                          ],
                         ),
-                    ],
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class OpsKpiGrid extends StatelessWidget {
+  final List<Widget> cards;
+  final int maxColumns;
+  final double minCardWidth;
+  final double spacing;
+  final double cardHeight;
+
+  const OpsKpiGrid({
+    super.key,
+    required this.cards,
+    required this.maxColumns,
+    this.minCardWidth = 150,
+    this.spacing = 16,
+    this.cardHeight = 136,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final available = constraints.maxWidth;
+        final columnsByWidth =
+            ((available + spacing) / (minCardWidth + spacing)).floor();
+        final columns = columnsByWidth.clamp(1, maxColumns);
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: cards.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: spacing,
+            mainAxisExtent: cardHeight,
+          ),
+          itemBuilder: (context, index) => cards[index],
+        );
+      },
+    );
+  }
+}
+
+class OpsCompactText extends StatelessWidget {
+  final String text;
+  final bool center;
+  final bool bold;
+  final Color? color;
+  final int maxLines;
+
+  const OpsCompactText(
+    this.text, {
+    super.key,
+    this.center = false,
+    this.bold = false,
+    this.color,
+    this.maxLines = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
+      textAlign: center ? TextAlign.center : TextAlign.start,
+      style: TextStyle(
+        color: color ?? OpsColors.text,
+        fontSize: 12,
+        height: 16 / 12,
+        fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
       ),
     );
   }

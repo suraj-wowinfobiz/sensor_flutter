@@ -11,6 +11,7 @@ import '../widgets/side_menu.dart';
 import 'alerts_screen.dart';
 import 'analytics_screen.dart';
 import 'dashboard_screen.dart';
+import 'sensors_screen.dart';
 import 'settings_screen.dart';
 
 class UserScreen extends ConsumerStatefulWidget {
@@ -250,7 +251,7 @@ class _UserScreenState extends ConsumerState<UserScreen>
     required String currentView,
     required ValueChanged<String> onViewChanged,
   }) {
-    const views = ['dashboard', 'alerts', 'analytics', 'settings'];
+    const views = ['dashboard', 'sensors', 'alerts', 'analytics', 'settings'];
     final index = views.indexOf(currentView);
     return Container(
       decoration: const BoxDecoration(
@@ -271,6 +272,11 @@ class _UserScreenState extends ConsumerState<UserScreen>
               icon: Icon(Icons.dashboard_outlined),
               selectedIcon: Icon(Icons.dashboard_rounded),
               label: 'Home',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.sensors_outlined),
+              selectedIcon: Icon(Icons.sensors_rounded),
+              label: 'Sensors',
             ),
             NavigationDestination(
               icon: Icon(Icons.warning_amber_outlined),
@@ -308,6 +314,8 @@ class _UserScreenState extends ConsumerState<UserScreen>
     switch (view) {
       case 'dashboard':
         return const UserDashboardScreen();
+      case 'sensors':
+        return const UserSensorsScreen();
       case 'alerts':
         return const UserAlertsScreen();
       case 'analytics':

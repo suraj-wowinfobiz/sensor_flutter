@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-
 import '../../core/theme/ops_theme.dart';
 import '../../super_admin/core/responsive/responsive_extensions.dart';
 
 class UserSideMenu extends StatelessWidget {
+  static const double desktopWidth = 284;
+  static const double desktopHeaderHeight = 78;
+
   final Animation<double> animation;
   final bool isOpen;
   final String currentView;
@@ -26,7 +28,7 @@ class UserSideMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final menuWidth =
-        context.narrowerThan(420) ? context.screenWidth * .88 : 264.0;
+        context.narrowerThan(420) ? context.screenWidth * 0.88 : desktopWidth;
 
     return IgnorePointer(
       ignoring: !isOpen,
@@ -43,161 +45,131 @@ class UserSideMenu extends StatelessWidget {
           height: double.infinity,
           decoration: const BoxDecoration(
             color: OpsColors.surfaceLow,
-            border: Border(right: BorderSide(color: OpsColors.border)),
+            border: Border(
+              right: BorderSide(color: OpsColors.border),
+            ),
           ),
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 28, 16, 24),
+              Container(
+                height: desktopHeaderHeight,
+                padding: const EdgeInsets.fromLTRB(20, 0, 16, 0),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: OpsColors.border),
+                  ),
+                ),
                 child: Row(
                   children: [
                     Container(
-                      width: 38,
-                      height: 38,
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
-                        color: OpsColors.primary,
-                        borderRadius: BorderRadius.circular(8),
+                        color: OpsColors.primaryContainer,
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(
-                        Icons.analytics_rounded,
+                        Icons.grid_view_rounded,
                         color: Colors.white,
-                        size: 22,
+                        size: 20,
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     const Expanded(
                       child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'L&T',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 22,
-                              height: 1,
-                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              height: 1.0,
+                              fontWeight: FontWeight.w800,
                               color: OpsColors.text,
                             ),
                           ),
+                          SizedBox(height: 5),
                           Text(
-                            'SENSOR ANALYTICS',
+                            'Sensor Analytics',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 11.5,
+                              height: 1.0,
+                              fontWeight: FontWeight.w600,
                               color: OpsColors.muted,
                             ),
                           ),
                         ],
                       ),
                     ),
+                    if (showCloseButton) const SizedBox(width: 8),
                     if (showCloseButton)
-                      IconButton(
-                        tooltip: 'Close menu',
-                        onPressed: onClose,
-                        icon: const Icon(Icons.close),
+                      GestureDetector(
+                        onTap: onClose,
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: OpsColors.surface,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: OpsColors.border),
+                          ),
+                          child: const Icon(Icons.close, size: 18),
+                        ),
                       ),
                   ],
                 ),
               ),
               Expanded(
                 child: ListView(
-                  padding: EdgeInsets.zero,
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                   children: [
-                    const _MenuSectionTitle('Main Menu'),
-                    _MenuItem(
-                      label: 'Dashboard',
-                      icon: Icons.dashboard_rounded,
-                      view: 'dashboard',
-                      currentView: currentView,
-                      onViewChanged: onViewChanged,
-                    ),
-                    _MenuItem(
-                      label: 'Sites',
-                      icon: Icons.location_on_outlined,
-                      view: 'sites',
-                      currentView: currentView,
-                      onViewChanged: onViewChanged,
-                      enabled: false,
-                    ),
-                    _MenuItem(
-                      label: 'Sensors',
-                      icon: Icons.sensors_outlined,
-                      view: 'sensors',
-                      currentView: currentView,
-                      onViewChanged: onViewChanged,
-                      enabled: false,
-                    ),
-                    _MenuItem(
-                      label: 'Alerts',
-                      icon: Icons.notifications_active_rounded,
-                      view: 'alerts',
-                      currentView: currentView,
-                      onViewChanged: onViewChanged,
-                      badgeValue: '12',
-                    ),
-                    _MenuItem(
-                      label: 'Analytics',
-                      icon: Icons.leaderboard_rounded,
-                      view: 'analytics',
-                      currentView: currentView,
-                      onViewChanged: onViewChanged,
-                    ),
-                    _MenuItem(
-                      label: 'Reports',
-                      icon: Icons.description_outlined,
-                      view: 'reports',
-                      currentView: currentView,
-                      onViewChanged: onViewChanged,
-                      enabled: false,
-                    ),
-                    _MenuItem(
-                      label: 'Documents',
-                      icon: Icons.folder_outlined,
-                      view: 'documents',
-                      currentView: currentView,
-                      onViewChanged: onViewChanged,
-                      enabled: false,
-                    ),
-                    _MenuItem(
-                      label: 'Integrations',
-                      icon: Icons.extension_outlined,
-                      view: 'integrations',
-                      currentView: currentView,
-                      onViewChanged: onViewChanged,
-                      enabled: false,
-                    ),
-                    _MenuItem(
-                      label: 'Settings',
-                      icon: Icons.settings_rounded,
-                      view: 'settings',
-                      currentView: currentView,
-                      onViewChanged: onViewChanged,
-                    ),
+                    _buildMenuSection(context, [
+                      _buildMenuItem(context, 'Dashboard',
+                          Icons.dashboard_rounded, 'dashboard'),
+                      _buildMenuItem(context, 'Sensors', Icons.sensors_outlined,
+                          'sensors'),
+                      _buildMenuItem(context, 'Alerts',
+                          Icons.notifications_none_rounded, 'alerts',
+                          badge: '12'),
+                      _buildMenuItem(context, 'Analytics',
+                          Icons.analytics_outlined, 'analytics'),
+                      _buildMenuItem(context, 'Settings',
+                          Icons.settings_outlined, 'settings'),
+                    ]),
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: InkWell(
-                  onTap: showCloseButton ? onClose : null,
-                  borderRadius: BorderRadius.circular(10),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+                child: GestureDetector(
+                  onTap: onLogout,
+                  child: Container(
+                    height: 48,
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEAF0FE),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: OpsColors.border),
                     ),
-                    child: Row(
+                    child: const Row(
                       children: [
                         Icon(
-                          Icons.chevron_left_rounded,
-                          size: 22,
+                          Icons.logout_rounded,
+                          size: 18,
                           color: OpsColors.muted,
                         ),
                         SizedBox(width: 12),
                         Text(
-                          'Collapse',
+                          'Logout',
                           style: TextStyle(
-                            color: OpsColors.muted,
-                            fontSize: 12,
+                            fontSize: 13,
+                            color: OpsColors.text,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -206,165 +178,106 @@ class UserSideMenu extends StatelessWidget {
                   ),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  color: OpsColors.surfaceHigh,
-                  border: Border(top: BorderSide(color: OpsColors.border)),
-                ),
-                child: Row(
-                  children: [
-                    const CircleAvatar(
-                      radius: 20,
-                      backgroundColor: OpsColors.primaryContainer,
-                      child: Text(
-                        'JS',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
+              if (showCloseButton)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 0, 18, 18),
+                  child: GestureDetector(
+                    onTap: onClose,
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.chevron_left_rounded,
+                          size: 20,
+                          color: OpsColors.muted,
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'JS',
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: OpsColors.text,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        SizedBox(width: 12),
+                        Text(
+                          'Collapse',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: OpsColors.muted,
+                            fontWeight: FontWeight.w700,
                           ),
-                          Text(
-                            'SITE OPERATOR - L&T',
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: OpsColors.muted,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      tooltip: 'Logout',
-                      onPressed: onLogout,
-                      icon: const Icon(Icons.logout_rounded, size: 19),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),
       ),
     );
   }
-}
 
-class _MenuSectionTitle extends StatelessWidget {
-  final String label;
-
-  const _MenuSectionTitle(this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 10),
-      child: Text(
-        label.toUpperCase(),
-        style: const TextStyle(
-          color: OpsColors.outline,
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          letterSpacing: .8,
-        ),
-      ),
+  Widget _buildMenuSection(BuildContext context, List<Widget> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: items,
     );
   }
-}
 
-class _MenuItem extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final String view;
-  final String currentView;
-  final ValueChanged<String> onViewChanged;
-  final String? badgeValue;
-  final bool enabled;
+  Widget _buildMenuItem(
+    BuildContext context,
+    String title,
+    IconData icon,
+    String view, {
+    String? badge,
+  }) {
+    final isActive = currentView == view;
+    const inactiveIconColor = Color(0xFF53627A);
+    const inactiveTextColor = Color(0xFF53627A);
+    final iconColor = isActive ? Colors.white : inactiveIconColor;
+    final textColor = isActive ? Colors.white : inactiveTextColor;
 
-  const _MenuItem({
-    required this.label,
-    required this.icon,
-    required this.view,
-    required this.currentView,
-    required this.onViewChanged,
-    this.badgeValue,
-    this.enabled = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final active = enabled && currentView == view;
-    final foreground = active
-        ? Colors.white
-        : enabled
-            ? OpsColors.muted
-            : OpsColors.muted.withValues(alpha: .92);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: InkWell(
-        onTap: enabled ? () => onViewChanged(view) : null,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            color: active ? OpsColors.primaryContainer : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: foreground,
-                size: 24,
+    return GestureDetector(
+      onTap: () => onViewChanged(view),
+      child: Container(
+        height: 56,
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: isActive ? OpsColors.primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 21,
+              color: iconColor,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                title,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  decoration: TextDecoration.none,
+                  color: textColor,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                ),
               ),
-              const SizedBox(width: 14),
-              Expanded(
+            ),
+            if (badge != null)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 7.5, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: isActive ? Colors.white : OpsColors.danger,
+                  borderRadius: BorderRadius.circular(999),
+                ),
                 child: Text(
-                  label.toUpperCase(),
+                  badge,
                   style: TextStyle(
-                    color: foreground,
-                    fontSize: 12,
+                    fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: .2,
+                    color: isActive ? OpsColors.danger : Colors.white,
                   ),
                 ),
               ),
-              if (badgeValue != null)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: active ? Colors.white : OpsColors.danger,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    badgeValue!,
-                    style: TextStyle(
-                      color: active ? OpsColors.danger : Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          ],
         ),
       ),
     );

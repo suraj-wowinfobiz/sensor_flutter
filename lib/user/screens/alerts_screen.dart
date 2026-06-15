@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/ops_theme.dart';
 import '../models/alert.dart';
 import '../providers/user_database_provider.dart';
+import '../widgets/ops_data_table.dart';
 
 class UserAlertsScreen extends StatelessWidget {
   const UserAlertsScreen({super.key});
@@ -36,58 +37,44 @@ class UserAlertsScreen extends StatelessWidget {
           ],
           child: Column(
             children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final count = constraints.maxWidth >= 900 ? 4 : 2;
-                  final cards = [
-                    OpsKpiCard(
-                      label: 'Open Alerts',
-                      value: '${openAlerts.isEmpty ? 12 : openAlerts.length}',
-                      helper: 'Currently unresolved',
-                      icon: Icons.notifications_active_rounded,
-                      color: OpsColors.danger,
-                    ),
-                    OpsKpiCard(
-                      label: 'Critical',
-                      value: '${critical == 0 ? 3 : critical}',
-                      helper: 'Immediate response required',
-                      icon: Icons.priority_high_rounded,
-                      color: OpsColors.danger,
-                    ),
-                    OpsKpiCard(
-                      label: 'Warning',
-                      value: '${warnings == 0 ? 9 : warnings}',
-                      helper: 'Monitoring required',
-                      icon: Icons.warning_amber_rounded,
-                      color: OpsColors.warning,
-                    ),
-                    const OpsKpiCard(
-                      label: 'Resolved Today',
-                      value: '18',
-                      helper: 'Closed by operations team',
-                      icon: Icons.task_alt_rounded,
-                      color: OpsColors.success,
-                    ),
-                  ];
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: cards.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: count,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      mainAxisExtent: 104,
-                    ),
-                    itemBuilder: (context, index) => cards[index],
-                  );
-                },
+              OpsKpiGrid(
+                maxColumns: 4,
+                minCardWidth: 180,
+                cardHeight: 132,
+                cards: [
+                  OpsKpiCard(
+                    label: 'Open Alerts',
+                    value: '${openAlerts.isEmpty ? 12 : openAlerts.length}',
+                    helper: 'Unresolved',
+                    icon: Icons.notifications_active_rounded,
+                    color: OpsColors.danger,
+                  ),
+                  OpsKpiCard(
+                    label: 'Critical',
+                    value: '${critical == 0 ? 3 : critical}',
+                    helper: 'Immediate response',
+                    icon: Icons.priority_high_rounded,
+                    color: OpsColors.danger,
+                  ),
+                  OpsKpiCard(
+                    label: 'Warning',
+                    value: '${warnings == 0 ? 9 : warnings}',
+                    helper: 'Monitoring required',
+                    icon: Icons.warning_amber_rounded,
+                    color: OpsColors.warning,
+                  ),
+                  const OpsKpiCard(
+                    label: 'Resolved Today',
+                    value: '18',
+                    helper: 'Closed today',
+                    icon: Icons.task_alt_rounded,
+                    color: OpsColors.success,
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
-              OpsPanel(
-                title: 'Active Alerts',
-                subtitle:
-                    'Severity, source, trigger time, assigned owner, and current response state',
+              OpsFramedPanel(
+                header: const _AlertsTableHeader(),
                 child: _AlertsTable(alerts: openAlerts),
               ),
               const SizedBox(height: 16),
@@ -112,40 +99,65 @@ class _AlertsTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rows = alerts.isEmpty ? _sampleAlerts : alerts;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: OpsDataTable(
+        minWidth: 1040,
         columns: const [
-          DataColumn(label: Text('ALERT ID')),
-          DataColumn(label: Text('SEVERITY')),
-          DataColumn(label: Text('SITE')),
-          DataColumn(label: Text('SOURCE')),
-          DataColumn(label: Text('TRIGGERED')),
-          DataColumn(label: Text('MESSAGE')),
-          DataColumn(label: Text('STATUS')),
-          DataColumn(label: Text('OWNER')),
+          OpsTableColumnSpec('ALERT ID'),
+          OpsTableColumnSpec('SEVERITY'),
+          OpsTableColumnSpec('SITE', flex: 2),
+          OpsTableColumnSpec('SOURCE'),
+          OpsTableColumnSpec('TRIGGERED'),
+          OpsTableColumnSpec('MESSAGE', flex: 3),
+          OpsTableColumnSpec('STATUS'),
         ],
         rows: rows.map((alert) {
           final sample = alert.id.startsWith('sample-');
-          return DataRow(cells: [
-            DataCell(Text(alert.id)),
-            DataCell(OpsStatusBadge(alert.alertLevel)),
-            DataCell(Text(sample ? _sampleSite(alert.id) : 'Project Alpha')),
-            DataCell(Text(alert.sensorId)),
-            DataCell(
-                Text(sample ? _sampleTime(alert.id) : _ago(alert.triggeredAt))),
-            DataCell(SizedBox(
-              width: 320,
-              child: Text(
-                alert.message,
-                overflow: TextOverflow.ellipsis,
-              ),
-            )),
-            DataCell(OpsStatusBadge(alert.isResolved ? 'Resolved' : 'Open')),
-            DataCell(Text(sample ? _sampleOwner(alert.id) : 'Unassigned')),
+          return OpsTableRowSpec([
+            OpsTableCellSpec.text(alert.id),
+            OpsTableCellSpec(child: OpsStatusBadge(alert.alertLevel)),
+            OpsTableCellSpec.text(
+              sample ? _sampleSite(alert.id) : 'Project Alpha',
+            ),
+            OpsTableCellSpec.text(alert.sensorId),
+            OpsTableCellSpec.text(
+              sample ? _sampleTime(alert.id) : _ago(alert.triggeredAt),
+            ),
+            OpsTableCellSpec.text(alert.message, maxLines: 1),
+            OpsTableCellSpec(
+              child: OpsStatusBadge(alert.isResolved ? 'Resolved' : 'Open'),
+            ),
           ]);
         }).toList(),
       ),
+    );
+  }
+}
+
+class _AlertsTableHeader extends StatelessWidget {
+  const _AlertsTableHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          'ACTIVE ALERTS',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: OpsColors.outline,
+                letterSpacing: .4,
+              ),
+        ),
+        const Spacer(),
+        Text(
+          'Severity, source, trigger time, and current response state',
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: OpsColors.muted),
+        ),
+      ],
     );
   }
 }
@@ -212,12 +224,6 @@ String _sampleTime(String id) => switch (id) {
       'sample-1' => '18 min ago',
       'sample-2' => '42 min ago',
       _ => '1 hr ago',
-    };
-
-String _sampleOwner(String id) => switch (id) {
-      'sample-1' => 'Unassigned',
-      'sample-2' => 'Investigating',
-      _ => 'Monitoring',
     };
 
 String _ago(DateTime date) {

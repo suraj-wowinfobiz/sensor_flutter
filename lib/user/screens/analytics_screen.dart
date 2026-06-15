@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/ops_theme.dart';
 import '../providers/user_database_provider.dart';
+import '../widgets/ops_data_table.dart';
 
 class UserAnalyticsScreen extends StatefulWidget {
   const UserAnalyticsScreen({super.key});
@@ -65,69 +66,54 @@ class _UserAnalyticsScreenState extends State<UserAnalyticsScreen> {
           ],
           child: Column(
             children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final count = constraints.maxWidth >= 1160
-                      ? 6
-                      : constraints.maxWidth >= 760
-                          ? 3
-                          : 1;
-                  final cards = [
-                    const OpsKpiCard(
-                      label: 'Site Health Score',
-                      value: '84 / 100',
-                      helper: 'Reporting health and alert load',
-                      icon: Icons.health_and_safety_outlined,
-                    ),
-                    OpsKpiCard(
-                      label: 'Alert Frequency',
-                      value: '${alertCount == 0 ? 32 : alertCount}',
-                      helper: 'Total alerts in selected period',
-                      icon: Icons.notifications_active_rounded,
-                      color: OpsColors.danger,
-                    ),
-                    const OpsKpiCard(
-                      label: 'Sensor Stability',
-                      value: '88%',
-                      helper: 'Stable reporting across sensors',
-                      icon: Icons.sensors_rounded,
-                      color: OpsColors.success,
-                    ),
-                    OpsKpiCard(
-                      label: 'Device Uptime',
-                      value: uptime,
-                      helper: 'Across all monitored devices',
-                      icon: Icons.router_rounded,
-                      color: OpsColors.success,
-                    ),
-                    const OpsKpiCard(
-                      label: 'Breach Rate',
-                      value: '11%',
-                      helper: 'Readings outside safe range',
-                      icon: Icons.stacked_line_chart_rounded,
-                      color: OpsColors.warning,
-                    ),
-                    const OpsKpiCard(
-                      label: 'Highest Risk Site',
-                      value: 'East Metro',
-                      helper: 'Requires operational review',
-                      icon: Icons.location_on_outlined,
-                      color: OpsColors.warning,
-                    ),
-                  ];
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: cards.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: count,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      mainAxisExtent: count == 1 ? 96 : 104,
-                    ),
-                    itemBuilder: (context, index) => cards[index],
-                  );
-                },
+              OpsKpiGrid(
+                maxColumns: 6,
+                minCardWidth: 145,
+                spacing: 12,
+                cardHeight: 126,
+                cards: [
+                  const OpsKpiCard(
+                    label: 'Site Health Score',
+                    value: '84 / 100',
+                    helper: 'Reporting health and alert load',
+                    icon: Icons.health_and_safety_outlined,
+                  ),
+                  OpsKpiCard(
+                    label: 'Alert Frequency',
+                    value: '${alertCount == 0 ? 32 : alertCount}',
+                    helper: 'Total alerts in selected period',
+                    icon: Icons.notifications_active_rounded,
+                    color: OpsColors.danger,
+                  ),
+                  const OpsKpiCard(
+                    label: 'Sensor Stability',
+                    value: '88%',
+                    helper: 'Stable reporting across sensors',
+                    icon: Icons.sensors_rounded,
+                    color: OpsColors.success,
+                  ),
+                  OpsKpiCard(
+                    label: 'Device Uptime',
+                    value: uptime,
+                    helper: 'Across all monitored devices',
+                    icon: Icons.router_rounded,
+                    color: OpsColors.success,
+                  ),
+                  const OpsKpiCard(
+                    label: 'Breach Rate',
+                    value: '11%',
+                    helper: 'Readings outside safe range',
+                    icon: Icons.stacked_line_chart_rounded,
+                    color: OpsColors.warning,
+                  ),
+                  const OpsKpiCard(
+                    label: 'Highest Risk Site',
+                    value: 'East Metro',
+                    helper: 'Requires operational review',
+                    icon: Icons.location_on_outlined,
+                    color: OpsColors.warning,
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               LayoutBuilder(
@@ -242,32 +228,30 @@ class _SitePerformanceTable extends StatelessWidget {
       ),
     ];
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        columns: const [
-          DataColumn(label: Text('SITE')),
-          DataColumn(label: Text('HEALTH')),
-          DataColumn(label: Text('SENSORS')),
-          DataColumn(label: Text('UPTIME')),
-          DataColumn(label: Text('ALERTS')),
-          DataColumn(label: Text('BREACHES')),
-          DataColumn(label: Text('AVG DELAY')),
-          DataColumn(label: Text('RISK')),
-        ],
-        rows: rows.map((row) {
-          return DataRow(cells: [
-            DataCell(Text(row.$1)),
-            DataCell(Text(row.$2)),
-            DataCell(Text(row.$3)),
-            DataCell(Text(row.$4)),
-            DataCell(Text(row.$5)),
-            DataCell(Text(row.$6)),
-            DataCell(Text(row.$7)),
-            DataCell(OpsStatusBadge(row.$8)),
-          ]);
-        }).toList(),
-      ),
+    return OpsDataTable(
+      minWidth: 920,
+      columns: const [
+        OpsTableColumnSpec('SITE', flex: 2),
+        OpsTableColumnSpec('HEALTH', center: true),
+        OpsTableColumnSpec('SENSORS', center: true),
+        OpsTableColumnSpec('UPTIME', center: true),
+        OpsTableColumnSpec('ALERTS', center: true),
+        OpsTableColumnSpec('BREACHES', center: true),
+        OpsTableColumnSpec('AVG DELAY', center: true),
+        OpsTableColumnSpec('RISK', center: true),
+      ],
+      rows: rows.map((row) {
+        return OpsTableRowSpec([
+          OpsTableCellSpec.text(row.$1, bold: true),
+          OpsTableCellSpec.text(row.$2, center: true),
+          OpsTableCellSpec.text(row.$3, center: true),
+          OpsTableCellSpec.text(row.$4, center: true),
+          OpsTableCellSpec.text(row.$5, center: true),
+          OpsTableCellSpec.text(row.$6, center: true),
+          OpsTableCellSpec.text(row.$7, center: true),
+          OpsTableCellSpec(center: true, child: OpsStatusBadge(row.$8)),
+        ]);
+      }).toList(),
     );
   }
 }

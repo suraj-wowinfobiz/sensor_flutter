@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/ops_theme.dart';
 import '../models/device.dart';
 import '../providers/user_database_provider.dart';
+import '../widgets/ops_data_table.dart';
 
 class UserDevicesScreen extends StatefulWidget {
   const UserDevicesScreen({super.key});
@@ -53,68 +54,53 @@ class _UserDevicesScreenState extends State<UserDevicesScreen> {
           ],
           child: Column(
             children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final count = constraints.maxWidth >= 1160
-                      ? 6
-                      : constraints.maxWidth >= 760
-                          ? 3
-                          : 1;
-                  final cards = [
-                    OpsKpiCard(
-                      label: 'Total Devices',
-                      value: '${db.devices.isEmpty ? 42 : db.devices.length}',
-                      helper: 'Across 6 active sites',
-                      icon: Icons.router_rounded,
-                    ),
-                    OpsKpiCard(
-                      label: 'Online Devices',
-                      value: '${db.devices.isEmpty ? 39 : online}',
-                      helper: 'Reporting normally',
-                      icon: Icons.check_circle_rounded,
-                      color: OpsColors.success,
-                    ),
-                    OpsKpiCard(
-                      label: 'Offline Devices',
-                      value: '${db.devices.isEmpty ? 3 : offline}',
-                      helper: 'Require follow-up',
-                      icon: Icons.portable_wifi_off_rounded,
-                      color: OpsColors.danger,
-                    ),
-                    const OpsKpiCard(
-                      label: 'Power Risk',
-                      value: '5',
-                      helper: 'Below recommended threshold',
-                      icon: Icons.battery_alert_rounded,
-                      color: OpsColors.warning,
-                    ),
-                    const OpsKpiCard(
-                      label: 'Firmware Outdated',
-                      value: '7',
-                      helper: 'Update recommended',
-                      icon: Icons.system_update_alt_rounded,
-                    ),
-                    const OpsKpiCard(
-                      label: 'Connectivity Issues',
-                      value: '4',
-                      helper: 'Intermittent reporting detected',
-                      icon: Icons.wifi_find_rounded,
-                      color: OpsColors.warning,
-                    ),
-                  ];
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: cards.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: count,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      mainAxisExtent: count == 1 ? 96 : 104,
-                    ),
-                    itemBuilder: (context, index) => cards[index],
-                  );
-                },
+              OpsKpiGrid(
+                maxColumns: 6,
+                minCardWidth: 145,
+                spacing: 12,
+                cardHeight: 126,
+                cards: [
+                  OpsKpiCard(
+                    label: 'Total Devices',
+                    value: '${db.devices.isEmpty ? 42 : db.devices.length}',
+                    helper: 'Across 6 active sites',
+                    icon: Icons.router_rounded,
+                  ),
+                  OpsKpiCard(
+                    label: 'Online Devices',
+                    value: '${db.devices.isEmpty ? 39 : online}',
+                    helper: 'Reporting normally',
+                    icon: Icons.check_circle_rounded,
+                    color: OpsColors.success,
+                  ),
+                  OpsKpiCard(
+                    label: 'Offline Devices',
+                    value: '${db.devices.isEmpty ? 3 : offline}',
+                    helper: 'Require follow-up',
+                    icon: Icons.portable_wifi_off_rounded,
+                    color: OpsColors.danger,
+                  ),
+                  const OpsKpiCard(
+                    label: 'Power Risk',
+                    value: '5',
+                    helper: 'Below recommended threshold',
+                    icon: Icons.battery_alert_rounded,
+                    color: OpsColors.warning,
+                  ),
+                  const OpsKpiCard(
+                    label: 'Firmware Outdated',
+                    value: '7',
+                    helper: 'Update recommended',
+                    icon: Icons.system_update_alt_rounded,
+                  ),
+                  const OpsKpiCard(
+                    label: 'Connectivity Issues',
+                    value: '4',
+                    helper: 'Intermittent reporting detected',
+                    icon: Icons.wifi_find_rounded,
+                    color: OpsColors.warning,
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               OpsPanel(
@@ -218,44 +204,55 @@ class _DeviceTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rows = devices.isEmpty ? _sampleDevices : devices;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        columns: const [
-          DataColumn(label: Text('DEVICE NAME')),
-          DataColumn(label: Text('DEVICE ID')),
-          DataColumn(label: Text('TYPE')),
-          DataColumn(label: Text('SITE')),
-          DataColumn(label: Text('ZONE')),
-          DataColumn(label: Text('SENSORS')),
-          DataColumn(label: Text('STATUS')),
-          DataColumn(label: Text('CONNECTIVITY')),
-          DataColumn(label: Text('POWER')),
-          DataColumn(label: Text('FIRMWARE')),
-          DataColumn(label: Text('LAST HEARTBEAT')),
-          DataColumn(label: Text('HEALTH')),
-        ],
-        rows: rows.map((device) {
-          final sample = device.id.startsWith('sample-');
-          final status = sample ? _sampleStatus(device.id) : device.status;
-          return DataRow(cells: [
-            DataCell(Text(device.deviceCode)),
-            DataCell(Text(device.id)),
-            const DataCell(Text('Edge Gateway')),
-            DataCell(Text(sample ? _sampleSite(device.id) : device.siteId)),
-            DataCell(Text(sample ? _sampleZone(device.id) : device.zoneId)),
-            DataCell(Text(sample ? _sampleSensors(device.id) : '3')),
-            DataCell(OpsStatusBadge(status == 'active' ? 'Online' : status)),
-            DataCell(Text(sample ? _sampleConnectivity(device.id) : 'Good')),
-            DataCell(Text(sample ? _samplePower(device.id) : 'External Power')),
-            DataCell(Text(sample ? _sampleFirmware(device.id) : 'v2.1.4')),
-            DataCell(Text(sample
-                ? _sampleHeartbeat(device.id)
-                : _ago(device.installedAt))),
-            DataCell(Text(sample ? _sampleHealth(device.id) : '91')),
-          ]);
-        }).toList(),
-      ),
+    return OpsDataTable(
+      minWidth: 1280,
+      columns: const [
+        OpsTableColumnSpec('DEVICE NAME', flex: 2),
+        OpsTableColumnSpec('DEVICE ID'),
+        OpsTableColumnSpec('TYPE'),
+        OpsTableColumnSpec('SITE'),
+        OpsTableColumnSpec('ZONE'),
+        OpsTableColumnSpec('SENSORS', center: true),
+        OpsTableColumnSpec('STATUS', center: true),
+        OpsTableColumnSpec('CONNECTIVITY'),
+        OpsTableColumnSpec('POWER'),
+        OpsTableColumnSpec('FIRMWARE'),
+        OpsTableColumnSpec('LAST HEARTBEAT'),
+        OpsTableColumnSpec('HEALTH', center: true),
+      ],
+      rows: rows.map((device) {
+        final sample = device.id.startsWith('sample-');
+        final status = sample ? _sampleStatus(device.id) : device.status;
+        return OpsTableRowSpec([
+          OpsTableCellSpec.text(device.deviceCode, bold: true),
+          OpsTableCellSpec.text(device.id),
+          OpsTableCellSpec.text('Edge Gateway'),
+          OpsTableCellSpec.text(
+              sample ? _sampleSite(device.id) : device.siteId),
+          OpsTableCellSpec.text(
+              sample ? _sampleZone(device.id) : device.zoneId),
+          OpsTableCellSpec.text(
+            sample ? _sampleSensors(device.id) : '3',
+            center: true,
+          ),
+          OpsTableCellSpec(
+            center: true,
+            child: OpsStatusBadge(status == 'active' ? 'Online' : status),
+          ),
+          OpsTableCellSpec.text(
+              sample ? _sampleConnectivity(device.id) : 'Good'),
+          OpsTableCellSpec.text(
+              sample ? _samplePower(device.id) : 'External Power'),
+          OpsTableCellSpec.text(sample ? _sampleFirmware(device.id) : 'v2.1.4'),
+          OpsTableCellSpec.text(
+            sample ? _sampleHeartbeat(device.id) : _ago(device.installedAt),
+          ),
+          OpsTableCellSpec.text(
+            sample ? _sampleHealth(device.id) : '91',
+            center: true,
+          ),
+        ]);
+      }).toList(),
     );
   }
 }
