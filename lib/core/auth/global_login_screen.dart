@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -152,7 +151,7 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   static const _rememberRoleKey = 'global_login_role';
   static const _rememberEnabledKey = 'global_login_remember';
   static const _apiEnabledKey = 'global_login_api_enabled';
-  static const _loginHeroAsset = 'assets/images/construction_line_art.jpg';
+  static const _loginHeroAsset = 'assets/images/construction_line_art.png';
   static const _loginHeroFallbackAsset = 'assets/images/construction.jpg';
   static const _sensorLogoAsset = 'assets/icons/sensor_icon.png';
 
@@ -738,54 +737,64 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   }
 
   Widget _buildUserHtmlLogin(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
+    final size = MediaQuery.sizeOf(context);
+    final width = size.width;
     final stacked = width < 960;
     final pagePadding = width >= 1280
         ? 48.0
         : width >= 960
             ? 28.0
             : 16.0;
+    final panelMinHeight =
+        stacked ? 0.0 : (size.height - (pagePadding * 2)).clamp(620.0, 760.0);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF6F8FC),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: EdgeInsets.all(pagePadding),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1240),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: OpsColors.surface,
-                  borderRadius: BorderRadius.circular(26),
-                  border: Border.all(color: OpsColors.border),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 28,
-                      offset: const Offset(0, 18),
-                    ),
-                  ],
-                ),
-                child: stacked
-                    ? Column(
-                        children: [
-                          _buildUserInfoColumn(compact: true),
-                          _buildUserAuthCard(context, compact: true),
-                        ],
-                      )
-                    : Row(
-                        children: [
-                          Expanded(
-                            flex: 11,
-                            child: _buildUserInfoColumn(compact: false),
-                          ),
-                          Expanded(
-                            flex: 7,
-                            child: _buildUserAuthCard(context, compact: false),
-                          ),
-                        ],
+              constraints: BoxConstraints(
+                maxWidth: 1240,
+                minHeight: panelMinHeight,
+              ),
+              child: SizedBox(
+                height: stacked ? null : panelMinHeight,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: OpsColors.surface,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: const Color(0xFFDDE4F0)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF20325B).withValues(alpha: 0.08),
+                        blurRadius: 40,
+                        offset: const Offset(0, 20),
                       ),
+                    ],
+                  ),
+                  child: stacked
+                      ? Column(
+                          children: [
+                            _buildUserInfoColumn(compact: true),
+                            _buildUserAuthCard(context, compact: true),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Expanded(
+                              flex: 11,
+                              child: _buildUserInfoColumn(compact: false),
+                            ),
+                            Expanded(
+                              flex: 7,
+                              child:
+                                  _buildUserAuthCard(context, compact: false),
+                            ),
+                          ],
+                        ),
+                ),
               ),
             ),
           ),
@@ -795,15 +804,27 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   }
 
   Widget _buildUserAuthCard(BuildContext context, {required bool compact}) {
-    final sidePadding = compact ? 28.0 : 48.0;
-    final titleSize = compact ? 30.0 : 36.0;
+    final sidePadding = compact ? 28.0 : 44.0;
+    final titleSize = compact ? 30.0 : 38.0;
 
     return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: compact
+            ? const BorderRadius.only(
+                bottomLeft: Radius.circular(28),
+                bottomRight: Radius.circular(28),
+              )
+            : const BorderRadius.only(
+                topRight: Radius.circular(28),
+                bottomRight: Radius.circular(28),
+              ),
+      ),
       padding: EdgeInsets.fromLTRB(
         sidePadding,
         compact ? 30 : 44,
         sidePadding,
-        compact ? 28 : 44,
+        compact ? 28 : 42,
       ),
       child: Form(
         key: _formKey,
@@ -811,25 +832,22 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Text(
-                'USER LOGIN',
-                style: TextStyle(
-                  color: OpsColors.primaryContainer,
-                  fontSize: compact ? 12 : 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0,
-                ),
+            
+            if (compact) ...[
+              const SizedBox(height: 10),
+              const _LoginBrandBadge(
+                sensorLogoAsset: _sensorLogoAsset,
+                compact: true,
               ),
-            ),
-            SizedBox(height: compact ? 22 : 32),
+            ],
+            SizedBox(height: compact ? 22 : 34),
             Text(
-              'Access your operations workspace',
+              'User Login',
               style: TextStyle(
-                color: OpsColors.text,
+                color: const Color(0xFF10244D),
                 fontSize: titleSize,
                 fontWeight: FontWeight.w700,
-                height: 1.05,
+                height: 1.02,
               ),
             ),
             const SizedBox(height: 10),
@@ -841,7 +859,7 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                 height: 1.45,
               ),
             ),
-            SizedBox(height: compact ? 24 : 28),
+            SizedBox(height: compact ? 28 : 34),
             _buildRefField(
               controller: _emailController,
               hintText: _selectedRole.emailHint,
@@ -884,29 +902,29 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
               initialValue: _selectedRole,
               decoration: InputDecoration(
                 hintText: 'Select login type',
-                fillColor: const Color(0xFFF1F4FF),
+                fillColor: const Color(0xFFF6F8FF),
                 filled: true,
                 prefixIcon: Icon(
                   _selectedRole.icon,
-                  color: OpsColors.primary,
+                  color: OpsColors.primaryContainer.withValues(alpha: 0.78),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  vertical: 14,
+                  vertical: 16,
                 ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(18),
                   borderSide: BorderSide.none,
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(18),
                   borderSide: BorderSide.none,
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(18),
                   borderSide: const BorderSide(
-                    color: OpsColors.primary,
-                    width: 1.3,
+                    color: Color(0xFF2B63F1),
+                    width: 1.4,
                   ),
                 ),
               ),
@@ -936,23 +954,25 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
             const SizedBox(height: 24),
             Center(
               child: SizedBox(
-                width: compact ? double.infinity : 220,
-                height: 44,
+                width: double.infinity,
+                height: 56,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(18),
                     gradient: const LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
                       colors: [
-                        Color(0xFFDB6AAE),
+                        Color(0xFF245BFF),
                         OpsColors.primaryContainer,
+                        Color(0xFF8D56D8),
                       ],
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color:
-                            OpsColors.primaryContainer.withValues(alpha: 0.18),
-                        blurRadius: 18,
-                        offset: const Offset(0, 10),
+                        color: const Color(0xFF245BFF).withValues(alpha: 0.20),
+                        blurRadius: 22,
+                        offset: const Offset(0, 12),
                       ),
                     ],
                   ),
@@ -963,7 +983,7 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                       shadowColor: Colors.transparent,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: BorderRadius.circular(18),
                       ),
                     ),
                     child: _isLoading
@@ -977,13 +997,19 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                               ),
                             ),
                           )
-                        : const Text(
-                            'LOGIN',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.45,
-                            ),
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'LOGIN',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              SizedBox(width: 10),
+                              Icon(Icons.arrow_forward_rounded, size: 18),
+                            ],
                           ),
                   ),
                 ),
@@ -997,195 +1023,64 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
 
   Widget _buildUserInfoColumn({required bool compact}) {
     return Container(
-      constraints: BoxConstraints(minHeight: compact ? 320 : 560),
-      padding: EdgeInsets.fromLTRB(
-        compact ? 24 : 36,
-        compact ? 28 : 34,
-        compact ? 24 : 36,
-        compact ? 28 : 34,
-      ),
+      constraints: BoxConstraints(minHeight: compact ? 300 : 620),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: compact
             ? const BorderRadius.only(
-                topLeft: Radius.circular(26),
-                topRight: Radius.circular(26),
+                topLeft: Radius.circular(28),
+                topRight: Radius.circular(28),
               )
             : const BorderRadius.only(
-                topLeft: Radius.circular(26),
-                bottomLeft: Radius.circular(26),
+                topLeft: Radius.circular(28),
+                bottomLeft: Radius.circular(28),
               ),
       ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: ClipRRect(
-              borderRadius: compact
-                  ? const BorderRadius.only(
-                      topLeft: Radius.circular(26),
-                      topRight: Radius.circular(26),
-                    )
-                  : const BorderRadius.only(
-                      topLeft: Radius.circular(26),
-                      bottomLeft: Radius.circular(26),
-                    ),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  const _LoginHeroImage(
-                    primaryAsset: _loginHeroAsset,
-                    fallbackAsset: _loginHeroFallbackAsset,
-                  ),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [
-                          Colors.white.withValues(alpha: 0.95),
-                          Colors.white.withValues(alpha: 0.74),
-                          Colors.white.withValues(alpha: 0.16),
-                        ],
-                        stops: const [0, 0.42, 1],
-                      ),
-                    ),
-                  ),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [
-                          Colors.white.withValues(alpha: 0.88),
-                          Colors.white.withValues(alpha: 0.06),
-                        ],
-                        stops: const [0, 0.58],
-                      ),
-                    ),
-                  ),
-                ],
+      child: ClipRRect(
+        borderRadius: compact
+            ? const BorderRadius.only(
+                topLeft: Radius.circular(28),
+                topRight: Radius.circular(28),
+              )
+            : const BorderRadius.only(
+                topLeft: Radius.circular(28),
+                bottomLeft: Radius.circular(28),
+              ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const _LoginHeroImage(
+              primaryAsset: _loginHeroAsset,
+              fallbackAsset: _loginHeroFallbackAsset,
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.00),
+                    Colors.white.withValues(alpha: 0.06),
+                    Colors.white.withValues(alpha: 0.24),
+                  ],
+                  stops: const [0, 0.62, 1],
+                ),
               ),
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 54,
-                        height: 54,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 18,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Image.asset(
-                            _sensorLogoAsset,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                decoration: BoxDecoration(
-                                  color: OpsColors.primaryContainer,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  Icons.grid_view_rounded,
-                                  color: Colors.white,
-                                  size: 22,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'L&T',
-                            style: TextStyle(
-                              color: OpsColors.text,
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800,
-                              height: 1,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Sensor Analytics',
-                            style: TextStyle(
-                              color: OpsColors.muted,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: compact ? 34 : 62),
-                  Text(
-                    'Welcome to\nsensor platform',
-                    style: TextStyle(
-                      color: OpsColors.text,
-                      fontSize: compact ? 34 : 44,
-                      height: 1.02,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    child: const Text(
-                      'Monitor site operations, check live sensor telemetry, track alert response, and access role-based dashboards from one shared workspace.',
-                      style: TextStyle(
-                        color: OpsColors.muted,
-                        fontSize: 14,
-                        height: 1.55,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      _LoginInfoChip(
-                        icon: Icons.sensors_outlined,
-                        label: 'Live telemetry',
-                      ),
-                      _LoginInfoChip(
-                        icon: Icons.notifications_active_outlined,
-                        label: 'Alert visibility',
-                      ),
-                      _LoginInfoChip(
-                        icon: Icons.analytics_outlined,
-                        label: 'Operational analytics',
-                      ),
-                    ],
-                  ),
-                ],
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.14),
+                    Colors.transparent,
+                  ],
+                ),
               ),
-              const _LoginTrustStrip(),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1210,27 +1105,31 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
           color: OpsColors.outline,
           fontSize: 14,
         ),
-        prefixIcon: Icon(prefixIcon, size: 18, color: OpsColors.outline),
+        prefixIcon: Icon(
+          prefixIcon,
+          size: 18,
+          color: OpsColors.primaryContainer.withValues(alpha: 0.78),
+        ),
         suffixIcon: suffix,
-        fillColor: const Color(0xFFF1F4FF),
+        fillColor: const Color(0xFFF6F8FF),
         filled: true,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 14,
+          vertical: 16,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(
-            color: OpsColors.primary,
-            width: 1.3,
+            color: Color(0xFF2B63F1),
+            width: 1.4,
           ),
         ),
       ),
@@ -1251,8 +1150,9 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
             setState(() => _rememberMe = value ?? false);
           },
           activeColor: primary,
+          side: const BorderSide(color: Color(0xFFC8D2EC)),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(5),
           ),
         ),
         const Flexible(
@@ -1313,82 +1213,70 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   }
 }
 
-class _LoginTrustStrip extends StatelessWidget {
-  const _LoginTrustStrip();
+class _LoginBrandBadge extends StatelessWidget {
+  final String sensorLogoAsset;
+  final bool compact;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.82),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: OpsColors.primaryContainer.withValues(alpha: 0.10),
-        ),
-      ),
-      child: const Wrap(
-        spacing: 18,
-        runSpacing: 10,
-        children: [
-          _TrustMetric(value: '128', label: 'Sensors'),
-          _TrustMetric(value: '96.2%', label: 'Online'),
-          _TrustMetric(value: '12', label: 'Open alerts'),
-        ],
-      ),
-    );
-  }
-}
-
-class _TrustMetric extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const _TrustMetric({
-    required this.value,
-    required this.label,
+  const _LoginBrandBadge({
+    required this.sensorLogoAsset,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 112,
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        compact ? 0 : 16,
+        compact ? 0 : 16,
+        compact ? 0 : 20,
+        compact ? 0 : 16,
+      ),
+      decoration: BoxDecoration(
+        color:
+            compact ? Colors.transparent : Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: compact
+            ? const []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 24,
+                  offset: const Offset(0, 14),
+                ),
+              ],
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 8,
-            height: 8,
-            decoration: const BoxDecoration(
-              color: OpsColors.primaryContainer,
-              shape: BoxShape.circle,
+            width: compact ? 48 : 52,
+            height: compact ? 48 : 52,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF4F7FF),
+              borderRadius: BorderRadius.circular(15),
             ),
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: RichText(
-              text: TextSpan(
-                children: [
-                  TextSpan(
-                    text: '$value ',
-                    style: const TextStyle(
-                      color: OpsColors.text,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
+            child: Padding(
+              padding: const EdgeInsets.all(11),
+              child: Image.asset(
+                sensorLogoAsset,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: OpsColors.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  ),
-                  TextSpan(
-                    text: label,
-                    style: const TextStyle(
-                      color: OpsColors.muted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                    child: const Icon(
+                      Icons.grid_view_rounded,
+                      color: Colors.white,
+                      size: 22,
                     ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
           ),
+         
         ],
       ),
     );
@@ -1406,21 +1294,9 @@ class _LoginHeroImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final directWebAssetUrl = 'assets/$primaryAsset?v=20260612b';
-
-    if (kIsWeb) {
-      return Image.network(
-        directWebAssetUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return _buildFallback();
-        },
-      );
-    }
-
     return Image.asset(
       primaryAsset,
-      fit: BoxFit.cover,
+      fit: BoxFit.contain,
       errorBuilder: (context, error, stackTrace) => _buildFallback(),
     );
   }
@@ -1443,45 +1319,6 @@ class _LoginHeroImage extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _LoginInfoChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _LoginInfoChip({
-    required this.icon,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.86),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: OpsColors.primaryContainer.withValues(alpha: 0.12),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: OpsColors.primaryContainer),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: OpsColors.text,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
