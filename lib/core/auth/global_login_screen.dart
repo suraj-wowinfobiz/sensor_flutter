@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../analytics/analytics_page.dart';
 import '../../analytics/api/analytics_login_api.dart';
@@ -151,7 +152,7 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   static const _rememberRoleKey = 'global_login_role';
   static const _rememberEnabledKey = 'global_login_remember';
   static const _apiEnabledKey = 'global_login_api_enabled';
-  static const _loginHeroAsset = 'assets/images/construction_line_art.png';
+  static const _loginHeroVideoAsset = 'assets/images/login_background.mp4';
   static const _loginHeroFallbackAsset = 'assets/images/construction.jpg';
   static const _sensorLogoAsset = 'assets/icons/sensor_icon.png';
 
@@ -207,8 +208,6 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
       return;
     }
     _didPrecacheLoginAssets = true;
-    precacheImage(const AssetImage(_loginHeroAsset), context)
-        .catchError((_) {});
     precacheImage(const AssetImage(_loginHeroFallbackAsset), context)
         .catchError((_) {});
     precacheImage(const AssetImage(_sensorLogoAsset), context)
@@ -246,6 +245,25 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Login failed: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _skipLogin() async {
+    FocusScope.of(context).unfocus();
+    setState(() => _isLoading = true);
+
+    try {
+      await _storePreferences();
+      await _openBypassPage();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Skip failed: $error')),
       );
     } finally {
       if (mounted) {
@@ -693,38 +711,67 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                       primary: primary,
                     ),
                     const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _submit,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 56,
+                            child: OutlinedButton(
+                              onPressed: _isLoading ? null : _skipLogin,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: primary,
+                                side: BorderSide(color: primary),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                              )
-                            : const Text(
-                                'Log In',
+                              ),
+                              child: const Text(
+                                'Skip',
                                 style: TextStyle(
-                                  fontSize: 18,
+                                  fontSize: 17,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                      ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            height: 56,
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _submit,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Log In',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -832,7 +879,6 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            
             if (compact) ...[
               const SizedBox(height: 10),
               const _LoginBrandBadge(
@@ -952,68 +998,98 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
               },
             ),
             const SizedBox(height: 24),
-            Center(
-              child: SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
-                    gradient: const LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        Color(0xFF245BFF),
-                        OpsColors.primaryContainer,
-                        Color(0xFF8D56D8),
-                      ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF245BFF).withValues(alpha: 0.20),
-                        blurRadius: 22,
-                        offset: const Offset(0, 12),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 56,
+                    child: OutlinedButton(
+                      onPressed: _isLoading ? null : _skipLogin,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: OpsColors.primaryContainer,
+                        side: BorderSide(
+                          color: OpsColors.primaryContainer
+                              .withValues(alpha: 0.42),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
                       ),
-                    ],
-                  ),
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
+                      child: const Text(
+                        'SKIP',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'LOGIN',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              SizedBox(width: 10),
-                              Icon(Icons.arrow_forward_rounded, size: 18),
-                            ],
-                          ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 56,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        gradient: const LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            Color(0xFF245BFF),
+                            OpsColors.primaryContainer,
+                            Color(0xFF8D56D8),
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                const Color(0xFF245BFF).withValues(alpha: 0.20),
+                            blurRadius: 22,
+                            offset: const Offset(0, 12),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _submit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'LOGIN',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  SizedBox(width: 10),
+                                  Icon(Icons.arrow_forward_rounded, size: 18),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1050,7 +1126,7 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
           fit: StackFit.expand,
           children: [
             const _LoginHeroImage(
-              primaryAsset: _loginHeroAsset,
+              videoAsset: _loginHeroVideoAsset,
               fallbackAsset: _loginHeroFallbackAsset,
             ),
             DecoratedBox(
@@ -1276,34 +1352,74 @@ class _LoginBrandBadge extends StatelessWidget {
               ),
             ),
           ),
-         
         ],
       ),
     );
   }
 }
 
-class _LoginHeroImage extends StatelessWidget {
-  final String primaryAsset;
+class _LoginHeroImage extends StatefulWidget {
+  final String videoAsset;
   final String fallbackAsset;
 
   const _LoginHeroImage({
-    required this.primaryAsset,
+    required this.videoAsset,
     required this.fallbackAsset,
   });
 
   @override
+  State<_LoginHeroImage> createState() => _LoginHeroImageState();
+}
+
+class _LoginHeroImageState extends State<_LoginHeroImage> {
+  VideoPlayerController? _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.asset(widget.videoAsset)
+      ..initialize().then((_) {
+        if (!mounted) return;
+        _controller!
+          ..setLooping(true)
+          ..setVolume(0)
+          ..play();
+        setState(() {});
+      }).catchError((_) {
+        if (!mounted) return;
+        setState(() {
+          _controller = null;
+        });
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Image.asset(
-      primaryAsset,
-      fit: BoxFit.contain,
-      errorBuilder: (context, error, stackTrace) => _buildFallback(),
-    );
+    final controller = _controller;
+    if (controller != null && controller.value.isInitialized) {
+      return FittedBox(
+        fit: BoxFit.cover,
+        clipBehavior: Clip.hardEdge,
+        child: SizedBox(
+          width: controller.value.size.width,
+          height: controller.value.size.height,
+          child: VideoPlayer(controller),
+        ),
+      );
+    }
+
+    return _buildFallback();
   }
 
   Widget _buildFallback() {
     return Image.asset(
-      fallbackAsset,
+      widget.fallbackAsset,
       fit: BoxFit.cover,
       errorBuilder: (context, error, stackTrace) {
         return DecoratedBox(
