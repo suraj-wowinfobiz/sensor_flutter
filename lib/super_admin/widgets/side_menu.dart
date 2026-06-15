@@ -71,7 +71,7 @@ class SideMenu extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'L&T',
+                            'WowGardian',
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 22,

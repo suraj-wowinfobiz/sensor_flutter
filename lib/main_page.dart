@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
 import 'core/auth/global_login_screen.dart';
 import 'core/theme/ops_theme.dart';
@@ -43,6 +44,8 @@ class _MainPageState extends State<MainPage> {
     'contact': GlobalKey(),
   };
 
+  VideoPlayerController? _bgController;
+
   bool _isMobileMenuOpen = false;
 
   void _scrollToSection(String section) {
@@ -62,9 +65,33 @@ class _MainPageState extends State<MainPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _bgController = VideoPlayerController.asset('assets/images/background.mp4');
+    _bgController!.initialize().then((_) {
+      _bgController!.setLooping(true);
+      _bgController!.setVolume(0);
+      _bgController!.play();
+      setState(() {});
+    }).catchError((_) {
+      // If video fails to initialize, we silently fall back to the image.
+    });
+  }
+
+  @override
+  void dispose() {
+    _bgController?.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.sizeOf(context).width;
+    final screenSize = MediaQuery.sizeOf(context);
+    final screenWidth = screenSize.width;
     final isMobile = screenWidth < 900;
+    final heroHeight =
+        isMobile ? 560.0 : (screenSize.height * 0.78).clamp(560.0, 760.0);
 
     return Scaffold(
       backgroundColor: OpsColors.background,
@@ -154,107 +181,170 @@ class _MainPageState extends State<MainPage> {
             ),
           SliverToBoxAdapter(
             key: _sectionKeys['home'],
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 560),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    OpsColors.text,
-                    OpsColors.primary.withValues(alpha: .82),
-                  ],
+            child: SizedBox(
+              height: heroHeight,
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: OpsColors.text,
                 ),
-                image: DecorationImage(
-                  image: const AssetImage('assets/images/construction.jpg'),
-                  fit: BoxFit.cover,
-                  colorFilter: ColorFilter.mode(
-                    OpsColors.text.withValues(alpha: .62),
-                    BlendMode.darken,
-                  ),
-                ),
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1280),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 84,
-                    ),
-                    child: SizedBox(
-                      width: isMobile ? double.infinity : 680,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: .12),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: .24),
-                              ),
-                            ),
-                            child: const Text(
-                              'LIVE CONSTRUCTION MONITORING',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: .7,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          Text(
-                            'Smart Sensors for Safer Construction Sites',
-                            style: TextStyle(
-                              fontSize: isMobile ? 36 : 52,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              height: 1.15,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          Text(
-                            'Monitor your site in real-time and prevent risks before they happen. Reduce incidents, ensure compliance, and protect your workforce.',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.white.withValues(alpha: .9),
-                              height: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: 32),
-                          Wrap(
-                            spacing: 16,
-                            runSpacing: 16,
-                            children: [
-                              ElevatedButton(
-                                onPressed: _openLogin,
-                                child: const Text('Request Demo'),
-                              ),
-                              OutlinedButton(
-                                onPressed: () => _scrollToSection('contact'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                  side: const BorderSide(
-                                    color: Colors.white,
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: const Text('Contact Us'),
-                              ),
-                            ],
-                          ),
-                        ],
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (_bgController != null &&
+                        _bgController!.value.isInitialized)
+                      FittedBox(
+                        fit: BoxFit.cover,
+                        clipBehavior: Clip.hardEdge,
+                        child: SizedBox(
+                          width: _bgController!.value.size.width,
+                          height: _bgController!.value.size.height,
+                          child: VideoPlayer(_bgController!),
+                        ),
+                      )
+                    else
+                      Image.asset(
+                        'assets/images/construction.jpg',
+                        fit: BoxFit.cover,
+                      ),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            OpsColors.text.withValues(alpha: .78),
+                            OpsColors.primary.withValues(alpha: .62),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
+                    Align(
+                      alignment: Alignment.center,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1280),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isMobile ? 20 : 32,
+                            vertical: isMobile ? 40 : 84,
+                          ),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final contentWidth =
+                                  isMobile ? constraints.maxWidth : 680.0;
+                              final compactCtas = constraints.maxWidth < 460;
+                              final subtitleWidth =
+                                  isMobile ? contentWidth : contentWidth * 0.8;
+
+                              return Align(
+                                alignment: Alignment.centerLeft,
+                                child: ConstrainedBox(
+                                  constraints:
+                                      BoxConstraints(maxWidth: contentWidth),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white
+                                              .withValues(alpha: .12),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: Colors.white
+                                                .withValues(alpha: .24),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'LIVE CONSTRUCTION MONITORING',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: .7,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 20),
+                                      Text(
+                                        'Smart Sensors for Safer Construction Sites',
+                                        softWrap: true,
+                                        style: TextStyle(
+                                          fontSize: isMobile ? 36 : 52,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
+                                          height: 1.15,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 18),
+                                      ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          maxWidth: subtitleWidth,
+                                        ),
+                                        child: Text(
+                                          'Track air quality, vibration, noise, and worker safety with one connected sensor platform built for industrial job sites.',
+                                          softWrap: true,
+                                          style: TextStyle(
+                                            fontSize: isMobile ? 16 : 18,
+                                            color: Colors.white
+                                                .withValues(alpha: .88),
+                                            height: 1.6,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 28),
+                                      Wrap(
+                                        spacing: 14,
+                                        runSpacing: 14,
+                                        children: [
+                                          SizedBox(
+                                            width: compactCtas
+                                                ? constraints.maxWidth
+                                                : null,
+                                            child: ElevatedButton(
+                                              onPressed: _openLogin,
+                                              child: const Text('Login'),
+                                            ),
+                                          ),
+                                          SizedBox(
+                                            width: compactCtas
+                                                ? constraints.maxWidth
+                                                : null,
+                                            child: OutlinedButton(
+                                              onPressed: () =>
+                                                  _scrollToSection('features'),
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor: Colors.white,
+                                                side: BorderSide(
+                                                  color: Colors.white
+                                                      .withValues(alpha: .42),
+                                                ),
+                                                backgroundColor: Colors.white
+                                                    .withValues(alpha: .08),
+                                              ),
+                                              child: const Text(
+                                                'Explore Features',
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -402,55 +492,7 @@ class _MainPageState extends State<MainPage> {
           ),
           SliverToBoxAdapter(
             key: _sectionKeys['contact'],
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1280),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [OpsColors.text, OpsColors.primary],
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 60,
-                      horizontal: 32,
-                    ),
-                    child: Column(
-                      children: [
-                        const Text(
-                          'Make Your Site Safer Today',
-                          style: TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Start monitoring your construction environment with real-time sensor intelligence.',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white.withValues(alpha: .82),
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 28),
-                        ElevatedButton(
-                          onPressed: _openLogin,
-                          child: const Text('Request Demo'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            child: const _ContactSection(),
           ),
           const SliverToBoxAdapter(child: _Footer()),
         ],
@@ -485,7 +527,7 @@ class _Brand extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              'L&T',
+              'WowGardian',
               style: TextStyle(
                 fontSize: 24,
                 height: 1,
@@ -909,53 +951,287 @@ class _BenefitItem extends StatelessWidget {
   }
 }
 
+class _ContactSection extends StatelessWidget {
+  const _ContactSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionBlock(
+      backgroundColor: Colors.white,
+      title: 'Contact',
+      subtitle:
+          'Reach our Thane, Mumbai team for demos, support, and business enquiries',
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 860;
+          final intro = Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: OpsColors.border),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: .08),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: OpsColors.primary.withValues(alpha: .08),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: OpsColors.primary.withValues(alpha: .14),
+                    ),
+                  ),
+                  child: const Text(
+                    'THANE, MUMBAI',
+                    style: TextStyle(
+                      color: OpsColors.primary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: .9,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Let’s talk about smarter construction monitoring.',
+                  style: TextStyle(
+                    color: OpsColors.text,
+                    fontSize: 30,
+                    height: 1.2,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Connect with Wow Infobiz for product enquiries, site deployment support, or a walkthrough of our sensor analytics platform.',
+                  style: TextStyle(
+                    color: OpsColors.muted,
+                    fontSize: 15,
+                    height: 1.7,
+                  ),
+                ),
+              ],
+            ),
+          );
+
+          const details = Column(
+            children: [
+              _ContactCard(
+                icon: Icons.location_on_outlined,
+                label: 'Address',
+                value:
+                    '607-B, 803 Lodha Supremus, Business District 2, Kolshet, Thane (W), Mumbai - 400607',
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 18),
+                child: Divider(color: OpsColors.border, height: 1),
+              ),
+              _ContactCard(
+                icon: Icons.phone_in_talk_outlined,
+                label: 'Phone',
+                value: '+91-9322600422',
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 18),
+                child: Divider(color: OpsColors.border, height: 1),
+              ),
+              _ContactCard(
+                icon: Icons.mail_outline_rounded,
+                label: 'Email',
+                value: 'info@wowinfobiz.com',
+              ),
+            ],
+          );
+
+          if (!isWide) {
+            return Column(
+              children: [
+                intro,
+                const SizedBox(height: 20),
+                const _ContactDetailsPanel(child: details),
+              ],
+            );
+          }
+
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: intro),
+                const SizedBox(width: 24),
+                const Expanded(
+                  child: _ContactDetailsPanel(child: details),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ContactDetailsPanel extends StatelessWidget {
+  final Widget child;
+
+  const _ContactDetailsPanel({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: OpsColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: .05),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _ContactCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _ContactCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: OpsColors.primary.withValues(alpha: .10),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: OpsColors.primary),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: OpsColors.muted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 16,
+                  height: 1.55,
+                  fontWeight: FontWeight.w700,
+                  color: OpsColors.text,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _Footer extends StatelessWidget {
   const _Footer();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: OpsColors.text,
+      color: Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1280),
           child: Column(
             children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isRow = constraints.maxWidth >= 768;
-                  const children = [
-                    _FooterColumn(
-                      title: 'L&T Sensor Analytics',
-                      content:
-                          'Smart sensor solutions for modern construction safety.',
+              const Divider(color: OpsColors.border),
+              const SizedBox(height: 32),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: OpsColors.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: .04),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
                     ),
-                    _FooterColumn(
-                      title: 'Quick Links',
-                      links: ['Home', 'Features', 'Use Cases', 'Login'],
-                    ),
-                    _FooterColumn(
-                      title: 'Resources',
-                      links: ['Safety Guides', 'Case Studies', 'Support'],
-                    ),
-                  ];
-                  return isRow
-                      ? const Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: children,
-                        )
-                      : const Column(children: children);
-                },
+                  ],
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isRow = constraints.maxWidth >= 768;
+                    const children = [
+                      _FooterColumn(
+                        title: 'WowGardian Sensor Analytics',
+                        content:
+                            'Smart sensor solutions for modern construction safety.',
+                      ),
+                      _FooterColumn(
+                        title: 'Quick Links',
+                        links: ['Home', 'Features', 'Use Cases', 'Login'],
+                      ),
+                      _FooterColumn(
+                        title: 'Resources',
+                        links: ['Safety Guides', 'Case Studies', 'Support'],
+                      ),
+                    ];
+                    return isRow
+                        ? const Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: children,
+                          )
+                        : const Column(children: children);
+                  },
+                ),
               ),
               const SizedBox(height: 40),
-              Divider(color: Colors.white.withValues(alpha: .18)),
+              const Divider(color: OpsColors.border),
               const SizedBox(height: 24),
-              Text(
-                '2026 L&T Sensor Analytics - Intelligent construction safety. All rights reserved.',
+              const Text(
+                '2026 WowGardian Sensor Analytics - Intelligent construction safety. All rights reserved.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.white.withValues(alpha: .58),
+                  color: OpsColors.muted,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -991,16 +1267,16 @@ class _FooterColumn extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
-                color: Colors.white,
+                color: OpsColors.text,
               ),
             ),
             const SizedBox(height: 16),
             if (content != null)
               Text(
                 content!,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
-                  color: Colors.white.withValues(alpha: .62),
+                  color: OpsColors.muted,
                 ),
               ),
             if (links != null)
@@ -1009,9 +1285,9 @@ class _FooterColumn extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
                     link,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
-                      color: Colors.white.withValues(alpha: .62),
+                      color: OpsColors.muted,
                     ),
                   ),
                 ),

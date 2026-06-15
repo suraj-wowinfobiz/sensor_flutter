@@ -6,8 +6,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 
 import 'core/auth/global_login_screen.dart';
-import 'core/auth/session_check_screen.dart';
 import 'core/theme/ops_theme.dart';
+import 'main_page.dart';
 import 'super_admin/core/providers/theme_riverpod_provider.dart';
 import 'super_admin/screens/super_admin_login_screen.dart';
 import 'user/screens/user_login_screen.dart';
@@ -81,7 +81,7 @@ class _AppRoot extends ConsumerWidget {
             child: child ?? const SizedBox.shrink(),
           );
         },
-        home: const SessionCheckScreen(),
+        home: const MainPage(),
         routes: {
           '/login': (context) => const UserLoginScreen(),
           '/login/global': (context) => const GlobalLoginScreen(),

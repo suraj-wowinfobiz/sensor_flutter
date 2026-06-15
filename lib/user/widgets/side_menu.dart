@@ -81,7 +81,7 @@ class UserSideMenu extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'L&T',
+                            'WowGardian',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(

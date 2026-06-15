@@ -40,7 +40,7 @@ class UserNavBar extends StatelessWidget {
     this.notifications = const [],
     this.hasNotifications = false,
     this.profileName = 'JS',
-    this.profileRole = 'Site Operator - L&T',
+    this.profileRole = 'Site Operator - WowGardian',
     this.profileInitial = 'JS',
   });
 

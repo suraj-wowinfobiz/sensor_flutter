@@ -44,7 +44,7 @@ class _UserSettingsScreenState extends State<UserSettingsScreen> {
                 _InfoRow('Email Address', 'user.operator@live.com'),
                 _InfoRow('Assigned Role', 'Site Operator'),
                 _InfoRow('Current Workspace', 'Project Alpha'),
-                _InfoRow('Organization', 'L&T Construction'),
+                _InfoRow('Organization', 'WowGardian Construction'),
               ],
             ),
           );
