@@ -943,55 +943,81 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
         .where((a) => a.alertLevel.trim().toLowerCase() != 'critical')
         .length;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
+    return OpsPage(
+      title: 'Alert Management',
+      subtitle:
+          'Monitor active warnings, critical incidents, ownership, and threshold activity across the platform',
+      actions: [
+        OutlinedButton.icon(
+          onPressed: () => ref.invalidate(superAdminAlertsApiProvider),
+          icon: const Icon(Icons.refresh_rounded, size: 18),
+          label: const Text('Refresh Alerts'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () => _showCreateAlertDialog(context),
+          icon: const Icon(Icons.add_alert),
+          label: const Text('Add Alert'),
+        ),
+      ],
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Alert Management',
-            style: TextStyle(
-              fontSize: 34,
-              fontWeight: FontWeight.w800,
-              color: OpsColors.text,
-            ),
-          ),
-          const SizedBox(height: 2),
-          const Text(
-            'Monitor and manage system alerts',
-            style: TextStyle(
-              fontSize: 15,
-              color: OpsColors.muted,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: () => _showCreateAlertDialog(context),
-              icon: const Icon(Icons.add_alert),
-              label: const Text('Add Alert'),
-            ),
-          ),
-          const SizedBox(height: 18),
-          _buildSummaryCards(
-            activeCount: activeCount,
-            criticalCount: criticalCount,
-            warningCount: warningCount,
-          ),
-          const SizedBox(height: 16),
-          _buildActiveAlertsPanel(
-            context,
-            allAlerts,
-            onAcknowledge: (alertId) async {
-              await AlertsApi.resolveAlert(alertId);
-              ref.invalidate(superAdminAlertsApiProvider);
-            },
-            onEdit: (alert) => _showEditAlertDialog(context, alert),
-            onDelete: (alert) => _deleteAlert(context, alert),
+          OpsKpiGrid(
+            maxColumns: 4,
+            minCardWidth: 180,
+            cardHeight: 132,
+            cards: [
+              OpsKpiCard(
+                label: 'Open Alerts',
+                value: '$activeCount',
+                helper: 'Unresolved',
+                icon: Icons.notifications_active_rounded,
+                color: OpsColors.danger,
+              ),
+              OpsKpiCard(
+                label: 'Critical',
+                value: '$criticalCount',
+                helper: 'Immediate response',
+                icon: Icons.priority_high_rounded,
+                color: OpsColors.danger,
+              ),
+              OpsKpiCard(
+                label: 'Warning',
+                value: '$warningCount',
+                helper: 'Monitoring required',
+                icon: Icons.warning_amber_rounded,
+                color: OpsColors.warning,
+              ),
+              OpsKpiCard(
+                label: 'Sensor Sources',
+                value: '${allAlerts.map((a) => a.sensorId).where((id) => id.trim().isNotEmpty).toSet().length}',
+                helper: 'Distinct sensors',
+                icon: Icons.sensors_outlined,
+              ),
+            ],
           ),
           const SizedBox(height: 16),
-          _buildThresholdManagementSection(context, db),
+          OpsPanel(
+            title: 'Active Alerts',
+            subtitle:
+                'Severity, source, trigger time, ownership, and response state',
+            child: _buildActiveAlertsPanel(
+              context,
+              allAlerts,
+              onAcknowledge: (alertId) async {
+                await AlertsApi.resolveAlert(alertId);
+                ref.invalidate(superAdminAlertsApiProvider);
+              },
+              onEdit: (alert) => _showEditAlertDialog(context, alert),
+              onDelete: (alert) => _deleteAlert(context, alert),
+            ),
+          ),
+          const SizedBox(height: 16),
+          OpsPanel(
+            title: 'Threshold Management',
+            subtitle:
+                'Review threshold profiles, parameters, and value ranges used by alerting',
+            child: _buildThresholdManagementSection(context, db),
+          ),
         ],
       ),
     );

@@ -1059,22 +1059,122 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
       builder: (context, db, child) {
         final sensors =
             allSensors.where((s) => _matchesFilters(db, s)).toList();
+        final activeSensors =
+            allSensors.where((s) => !_inactiveSensors.contains(s.id)).length;
+        final inactiveSensors =
+            allSensors.where((s) => _inactiveSensors.contains(s.id)).length;
+        final assignedDevices = allSensors
+            .where((s) => s.deviceId.trim().isNotEmpty)
+            .map((s) => s.deviceId)
+            .toSet()
+            .length;
+        final typeCount = allSensors
+            .where((s) => s.sensorTypeId.trim().isNotEmpty)
+            .map((s) => s.sensorTypeId)
+            .toSet()
+            .length;
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
+        return OpsPage(
+          title: 'Sensors',
+          subtitle:
+              'Track sensor inventory, linked devices, deployment coverage, and operational status across the platform',
+          actions: [
+            OutlinedButton.icon(
+              onPressed: () => setState(() => _showFilters = !_showFilters),
+              icon: const Icon(Icons.tune_rounded, size: 18),
+              label: Text(_showFilters ? 'Hide Filters' : 'Show Filters'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => setState(() => _isListView = !_isListView),
+              icon: Icon(
+                _isListView
+                    ? Icons.grid_view_rounded
+                    : Icons.view_list_rounded,
+                size: 18,
+              ),
+              label: Text(_isListView ? 'Cards' : 'List'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => _showSensorModal(),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add Sensor'),
+            ),
+          ],
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(context),
-              if (_showFilters) ...[
-                const SizedBox(height: 18),
-                _buildFiltersPanel(
-                    context, db, sensors.length, allSensors.length),
-              ],
-              const SizedBox(height: 18),
-              _isListView
-                  ? _buildList(context, db, sensors)
-                  : _buildGrid(context, db, sensors),
+              OpsKpiGrid(
+                maxColumns: 6,
+                minCardWidth: 145,
+                spacing: 12,
+                cardHeight: 126,
+                cards: [
+                  OpsKpiCard(
+                    label: 'Total Sensors',
+                    value: '${allSensors.length}',
+                    helper: 'Platform inventory',
+                    icon: Icons.sensors_rounded,
+                  ),
+                  OpsKpiCard(
+                    label: 'Active Sensors',
+                    value: '$activeSensors',
+                    helper: 'Currently enabled',
+                    icon: Icons.check_circle_rounded,
+                    color: OpsColors.success,
+                  ),
+                  OpsKpiCard(
+                    label: 'Inactive Sensors',
+                    value: '$inactiveSensors',
+                    helper: 'Toggled off',
+                    icon: Icons.power_settings_new_rounded,
+                    color: OpsColors.warning,
+                  ),
+                  OpsKpiCard(
+                    label: 'Sensor Types',
+                    value: '$typeCount',
+                    helper: 'Distinct categories',
+                    icon: Icons.category_outlined,
+                  ),
+                  OpsKpiCard(
+                    label: 'Assigned Devices',
+                    value: '$assignedDevices',
+                    helper: 'Linked hardware',
+                    icon: Icons.memory_rounded,
+                    color: OpsColors.primaryContainer,
+                  ),
+                  OpsKpiCard(
+                    label: 'Filtered View',
+                    value: '${sensors.length}',
+                    helper: 'Of ${allSensors.length} total',
+                    icon: Icons.filter_alt_outlined,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              OpsPanel(
+                title: 'Sensor Inventory',
+                subtitle:
+                    'Serial details, sensor type, linked device, channel mapping, and power actions',
+                child: Column(
+                  children: [
+                    if (_showFilters) ...[
+                      _buildFiltersPanel(
+                          context, db, sensors.length, allSensors.length),
+                      const SizedBox(height: 14),
+                    ],
+                    if (sensors.isEmpty)
+                      const OpsEmptyState(
+                        title: 'No sensors found',
+                        message:
+                            'No sensors match the selected filters or current search query.',
+                        icon: Icons.sensors_off_outlined,
+                      )
+                    else
+                      (_isListView
+                          ? _buildList(context, db, sensors)
+                          : _buildGrid(context, db, sensors)),
+                  ],
+                ),
+              ),
             ],
           ),
         );

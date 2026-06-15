@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/app_session.dart';
 import '../../core/theme/ops_theme.dart';
+import '../api/alerts_api.dart';
 import '../core/responsive/responsive_extensions.dart';
 import '../providers/super_admin_riverpod_provider.dart';
 import '../widgets/nav_bar.dart';
@@ -32,6 +33,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
   String _currentView = 'dashboard';
   bool _showTopNav = true;
   bool _showBottomNav = true;
+  final List<String> _openedViews = ['dashboard'];
   late AnimationController _menuController;
 
   @override
@@ -41,6 +43,21 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final db = ref.read(superAdminBackendChangeNotifierProvider);
+      try {
+        await Future.wait([
+          db.loadDevices(),
+          db.loadSensors(),
+          db.loadUsers(),
+          db.loadOrganizations(),
+          _refreshAlerts(),
+        ]);
+      } catch (_) {
+        // Keep the shell responsive even if one preload request fails.
+      }
+    });
   }
 
   void toggleMenu() {
@@ -70,7 +87,22 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
   void _setCurrentView(String view) {
     final normalized = _normalizeView(view);
     if (_currentView == normalized) return;
+    if (normalized == 'alerts') {
+      _refreshAlerts();
+    }
     setState(() => _currentView = normalized);
+    if (!context.isDesktopLayout) closeMenu();
+  }
+
+  Future<void> _refreshAlerts() async {
+    try {
+      final alerts = await AlertsApi.getAlerts();
+      if (!mounted) return;
+      ref.read(superAdminBackendChangeNotifierProvider).alerts = alerts;
+      setState(() {});
+    } catch (_) {
+      // Alerts screen itself still owns full API error handling.
+    }
   }
 
   bool _onScroll(UserScrollNotification notification) {
@@ -120,66 +152,80 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
       showMenuButton: false,
       onSettingsTap: () => _setCurrentView('config'),
       onLogoutTap: _logout,
+      currentView: _currentView,
       notifications: notifications,
       hasNotifications: hasNotifications,
     );
 
-    final scaffold = Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return Scaffold(
+      backgroundColor: OpsColors.background,
       body: SafeArea(
-        child: Column(
-          children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 280),
-              switchInCurve: Curves.easeOutQuart,
-              switchOutCurve: Curves.easeInQuart,
-              transitionBuilder: (child, animation) {
-                final slide = Tween<Offset>(
-                  begin: const Offset(0, -0.08),
-                  end: Offset.zero,
-                ).animate(animation);
-                return SizeTransition(
-                  sizeFactor: animation,
-                  axisAlignment: -1,
-                  child: FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(position: slide, child: child),
-                  ),
-                );
-              },
-              child: (isDesktop || _showTopNav)
-                  ? navBar
-                  : const SizedBox.shrink(key: ValueKey('hidden-admin-nav')),
-            ),
-            Expanded(
-              child: NotificationListener<UserScrollNotification>(
-                onNotification: _onScroll,
-                child: isDesktop
-                    ? Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+        child: NotificationListener<UserScrollNotification>(
+          onNotification: _onScroll,
+          child: isDesktop
+              ? Row(
+                  children: [
+                    SideMenu(
+                      animation: const AlwaysStoppedAnimation<double>(1.0),
+                      isOpen: true,
+                      currentView: _currentView,
+                      onViewChanged: _setCurrentView,
+                      onClose: closeMenu,
+                      onLogout: _logout,
+                      showCloseButton: false,
+                    ),
+                    Expanded(
+                      child: Column(
                         children: [
-                          SideMenu(
-                            animation:
-                                const AlwaysStoppedAnimation<double>(1.0),
-                            isOpen: true,
-                            currentView: _currentView,
-                            onViewChanged: _setCurrentView,
-                            onClose: () {},
-                            onLogout: _logout,
-                            showCloseButton: false,
-                          ),
-                          Expanded(
-                            child: _buildContent(_currentView),
-                          ),
+                          navBar,
+                          Expanded(child: _buildContent(_currentView)),
                         ],
-                      )
-                    : Align(
-                        alignment: Alignment.topLeft,
-                        child: _buildContent(_currentView),
                       ),
-              ),
-            ),
-          ],
+                    ),
+                  ],
+                )
+              : Stack(
+                  children: [
+                    Column(
+                      children: [
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          child: _showTopNav
+                              ? NavBar(
+                                  key: const ValueKey('mobile-admin-nav'),
+                                  onMenuToggle: toggleMenu,
+                                  isMenuOpen: _isMenuOpen,
+                                  showMenuButton: true,
+                                  onSettingsTap: () => _setCurrentView('config'),
+                                  onLogoutTap: _logout,
+                                  currentView: _currentView,
+                                  notifications: notifications,
+                                  hasNotifications: hasNotifications,
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                        Expanded(child: _buildContent(_currentView)),
+                      ],
+                    ),
+                    if (_isMenuOpen)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          onTap: closeMenu,
+                          child: Container(
+                            color: Colors.black.withValues(alpha: .24),
+                          ),
+                        ),
+                      ),
+                    SideMenu(
+                      animation: _menuController,
+                      isOpen: _isMenuOpen,
+                      currentView: _currentView,
+                      onViewChanged: _setCurrentView,
+                      onClose: closeMenu,
+                      onLogout: _logout,
+                    ),
+                  ],
+                ),
         ),
       ),
       bottomNavigationBar: isDesktop
@@ -216,8 +262,6 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
                     ),
             ),
     );
-
-    return scaffold;
   }
 
   Widget _buildBottomNav({
@@ -241,59 +285,44 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
       child: SafeArea(
         top: false,
         minimum: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: BottomNavigationBar(
-            type: BottomNavigationBarType.fixed,
-            elevation: 0,
-            backgroundColor: OpsColors.surface,
-            selectedItemColor: OpsColors.primary,
-            unselectedItemColor: OpsColors.muted,
-            selectedLabelStyle: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+        child: NavigationBar(
+          height: 64,
+          selectedIndex: index < 0 ? 0 : index,
+          backgroundColor: OpsColors.surface,
+          indicatorColor: OpsColors.primary.withValues(alpha: .10),
+          onDestinationSelected: (i) => onViewChanged(views[i]),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard_rounded),
+              label: 'Home',
             ),
-            unselectedLabelStyle: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
+            NavigationDestination(
+              icon: Icon(Icons.devices_other_outlined),
+              selectedIcon: Icon(Icons.devices_other),
+              label: 'Devices',
             ),
-            showSelectedLabels: false,
-            showUnselectedLabels: false,
-            currentIndex: index < 0 ? 0 : index,
-            onTap: (i) => onViewChanged(views[i]),
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.dashboard_outlined),
-                activeIcon: Icon(Icons.dashboard_rounded),
-                label: '',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.devices_other_outlined),
-                activeIcon: Icon(Icons.devices_other),
-                label: '',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.sensors_outlined),
-                activeIcon: Icon(Icons.sensors),
-                label: '',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.warning_amber_outlined),
-                activeIcon: Icon(Icons.warning_amber_rounded),
-                label: '',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.analytics_outlined),
-                activeIcon: Icon(Icons.analytics),
-                label: '',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.settings_outlined),
-                activeIcon: Icon(Icons.settings),
-                label: '',
-              ),
-            ],
-          ),
+            NavigationDestination(
+              icon: Icon(Icons.sensors_outlined),
+              selectedIcon: Icon(Icons.sensors_rounded),
+              label: 'Sensors',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.warning_amber_outlined),
+              selectedIcon: Icon(Icons.warning_amber_rounded),
+              label: 'Alerts',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.analytics_outlined),
+              selectedIcon: Icon(Icons.analytics),
+              label: 'Analytics',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings),
+              label: 'Settings',
+            ),
+          ],
         ),
       ),
     );
@@ -337,9 +366,19 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
 
   Widget _buildContent(String view) {
     final normalized = _normalizeView(view);
-    return KeyedSubtree(
-      key: PageStorageKey<String>('admin_$normalized'),
-      child: _buildView(normalized),
+    if (!_openedViews.contains(normalized)) {
+      _openedViews.add(normalized);
+    }
+    return IndexedStack(
+      index: _openedViews.indexOf(normalized),
+      children: _openedViews
+          .map(
+            (openedView) => KeyedSubtree(
+              key: PageStorageKey<String>('admin_$openedView'),
+              child: _buildView(openedView),
+            ),
+          )
+          .toList(),
     );
   }
 

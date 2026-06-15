@@ -857,21 +857,116 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
         final allDevices = db.devices;
         final devices =
             allDevices.where((d) => _matchesFilters(db, d)).toList();
+        final online = allDevices.where((d) => d.status == 'active').length;
+        final offline = allDevices.length - online;
+        final webhookConfigured = allDevices
+            .where((d) => d.webHookUrl.trim().isNotEmpty)
+            .length;
+        final outdatedFirmware = allDevices
+            .where((d) => d.firmwareVersion.trim().isEmpty)
+            .length;
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
+        return OpsPage(
+          title: 'Devices',
+          subtitle:
+              'Monitor gateways, field hardware, connectivity, and deployment health across organizations and sites',
+          actions: [
+            OutlinedButton.icon(
+              onPressed: () => setState(() => _showFilters = !_showFilters),
+              icon: const Icon(Icons.tune_rounded, size: 18),
+              label: Text(_showFilters ? 'Hide Filters' : 'Show Filters'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => setState(() => _isListView = !_isListView),
+              icon: Icon(
+                _isListView
+                    ? Icons.grid_view_rounded
+                    : Icons.view_list_rounded,
+                size: 18,
+              ),
+              label: Text(_isListView ? 'Cards' : 'List'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => _showDeviceModal(),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add Device'),
+            ),
+          ],
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(context),
-              if (_showFilters) ...[
-                const SizedBox(height: 18),
-                _buildFiltersPanel(context, devices.length, allDevices.length),
-              ],
-              const SizedBox(height: 18),
-              _isListView
-                  ? _buildList(context, db, devices)
-                  : _buildGrid(context, db, devices),
+              OpsKpiGrid(
+                maxColumns: 6,
+                minCardWidth: 145,
+                spacing: 12,
+                cardHeight: 126,
+                cards: [
+                  OpsKpiCard(
+                    label: 'Total Devices',
+                    value: '${allDevices.length}',
+                    helper: 'Platform inventory',
+                    icon: Icons.router_rounded,
+                  ),
+                  OpsKpiCard(
+                    label: 'Online Devices',
+                    value: '$online',
+                    helper: 'Reporting normally',
+                    icon: Icons.check_circle_rounded,
+                    color: OpsColors.success,
+                  ),
+                  OpsKpiCard(
+                    label: 'Offline Devices',
+                    value: '$offline',
+                    helper: 'Require follow-up',
+                    icon: Icons.portable_wifi_off_rounded,
+                    color: OpsColors.danger,
+                  ),
+                  OpsKpiCard(
+                    label: 'Webhook Ready',
+                    value: '$webhookConfigured',
+                    helper: 'Configured integrations',
+                    icon: Icons.webhook_rounded,
+                    color: OpsColors.primaryContainer,
+                  ),
+                  OpsKpiCard(
+                    label: 'Firmware Review',
+                    value: '$outdatedFirmware',
+                    helper: 'Missing version info',
+                    icon: Icons.system_update_alt_rounded,
+                    color: OpsColors.warning,
+                  ),
+                  OpsKpiCard(
+                    label: 'Filtered View',
+                    value: '${devices.length}',
+                    helper: 'Of ${allDevices.length} total',
+                    icon: Icons.filter_alt_outlined,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              OpsPanel(
+                title: 'Device Fleet',
+                subtitle:
+                    'Connected gateways, site assignment, heartbeat state, network details, and power actions',
+                child: Column(
+                  children: [
+                    if (_showFilters) ...[
+                      _buildFiltersPanel(context, devices.length, allDevices.length),
+                      const SizedBox(height: 14),
+                    ],
+                    if (devices.isEmpty)
+                      const OpsEmptyState(
+                        title: 'No devices found',
+                        message:
+                            'No devices match the selected filters or current search query.',
+                        icon: Icons.router_outlined,
+                      )
+                    else
+                      (_isListView
+                          ? _buildList(context, db, devices)
+                          : _buildGrid(context, db, devices)),
+                  ],
+                ),
+              ),
             ],
           ),
         );

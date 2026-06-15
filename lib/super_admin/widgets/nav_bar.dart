@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+
 import '../../core/theme/ops_theme.dart';
-import '../core/responsive/responsive_extensions.dart';
 
 class AdminNotificationItem {
   final String title;
@@ -15,6 +15,8 @@ class AdminNotificationItem {
 }
 
 class NavBar extends StatelessWidget {
+  static const double desktopHeight = 78;
+
   final VoidCallback onMenuToggle;
   final bool isMenuOpen;
   final bool showMenuButton;
@@ -22,6 +24,10 @@ class NavBar extends StatelessWidget {
   final VoidCallback onLogoutTap;
   final List<AdminNotificationItem> notifications;
   final bool hasNotifications;
+  final String currentView;
+  final String profileName;
+  final String profileRole;
+  final String profileInitial;
 
   const NavBar({
     super.key,
@@ -32,17 +38,23 @@ class NavBar extends StatelessWidget {
     required this.onLogoutTap,
     this.notifications = const [],
     this.hasNotifications = false,
+    this.currentView = 'dashboard',
+    this.profileName = 'suraj.tiwari',
+    this.profileRole = 'Super Admin',
+    this.profileInitial = 'SA',
   });
 
   @override
   Widget build(BuildContext context) {
-    final isCompact = context.narrowerThan(900);
-    final isMobile = context.narrowerThan(700);
+    final width = MediaQuery.sizeOf(context).width;
+    final showSearch = width >= 980;
+    final showProfileText = width >= 720;
+    final isDesktop = width >= 1024;
+    final showWorkspaceSelector = isDesktop && width >= 1200;
 
     return Container(
-      height: isCompact ? 58 : 72,
-      margin: EdgeInsets.zero,
-      padding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 32),
+      height: isDesktop ? desktopHeight : 88,
+      padding: EdgeInsets.symmetric(horizontal: isDesktop ? 24 : 20),
       decoration: const BoxDecoration(
         color: OpsColors.surface,
         border: Border(bottom: BorderSide(color: OpsColors.border)),
@@ -50,88 +62,88 @@ class NavBar extends StatelessWidget {
       child: Row(
         children: [
           if (showMenuButton) ...[
-            InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: onMenuToggle,
-              child: Container(
-                width: isCompact ? 36 : 42,
-                height: isCompact ? 36 : 42,
-                decoration: BoxDecoration(
-                  color: OpsColors.surfaceLow,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: OpsColors.border),
+            IconButton(
+              tooltip: isMenuOpen ? 'Close menu' : 'Open menu',
+              onPressed: onMenuToggle,
+              icon: Icon(isMenuOpen ? Icons.close : Icons.menu),
+            ),
+            const SizedBox(width: 12),
+          ],
+          if (showWorkspaceSelector) ...[
+            OutlinedButton(
+              onPressed: () {},
+              style: OutlinedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  isMenuOpen ? Icons.close : Icons.menu,
-                  color: OpsColors.text,
-                  size: isCompact ? 20 : 24,
+                side: const BorderSide(color: OpsColors.border),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.admin_panel_settings_outlined,
+                      size: 18, color: OpsColors.primary),
+                  SizedBox(width: 12),
+                  Text(
+                    'Admin Console',
+                    style: TextStyle(
+                      color: OpsColors.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 20,
+                    color: OpsColors.muted,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 20),
+          ],
+          if (showSearch)
+            SizedBox(
+              width: width >= 1400 ? 420 : 320,
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search users, devices, sites...',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 22),
+                  fillColor: const Color(0xFFF6F7FB),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: OpsColors.primary.withValues(alpha: .30),
+                      width: 1.5,
+                    ),
+                  ),
                 ),
               ),
             ),
-            SizedBox(width: isCompact ? 8 : 12),
-          ],
-          Container(
-            width: isCompact ? 32 : 40,
-            height: isCompact ? 32 : 40,
-            decoration: BoxDecoration(
-              color: OpsColors.primary,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              Icons.analytics_rounded,
-              color: Colors.white,
-              size: isCompact ? 17 : 20,
-            ),
-          ),
-          SizedBox(width: isCompact ? 8 : 12),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'WowGardian',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: OpsColors.text,
-                    fontSize: isCompact ? 18 : 22,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                if (!isCompact)
-                  const Text(
-                    'SENSOR ANALYTICS',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: OpsColors.muted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-              ],
-            ),
-          ),
+          const Spacer(),
           PopupMenuButton<int>(
             tooltip: 'Notifications',
-            offset: const Offset(0, 40),
-            constraints: const BoxConstraints(minWidth: 300, maxWidth: 360),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
+            constraints: const BoxConstraints(minWidth: 320, maxWidth: 380),
             itemBuilder: (context) {
               if (notifications.isEmpty) {
-                return [
-                  const PopupMenuItem<int>(
+                return const [
+                  PopupMenuItem<int>(
                     enabled: false,
-                    height: 72,
-                    child: Center(
-                      child: Text(
-                        'No notifications',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
+                    child: OpsEmptyState(
+                      title: 'No notifications',
+                      message: 'There are no unresolved alerts in the platform.',
+                      icon: Icons.notifications_none_rounded,
                     ),
                   ),
                 ];
@@ -140,37 +152,22 @@ class NavBar extends StatelessWidget {
               return notifications.take(6).map((item) {
                 return PopupMenuItem<int>(
                   enabled: false,
-                  height: 64,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(top: 5),
-                        child: Icon(Icons.circle, size: 9),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              item.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                              ),
-                            ),
-                            Text(
-                              item.message,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.circle, size: 9),
+                    title: Text(item.title),
+                    subtitle: Text(
+                      item.message,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: Text(
+                      _timeLabel(item.time),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: OpsColors.muted,
+                          ),
+                    ),
                   ),
                 );
               }).toList();
@@ -180,7 +177,7 @@ class NavBar extends StatelessWidget {
                 Icon(
                   Icons.notifications_none_rounded,
                   color: OpsColors.text,
-                  size: isCompact ? 20 : 23,
+                  size: isDesktop ? 23 : 20,
                 ),
                 if (hasNotifications)
                   Positioned(
@@ -198,21 +195,33 @@ class NavBar extends StatelessWidget {
               ],
             ),
           ),
-          SizedBox(width: isCompact ? 6 : 10),
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: 'Help',
+            onPressed: () {},
+            icon: const Icon(Icons.help_outline_rounded),
+          ),
+          const SizedBox(width: 20),
+          Container(
+            width: 1,
+            height: isDesktop ? 42 : 40,
+            color: OpsColors.border,
+          ),
+          const SizedBox(width: 20),
           PopupMenuButton<String>(
-            tooltip: 'Profile menu',
+            tooltip: 'Profile',
             onSelected: (value) {
               if (value == 'settings') onSettingsTap();
               if (value == 'logout') onLogoutTap();
             },
             itemBuilder: (context) => [
-              const PopupMenuItem<String>(
+              PopupMenuItem<String>(
                 value: 'profile',
                 enabled: false,
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text('suraj.tiwari'),
-                  subtitle: Text('Super Admin'),
+                  title: Text(profileName),
+                  subtitle: Text(profileRole),
                 ),
               ),
               const PopupMenuDivider(),
@@ -227,44 +236,38 @@ class NavBar extends StatelessWidget {
             ],
             child: Row(
               children: [
-                if (!isCompact)
+                if (showProfileText) ...[
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      const Text(
-                        'suraj.tiwari',
-                        style: TextStyle(
-                          color: OpsColors.text,
+                      Text(
+                        profileName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
                           fontSize: 14,
-                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       Text(
-                        'Super Admin',
-                        style: TextStyle(
-                          color: OpsColors.muted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        profileRole,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              fontSize: 11.5,
+                              color: OpsColors.muted,
+                            ),
                       ),
                     ],
                   ),
-                SizedBox(width: isCompact ? 6 : 10),
-                Container(
-                  width: isMobile ? 34 : 40,
-                  height: isMobile ? 34 : 40,
-                  decoration: BoxDecoration(
-                    color: OpsColors.primaryContainer,
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
+                  const SizedBox(width: 12),
+                ],
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: OpsColors.primaryContainer,
                   child: Text(
-                    'F',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: isMobile ? 12 : 14,
-                      fontWeight: FontWeight.w700,
+                    profileInitial,
+                    style: const TextStyle(
+                      color: Color(0xFFEEEFFF),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
@@ -274,5 +277,14 @@ class NavBar extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _timeLabel(DateTime time) {
+    final now = DateTime.now();
+    final difference = now.difference(time);
+    if (difference.inMinutes < 1) return 'now';
+    if (difference.inHours < 1) return '${difference.inMinutes}m';
+    if (difference.inDays < 1) return '${difference.inHours}h';
+    return '${difference.inDays}d';
   }
 }

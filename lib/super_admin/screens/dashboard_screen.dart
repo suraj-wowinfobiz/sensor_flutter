@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/ops_theme.dart';
+import '../../user/widgets/ops_data_table.dart';
 import '../providers/super_admin_api_riverpod_provider.dart';
 import '../providers/super_admin_riverpod_provider.dart';
 import '../services/analytics_sse_service.dart';
@@ -608,7 +609,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       final level = (item.alertLevel as String).trim().toLowerCase();
       return level.contains('critical') || level.contains('high');
     }).length;
-    final platformUpdateAt = _latestPlatformUpdateAt(db);
+    final platformUpdateAt = _latestPlatformUpdateAt(db) ?? DateTime.now();
     final vendorSeries = _dailySpotsFromDates(
       (db.users as List).where((item) {
         final role = (item.role as String).trim().toLowerCase();
@@ -654,58 +655,285 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       }).map((item) => item.triggeredAt as DateTime),
       days: 14,
     );
-    final content = Padding(
-      padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
+    final openAlerts = (db.alerts as List)
+        .where((item) => item.resolvedAt == null)
+        .toList()
+      ..sort((a, b) => b.triggeredAt.compareTo(a.triggeredAt));
+    final warningAlerts = openAlerts.where((item) {
+      final level = item.alertLevel.trim().toLowerCase();
+      return level.contains('warning') || level.contains('warn');
+    }).length;
+    final infoAlerts = openAlerts.length - criticalAlerts - warningAlerts;
+    final content = OpsPage(
+      title: 'Dashboard',
+      subtitle:
+          'Platform-wide overview of organizations, devices, alerts, onboarding, and live sensor analytics',
+      actions: [
+        OutlinedButton.icon(
+          onPressed: () {},
+          icon: const Icon(Icons.calendar_today_outlined, size: 16),
+          label: Text(
+            '${platformUpdateAt.day.toString().padLeft(2, '0')}/'
+            '${platformUpdateAt.month.toString().padLeft(2, '0')}/'
+            '${platformUpdateAt.year}',
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: () {},
+          icon: const Icon(Icons.file_download_outlined, size: 18),
+          label: const Text('Export Overview'),
+        ),
+      ],
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildTopStats(
-            context,
-            organizationsCount: organizationsCount,
-            activeOrganizationsCount: activeOrganizationsCount,
-            sitesCount: sitesCount,
-            devicesCount: devicesCount,
-            onlineDevicesCount: onlineDevicesCount,
-            activeAlerts: activeAlerts,
-            criticalAlerts: criticalAlerts,
-            platformUpdateAt: platformUpdateAt,
+          OpsKpiGrid(
+            maxColumns: 6,
+            minCardWidth: 145,
+            cardHeight: 132,
+            cards: [
+              OpsKpiCard(
+                label: 'Organizations',
+                value: '$organizationsCount',
+                helper: '$activeOrganizationsCount active',
+                icon: Icons.apartment_rounded,
+              ),
+              OpsKpiCard(
+                label: 'Sites',
+                value: '$sitesCount',
+                helper: 'Managed locations',
+                icon: Icons.location_city_outlined,
+              ),
+              OpsKpiCard(
+                label: 'Devices',
+                value: '$devicesCount',
+                helper: '$onlineDevicesCount online',
+                icon: Icons.devices_other_rounded,
+                color: OpsColors.success,
+              ),
+              OpsKpiCard(
+                label: 'Active Alerts',
+                value: '$activeAlerts',
+                helper: '$criticalAlerts critical',
+                icon: Icons.warning_amber_rounded,
+                color: OpsColors.danger,
+              ),
+              OpsKpiCard(
+                label: 'Vendors',
+                value: '${db.users.where((u) => u.role.toLowerCase().contains('vendor')).length}',
+                helper: 'Partner accounts',
+                icon: Icons.storefront_outlined,
+              ),
+              OpsKpiCard(
+                label: 'Engineers',
+                value: '${db.users.where((u) => u.role.toLowerCase().contains('engineer')).length}',
+                helper: 'Field & support',
+                icon: Icons.engineering_outlined,
+                color: OpsColors.primaryContainer,
+              ),
+            ],
           ),
-          const SizedBox(height: 18),
-          _buildLiveSeriesCard(
-            context,
-            title: 'User Role Onboarding Trend',
-            icon: Icons.people_outline,
-            xData: vendorSeries,
-            yData: engineerSeries,
-            zData: userRoleSeries,
-            xLabel: 'Vendors',
-            yLabel: 'Engineers',
-            zLabel: 'Users',
-            yAxisLabel: 'New accounts per day',
-            xAxisLabel: 'Last 30 days',
-            xTickLabels: _dayLabels(30),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final vertical = constraints.maxWidth <= 900;
+              final left = OpsPanel(
+                title: 'Platform Status',
+                padding: const EdgeInsets.all(24),
+                child: _AdminStatusDonut(
+                  online: onlineDevicesCount,
+                  warning: criticalAlerts + warningAlerts,
+                  offline: (devicesCount - onlineDevicesCount).clamp(0, 99999),
+                ),
+              );
+              final center = OpsPanel(
+                title: 'Alerts Summary',
+                subtitle: 'Current unresolved load',
+                padding: const EdgeInsets.all(24),
+                child: _AdminAlertSummary(
+                  critical: criticalAlerts,
+                  warning: warningAlerts,
+                  info: infoAlerts < 0 ? 0 : infoAlerts,
+                  total: openAlerts.length,
+                ),
+              );
+              final right = OpsPanel(
+                title: 'Live Feed',
+                trailing: const _AdminActiveBadge(),
+                padding: const EdgeInsets.all(24),
+                child: _AdminLiveFeed(alerts: openAlerts),
+              );
+
+              if (vertical) {
+                return Column(
+                  children: [
+                    left,
+                    const SizedBox(height: 12),
+                    center,
+                    const SizedBox(height: 12),
+                    right,
+                  ],
+                );
+              }
+
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: left),
+                    const SizedBox(width: 12),
+                    Expanded(child: center),
+                    const SizedBox(width: 12),
+                    Expanded(child: right),
+                  ],
+                ),
+              );
+            },
           ),
-          const SizedBox(height: 18),
-          _buildAnalyzedRow(context),
-          const SizedBox(height: 18),
-          _buildAnalyticsGrid(context, db),
-          const SizedBox(height: 18),
-          _buildScatterCard(context),
-          const SizedBox(height: 18),
-          _buildSensorReadingsCard(context),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stacked = constraints.maxWidth <= 980;
+              final overview = OpsFramedPanel(
+                header: const _AdminOverviewHeader(),
+                child: _AdminOverviewTable(db: db),
+              );
+              final trend = OpsPanel(
+                title: 'User Role Onboarding Trend',
+                padding: const EdgeInsets.all(24),
+                child: _AdminHealthTrend(
+                  firstLabel: 'Vendors',
+                  secondLabel: 'Engineers',
+                  firstValues: _seriesPercentages(vendorSeries),
+                  secondValues: _seriesPercentages(engineerSeries),
+                  bottomLabels: _dayLabels(7),
+                ),
+              );
+
+              if (stacked) {
+                return Column(
+                  children: [
+                    overview,
+                    const SizedBox(height: 16),
+                    trend,
+                  ],
+                );
+              }
+
+              return const SizedBox();
+            },
+          ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth <= 980) {
+                return const SizedBox.shrink();
+              }
+              return SizedBox(
+                height: 396,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      flex: 6,
+                      child: OpsFramedPanel(
+                        header: const _AdminOverviewHeader(),
+                        child: _AdminOverviewTable(db: db),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      flex: 4,
+                      child: OpsPanel(
+                        title: 'User Role Onboarding Trend',
+                        padding: const EdgeInsets.all(24),
+                        child: _AdminHealthTrend(
+                          firstLabel: 'Vendors',
+                          secondLabel: 'Engineers',
+                          firstValues: _seriesPercentages(vendorSeries),
+                          secondValues: _seriesPercentages(engineerSeries),
+                          bottomLabels: _dayLabels(7),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+          const _AdminDashboardFooter(),
+          const SizedBox(height: 20),
+          _buildTwoColumnRow(
+            context,
+            left: _buildAnalyzedRow(context),
+            right: _buildVelocityCard(context),
+          ),
+          const SizedBox(height: 16),
+          _buildTwoColumnRow(
+            context,
+            left: _statusDistributionCard(context, db),
+            right: _tiltPatternCard(context),
+          ),
+          const SizedBox(height: 16),
+          _buildTwoColumnRow(
+            context,
+            left: _alertMappingCoverageCard(context, db),
+            right: _buildScatterCard(context),
+          ),
+          const SizedBox(height: 16),
+          _buildTwoColumnRow(
+            context,
+            left: _buildSensorReadingsCard(context),
+            right: _buildTopTiltSensorsCard(context, db),
+          ),
+          const SizedBox(height: 16),
           _buildBottomLiveStats(context, db),
-          const SizedBox(height: 18),
-          _buildTopTiltSensorsCard(context, db),
         ],
       ),
     );
 
     if (widget.embeddedScroll) return content;
 
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      child: content,
+    return content;
+  }
+
+  List<double> _seriesPercentages(List<FlSpot> spots) {
+    if (spots.isEmpty) return const [0, 0, 0, 0, 0, 0, 0];
+    final values = spots.map((spot) => spot.y).toList();
+    final maxValue = values.reduce(max);
+    if (maxValue <= 0) {
+      return List<double>.filled(values.length.clamp(0, 7), 0);
+    }
+    final normalized = values.map((value) => (value / maxValue) * 100).toList();
+    if (normalized.length <= 7) return normalized;
+    return normalized.sublist(normalized.length - 7);
+  }
+
+  Widget _buildTwoColumnRow(
+    BuildContext context, {
+    required Widget left,
+    required Widget right,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth <= 980) {
+          return Column(
+            children: [
+              left,
+              const SizedBox(height: 16),
+              right,
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: left),
+            const SizedBox(width: 16),
+            Expanded(child: right),
+          ],
+        );
+      },
     );
   }
 
@@ -2879,6 +3107,641 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Theme.of(context).brightness == Brightness.light
         ? const Color(0xFF60717c)
         : const Color(0xFF9FB4C6);
+  }
+}
+
+class _AdminStatusDonut extends StatelessWidget {
+  final int online;
+  final int warning;
+  final int offline;
+
+  const _AdminStatusDonut({
+    required this.online,
+    required this.warning,
+    required this.offline,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final total = (online + warning + offline).clamp(1, 99999);
+    return Column(
+      children: [
+        SizedBox(
+          height: 190,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              CustomPaint(
+                size: const Size(160, 160),
+                painter: _AdminDonutPainter(
+                  online: online / total,
+                  warning: warning / total,
+                  offline: offline / total,
+                ),
+              ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('$total',
+                      style: Theme.of(context).textTheme.headlineMedium),
+                  Text('TOTAL', style: Theme.of(context).textTheme.labelSmall),
+                ],
+              ),
+            ],
+          ),
+        ),
+        _legend('Online', online, total, OpsColors.success),
+        _legend('Attention', warning, total, OpsColors.amber),
+        _legend('Offline', offline, total, OpsColors.danger),
+      ],
+    );
+  }
+
+  Widget _legend(String label, int value, int total, Color color) {
+    final factor = value / total;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text(label, style: const TextStyle(color: OpsColors.muted)),
+          const Spacer(),
+          Text(
+            '$value (${(factor * 100).round()}%)',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminDonutPainter extends CustomPainter {
+  final double online;
+  final double warning;
+  final double offline;
+
+  const _AdminDonutPainter({
+    required this.online,
+    required this.warning,
+    required this.offline,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 14
+      ..strokeCap = StrokeCap.round;
+    var start = -pi / 2;
+    for (final segment in [
+      (offline, OpsColors.danger),
+      (warning, OpsColors.amber),
+      (online, OpsColors.success),
+    ]) {
+      paint.color = segment.$2;
+      final sweep = max(segment.$1, .02) * pi * 2;
+      canvas.drawArc(rect.deflate(14), start, sweep, false, paint);
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AdminDonutPainter oldDelegate) {
+    return oldDelegate.online != online ||
+        oldDelegate.warning != warning ||
+        oldDelegate.offline != offline;
+  }
+}
+
+class _AdminAlertSummary extends StatelessWidget {
+  final int critical;
+  final int warning;
+  final int info;
+  final int total;
+
+  const _AdminAlertSummary({
+    required this.critical,
+    required this.warning,
+    required this.info,
+    required this.total,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final safeTotal = total <= 0 ? 1 : total;
+    return Column(
+      children: [
+        _AdminCategoryRow(
+          'Critical',
+          critical,
+          critical / safeTotal,
+          OpsColors.danger,
+        ),
+        _AdminCategoryRow(
+          'Warning',
+          warning,
+          warning / safeTotal,
+          const Color(0xFFF97316),
+        ),
+        _AdminCategoryRow(
+          'Info',
+          info,
+          info / safeTotal,
+          OpsColors.primary,
+        ),
+        _AdminCategoryRow(
+          'Healthy',
+          (safeTotal - critical - warning - info).clamp(0, safeTotal),
+          ((safeTotal - critical - warning - info).clamp(0, safeTotal)) /
+              safeTotal,
+          OpsColors.success,
+        ),
+      ],
+    );
+  }
+}
+
+class _AdminCategoryRow extends StatelessWidget {
+  final String label;
+  final int value;
+  final double factor;
+  final Color color;
+
+  const _AdminCategoryRow(this.label, this.value, this.factor, this.color);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Text(label, style: const TextStyle(color: OpsColors.muted)),
+              const Spacer(),
+              Text('$value',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: factor.clamp(0, 1),
+              minHeight: 8,
+              color: color,
+              backgroundColor: const Color(0xFFECEEF0),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminActiveBadge extends StatelessWidget {
+  const _AdminActiveBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.circle, size: 8, color: OpsColors.success),
+        SizedBox(width: 8),
+        Text(
+          'ACTIVE',
+          style: TextStyle(
+            color: OpsColors.success,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AdminLiveFeed extends StatelessWidget {
+  final List<dynamic> alerts;
+
+  const _AdminLiveFeed({required this.alerts});
+
+  @override
+  Widget build(BuildContext context) {
+    final display = alerts.take(4).map((alert) {
+      final level = alert.alertLevel.toString().trim().toLowerCase();
+      final color = level.contains('critical')
+          ? OpsColors.danger
+          : level.contains('warn')
+              ? OpsColors.amber
+              : OpsColors.primary;
+      return (
+        _iconForLevel(level),
+        color,
+        alert.message.toString().trim().isEmpty
+            ? 'Alert ${alert.id}'
+            : alert.message.toString().trim(),
+        _ago(alert.triggeredAt as DateTime),
+        alert.sensorId.toString().trim().isEmpty
+            ? 'Unknown'
+            : alert.sensorId.toString().trim(),
+        color
+      );
+    }).toList();
+
+    if (display.isEmpty) {
+      return const OpsEmptyState(
+        title: 'No live updates',
+        message: 'There are no unresolved alert events to show right now.',
+        icon: Icons.notifications_none_rounded,
+      );
+    }
+
+    return Column(
+      children: display.indexed.map((entry) {
+        final index = entry.$1;
+        final row = entry.$2;
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            border: index == display.length - 1
+                ? null
+                : const Border(
+                    bottom: BorderSide(color: Color(0xFFECEEF0)),
+                  ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: row.$2.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Icon(row.$1, color: row.$2, size: 18),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      row.$3,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(row.$4, style: Theme.of(context).textTheme.labelSmall),
+                  ],
+                ),
+              ),
+              Text(
+                row.$5,
+                style: TextStyle(
+                  color: row.$6,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  static IconData _iconForLevel(String level) {
+    if (level.contains('critical') || level.contains('high')) {
+      return Icons.warning_amber_rounded;
+    }
+    if (level.contains('warn')) return Icons.report_problem_outlined;
+    return Icons.info_outline_rounded;
+  }
+
+  static String _ago(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inHours < 1) return '${diff.inMinutes} mins ago';
+    if (diff.inDays < 1) return '${diff.inHours} hrs ago';
+    return '${diff.inDays} days ago';
+  }
+}
+
+class _AdminOverviewTable extends StatelessWidget {
+  final dynamic db;
+
+  const _AdminOverviewTable({required this.db});
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = (db.sites as List).map((site) {
+      final siteDevices =
+          (db.devices as List).where((device) => device.siteId == site.id).toList();
+      final siteDeviceIds = siteDevices.map((device) => device.id).toSet();
+      final siteSensors = (db.sensors as List)
+          .where((sensor) => siteDeviceIds.contains(sensor.deviceId))
+          .toList();
+      final siteSensorIds = siteSensors.map((sensor) => sensor.id).toSet();
+      final siteAlerts = (db.alerts as List)
+          .where((alert) => alert.resolvedAt == null)
+          .where((alert) => siteSensorIds.contains(alert.sensorId))
+          .toList();
+      final onlineDevices = siteDevices.where((device) {
+        final status = device.status.toString().trim().toLowerCase();
+        return status == 'active' ||
+            status == 'online' ||
+            status == 'healthy' ||
+            status == 'running';
+      }).length;
+      final lastUpdate = siteDevices.isEmpty
+          ? 'No data'
+          : _AdminLiveFeed._ago(
+              siteDevices
+                  .map((device) => device.installedAt as DateTime)
+                  .reduce((a, b) => a.isAfter(b) ? a : b),
+            );
+      return (
+        site.name.toString(),
+        onlineDevices == siteDevices.length && siteDevices.isNotEmpty
+            ? 'Online'
+            : onlineDevices == 0
+                ? 'Offline'
+                : 'Warning',
+        '${siteSensors.length} / ${siteDevices.length}',
+        '${siteAlerts.length}',
+        lastUpdate,
+      );
+    }).toList();
+
+    return OpsDataTable(
+      columns: const [
+        OpsTableColumnSpec('SITE', flex: 2),
+        OpsTableColumnSpec('STATUS'),
+        OpsTableColumnSpec('SENSORS', center: true),
+        OpsTableColumnSpec('ALERTS', center: true),
+        OpsTableColumnSpec('LAST\nUPDATE'),
+      ],
+      rows: rows.map((row) {
+        final alertColor = row.$4 == '0'
+            ? OpsColors.muted
+            : row.$4 == '1'
+                ? OpsColors.warning
+                : OpsColors.danger;
+        return OpsTableRowSpec([
+          OpsTableCellSpec.text(row.$1, bold: true),
+          OpsTableCellSpec(child: OpsStatusBadge(row.$2)),
+          OpsTableCellSpec.text(row.$3, center: true, bold: true),
+          OpsTableCellSpec.text(
+            row.$4,
+            center: true,
+            bold: true,
+            color: alertColor,
+          ),
+          OpsTableCellSpec.text(row.$5, color: OpsColors.muted),
+        ]);
+      }).toList(),
+    );
+  }
+}
+
+class _AdminOverviewHeader extends StatelessWidget {
+  const _AdminOverviewHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          'SITE OVERVIEW',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: OpsColors.outline,
+                letterSpacing: .4,
+              ),
+        ),
+        const Spacer(),
+        TextButton.icon(
+          onPressed: () {},
+          iconAlignment: IconAlignment.end,
+          label: const Text('View all'),
+          icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+          style: TextButton.styleFrom(
+            foregroundColor: OpsColors.primary,
+            textStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AdminHealthTrend extends StatelessWidget {
+  final String firstLabel;
+  final String secondLabel;
+  final List<double> firstValues;
+  final List<double> secondValues;
+  final List<String> bottomLabels;
+
+  const _AdminHealthTrend({
+    required this.firstLabel,
+    required this.secondLabel,
+    required this.firstValues,
+    required this.secondValues,
+    required this.bottomLabels,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 286,
+      child: Stack(
+        children: [
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Row(
+              children: [
+                _AdminLegendDot(firstLabel, OpsColors.success),
+                const SizedBox(width: 14),
+                _AdminLegendDot(secondLabel, OpsColors.amber),
+              ],
+            ),
+          ),
+          const Positioned(
+            top: 26,
+            bottom: 32,
+            left: 0,
+            width: 30,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('100%'),
+                Text('75%'),
+                Text('50%'),
+                Text('25%'),
+                Text('0%'),
+              ],
+            ),
+          ),
+          Positioned(
+            top: 26,
+            bottom: 38,
+            left: 38,
+            right: 0,
+            child: CustomPaint(
+              painter: _AdminTrendPainter(
+                firstValues: firstValues,
+                secondValues: secondValues,
+              ),
+              child: const SizedBox.expand(),
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            left: 38,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: bottomLabels
+                  .map((label) => Text(label))
+                  .toList(growable: false),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminLegendDot extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _AdminLegendDot(this.label, this.color);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: const TextStyle(color: OpsColors.muted)),
+      ],
+    );
+  }
+}
+
+class _AdminTrendPainter extends CustomPainter {
+  final List<double> firstValues;
+  final List<double> secondValues;
+
+  const _AdminTrendPainter({
+    required this.firstValues,
+    required this.secondValues,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gridPaint = Paint()
+      ..color = OpsColors.border
+      ..strokeWidth = 1;
+    for (var i = 0; i < 4; i++) {
+      final y = size.height * i / 4;
+      _drawDashedLine(canvas, Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    _drawLine(canvas, size, firstValues, OpsColors.success);
+    _drawLine(canvas, size, secondValues, OpsColors.amber);
+  }
+
+  void _drawLine(Canvas canvas, Size size, List<double> values, Color color) {
+    if (values.isEmpty) return;
+    final path = Path();
+    final pointPaint = Paint()..color = color;
+    final linePaint = Paint()
+      ..color = color
+      ..strokeWidth = 2.2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    for (var i = 0; i < values.length; i++) {
+      final x = values.length == 1 ? 0.0 : size.width * i / (values.length - 1);
+      final y = size.height - (values[i] / 100 * size.height);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+      canvas.drawCircle(Offset(x, y), 3, pointPaint);
+    }
+    canvas.drawPath(path, linePaint);
+  }
+
+  void _drawDashedLine(Canvas canvas, Offset start, Offset end, Paint paint) {
+    const dash = 5.0;
+    const gap = 5.0;
+    var x = start.dx;
+    while (x < end.dx) {
+      canvas.drawLine(
+        Offset(x, start.dy),
+        Offset(min(x + dash, end.dx), end.dy),
+        paint,
+      );
+      x += dash + gap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AdminTrendPainter oldDelegate) {
+    return oldDelegate.firstValues != firstValues ||
+        oldDelegate.secondValues != secondValues;
+  }
+}
+
+class _AdminDashboardFooter extends StatelessWidget {
+  const _AdminDashboardFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.only(top: 20),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: OpsColors.border)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.schedule_rounded, size: 16, color: OpsColors.muted),
+          SizedBox(width: 8),
+          Text('All times in IST (UTC +05:30)',
+              style: TextStyle(color: OpsColors.muted)),
+          Spacer(),
+          Icon(Icons.circle, size: 8, color: OpsColors.success),
+          SizedBox(width: 8),
+          Text('Platform updates refresh automatically',
+              style: TextStyle(color: OpsColors.muted)),
+        ],
+      ),
+    );
   }
 }
 
