@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
-import '../../analytics/analytics_page.dart';
-import '../../engineer/api/api_client.dart' as engineer_api_client;
-import '../../engineer/engineer_page.dart';
-import '../../super_admin/api/api_client.dart' as super_admin_api_client;
-import '../../super_admin/screens/admin_screen.dart';
-import '../../user/api/api_client.dart' as user_api_client;
-import '../../user/screens/user_login_screen.dart';
-import '../../user/user_page.dart';
-import '../../user_admin/api/api_client.dart' as user_admin_api_client;
-import '../../user_admin/user_admin_page.dart';
-import '../../vendor/api/api_client.dart' as vendor_api_client;
-import '../../vendor/vendor_page.dart';
+
+import '../../common/pages/dashboard/admin_dashboard.dart';
+import '../../common/pages/dashboard/analytics_dashboard.dart';
+import '../../common/pages/dashboard/analytics_role_dashboard.dart';
+import '../../common/pages/dashboard/engineer_dashboard.dart';
+import '../../common/pages/dashboard/user_admin_dashboard.dart';
+import '../../common/pages/dashboard/user_dashboard.dart';
+import '../../common/pages/dashboard/vendor_dashboard.dart';
+import '../../common/platform/api/api_client.dart';
 import 'app_session.dart';
+import 'global_login_screen.dart';
 
 class SessionCheckScreen extends StatefulWidget {
   const SessionCheckScreen({super.key});
@@ -37,51 +35,33 @@ class _SessionCheckScreenState extends State<SessionCheckScreen> {
       final role = sessionData['role'];
       final token = sessionData['token'];
 
-      // Restore API tokens based on role
       if (token != null && token.isNotEmpty) {
-        switch (role) {
-          case 'user':
-            await user_api_client.ApiClient.setAuthToken(token);
-            await super_admin_api_client.ApiClient.setAuthToken(token);
-            break;
-          case 'user_admin':
-            await user_admin_api_client.ApiClient.setAuthToken(token);
-            break;
-          case 'engineer':
-            await engineer_api_client.ApiClient.setAuthToken(token);
-            break;
-          case 'vendor':
-            await vendor_api_client.ApiClient.setAuthToken(token);
-            await super_admin_api_client.ApiClient.setAuthToken(token);
-            break;
-          case 'analytics':
-            await super_admin_api_client.ApiClient.setAuthToken(token);
-            break;
-          case 'super_admin':
-            await super_admin_api_client.ApiClient.setAuthToken(token);
-            break;
-        }
+        await ApiClient.setAuthToken(token);
       }
 
       Widget? targetPage;
       switch (role) {
         case 'user':
-          targetPage = const UserPage();
+          targetPage = const UserDashboardPage();
           break;
         case 'user_admin':
-          targetPage = const UserAdminPage();
+          targetPage = const UserAdminDashboardPage();
           break;
         case 'engineer':
-          targetPage = const EngineerPage();
+          targetPage = const EngineerDashboardPage();
           break;
         case 'vendor':
-          targetPage = const VendorPage();
+          targetPage = const VendorDashboardPage();
           break;
         case 'analytics':
-          targetPage = const AnalyticsPage();
+          targetPage = const AnalyticsDashboardPage();
           break;
+        case 'analytics_role':
+          targetPage = const AnalyticsRoleDashboardPage();
+          break;
+        case 'admin':
         case 'super_admin':
-          targetPage = const AdminScreen();
+          targetPage = const AdminDashboardPage();
           break;
       }
 
@@ -96,7 +76,7 @@ class _SessionCheckScreenState extends State<SessionCheckScreen> {
     if (mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => const UserLoginScreen(),
+          builder: (_) => const GlobalLoginScreen(),
         ),
       );
     }

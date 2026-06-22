@@ -5,17 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart'
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 
+import 'common/platform/core/providers/theme_riverpod_provider.dart';
+import 'common/platform/providers/super_admin_riverpod_provider.dart';
+import 'core/auth/app_role.dart';
 import 'core/auth/global_login_screen.dart';
 import 'core/theme/ops_theme.dart';
 import 'main_page.dart';
-import 'super_admin/core/providers/theme_riverpod_provider.dart';
-import 'super_admin/screens/super_admin_login_screen.dart';
-import 'user/screens/user_login_screen.dart';
-import 'user_admin/screens/user_admin_login_screen.dart';
-import 'engineer/screens/engineer_login_screen.dart';
-import 'vendor/screens/vendor_login_screen.dart';
-import 'analytics/screens/analytics_login_screen.dart';
-import 'super_admin/providers/super_admin_riverpod_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -67,7 +62,7 @@ class _AppRoot extends ConsumerWidget {
         ChangeNotifierProvider.value(value: superAdminDatabase),
       ],
       child: MaterialApp(
-        title: 'Industrial Tilt Super Admin',
+        title: 'Industrial Tilt Platform',
         debugShowCheckedModeBanner: false,
         scrollBehavior: const AppScrollBehavior(),
         theme: OpsTheme.light(),
@@ -83,14 +78,36 @@ class _AppRoot extends ConsumerWidget {
         },
         home: const MainPage(),
         routes: {
-          '/login': (context) => const UserLoginScreen(),
+          '/login': (context) => const GlobalLoginScreen(),
           '/login/global': (context) => const GlobalLoginScreen(),
-          '/login/user': (context) => const UserLoginScreen(),
-          '/login/user-admin': (context) => const UserAdminLoginScreen(),
-          '/login/engineer': (context) => const EngineerLoginScreen(),
-          '/login/super-admin': (context) => const SuperAdminLoginScreen(),
-          '/login/vendor': (context) => const VendorLoginScreen(),
-          '/login/analytics': (context) => const AnalyticsLoginScreen(),
+          '/login/user': (context) => const GlobalLoginScreen(
+                initialRole: AppLoginRole.user,
+                allowRoleSelection: false,
+              ),
+          '/login/user-admin': (context) => const GlobalLoginScreen(
+                initialRole: AppLoginRole.userAdmin,
+                allowRoleSelection: false,
+              ),
+          '/login/engineer': (context) => const GlobalLoginScreen(
+                initialRole: AppLoginRole.engineer,
+                allowRoleSelection: false,
+              ),
+          '/login/admin': (context) => const GlobalLoginScreen(
+                initialRole: AppLoginRole.admin,
+                allowRoleSelection: false,
+              ),
+          '/login/super-admin': (context) => const GlobalLoginScreen(
+                initialRole: AppLoginRole.admin,
+                allowRoleSelection: false,
+              ),
+          '/login/vendor': (context) => const GlobalLoginScreen(
+                initialRole: AppLoginRole.vendor,
+                allowRoleSelection: false,
+              ),
+          '/login/analytics': (context) => const GlobalLoginScreen(
+                initialRole: AppLoginRole.analytics,
+                allowRoleSelection: false,
+              ),
         },
       ),
     );

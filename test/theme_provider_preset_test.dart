@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:wowguardian/super_admin/providers/theme_provider.dart';
+import 'package:wowguardian/common/platform/providers/theme_provider.dart';
 
 Future<void> _drainAsync() async {
   await Future<void>.delayed(const Duration(milliseconds: 5));

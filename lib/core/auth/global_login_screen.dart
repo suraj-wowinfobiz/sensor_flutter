@@ -2,136 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 
-import '../../analytics/analytics_page.dart';
-import '../../analytics/api/analytics_login_api.dart';
-import '../../analytics_role/analytics_role_page.dart';
-import '../../analytics_role/api/analytics_role_login_api.dart';
-import '../../engineer/api/api_client.dart' as engineer_api_client;
-import '../../engineer/api/engineer_login_api.dart';
-import '../../engineer/engineer_page.dart';
-import '../../super_admin/api/api_client.dart' as super_admin_api_client;
-import '../../super_admin/api/super_admin_login_api.dart';
-import '../../super_admin/screens/admin_screen.dart';
-import '../../user/api/api_client.dart' as user_api_client;
-import '../../user/api/user_login_api.dart';
-import '../../user/user_page.dart';
-import '../../user_admin/api/api_client.dart' as user_admin_api_client;
-import '../../user_admin/api/user_admin_login_api.dart';
-import '../../user_admin/user_admin_page.dart';
-import '../../vendor/api/api_client.dart' as vendor_api_client;
-import '../../vendor/api/vendor_login_api.dart';
-import '../../vendor/vendor_page.dart';
+import '../../common/pages/dashboard/admin_dashboard.dart';
+import '../../common/pages/dashboard/analytics_dashboard.dart';
+import '../../common/pages/dashboard/analytics_role_dashboard.dart';
+import '../../common/pages/dashboard/engineer_dashboard.dart';
+import '../../common/pages/dashboard/user_admin_dashboard.dart';
+import '../../common/pages/dashboard/user_dashboard.dart';
+import '../../common/pages/dashboard/vendor_dashboard.dart';
+import '../../common/platform/api/api_client.dart';
+import '../../common/platform/core/api/auth_api.dart';
 import '../theme/ops_theme.dart';
+import 'app_role.dart';
 import 'app_session.dart';
-
-enum AppLoginRole {
-  user,
-  userAdmin,
-  engineer,
-  vendor,
-  analytics,
-  analyticsRole,
-  superAdmin,
-}
-
-extension AppLoginRoleX on AppLoginRole {
-  String get label {
-    switch (this) {
-      case AppLoginRole.user:
-        return 'User';
-      case AppLoginRole.userAdmin:
-        return 'User Admin';
-      case AppLoginRole.engineer:
-        return 'Engineer';
-      case AppLoginRole.vendor:
-        return 'Vendor';
-      case AppLoginRole.analytics:
-        return 'Analytics';
-      case AppLoginRole.analyticsRole:
-        return 'Analytics Role';
-      case AppLoginRole.superAdmin:
-        return 'Super Admin';
-    }
-  }
-
-  String get description {
-    switch (this) {
-      case AppLoginRole.user:
-        return 'Monitor sensors, devices, alerts, and live site activity.';
-      case AppLoginRole.userAdmin:
-        return 'Manage users, organizations, and operational access.';
-      case AppLoginRole.engineer:
-        return 'Configure devices, sensors, and engineering workflows.';
-      case AppLoginRole.vendor:
-        return 'Access vendor operations, customers, and support tools.';
-      case AppLoginRole.analytics:
-        return 'Review analytics dashboards and site performance trends.';
-      case AppLoginRole.analyticsRole:
-        return 'Review assigned analytics workspaces and performance signals.';
-      case AppLoginRole.superAdmin:
-        return 'Control platform-wide configuration and administration.';
-    }
-  }
-
-  String get emailHint {
-    switch (this) {
-      case AppLoginRole.user:
-        return 'user@example.com';
-      case AppLoginRole.userAdmin:
-        return 'useradmin@example.com';
-      case AppLoginRole.engineer:
-        return 'engineer@example.com';
-      case AppLoginRole.vendor:
-        return 'vendor@example.com';
-      case AppLoginRole.analytics:
-        return 'analytics@example.com';
-      case AppLoginRole.analyticsRole:
-        return 'analytics-role@example.com';
-      case AppLoginRole.superAdmin:
-        return 'admin@example.com';
-    }
-  }
-
-  IconData get icon {
-    switch (this) {
-      case AppLoginRole.user:
-        return Icons.person_outline;
-      case AppLoginRole.userAdmin:
-        return Icons.admin_panel_settings_outlined;
-      case AppLoginRole.engineer:
-        return Icons.engineering_outlined;
-      case AppLoginRole.vendor:
-        return Icons.storefront_outlined;
-      case AppLoginRole.analytics:
-        return Icons.insights_outlined;
-      case AppLoginRole.analyticsRole:
-        return Icons.query_stats_outlined;
-      case AppLoginRole.superAdmin:
-        return Icons.security_outlined;
-    }
-  }
-
-  String get principalKey {
-    switch (this) {
-      case AppLoginRole.user:
-        return 'user_principal_id';
-      case AppLoginRole.userAdmin:
-        return 'user_admin_principal_id';
-      case AppLoginRole.engineer:
-        return 'engineer_principal_id';
-      case AppLoginRole.vendor:
-        return 'vendor_principal_id';
-      case AppLoginRole.analytics:
-        return 'analytics_principal_id';
-      case AppLoginRole.analyticsRole:
-        return 'analytics_role_principal_id';
-      case AppLoginRole.superAdmin:
-        return 'super_admin_principal_id';
-    }
-  }
-
-  String get rememberValue => name;
-}
 
 class GlobalLoginScreen extends StatefulWidget {
   final AppLoginRole initialRole;
@@ -275,188 +157,41 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   Future<void> _loginWithApi() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
-
-    switch (_selectedRole) {
-      case AppLoginRole.user:
-        final response =
-            await UserLoginApi.login(email: email, password: password);
-        if (response.status.toUpperCase() != 'SUCCESS') {
-          throw response.message;
-        }
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-            _selectedRole.principalKey, response.body.principalId.trim());
-        await user_api_client.ApiClient.setAuthToken(response.body.token);
-        await super_admin_api_client.ApiClient.setAuthToken(
-            response.body.token);
-        await AppSession.saveSession(
-          token: response.body.token,
-          username: email,
-          role: 'user',
-        );
-        await _pushHome(const UserPage());
-        return;
-      case AppLoginRole.userAdmin:
-        final response =
-            await UserAdminLoginApi.login(email: email, password: password);
-        if (response.status.toUpperCase() != 'SUCCESS') {
-          throw response.message;
-        }
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-            _selectedRole.principalKey, response.body.principalId.trim());
-        await user_admin_api_client.ApiClient.setAuthToken(response.body.token);
-        await AppSession.saveSession(
-          token: response.body.token,
-          username: email,
-          role: 'user_admin',
-        );
-        await _pushHome(const UserAdminPage());
-        return;
-      case AppLoginRole.engineer:
-        final response =
-            await EngineerLoginApi.login(email: email, password: password);
-        if (response.status.toUpperCase() != 'SUCCESS') {
-          throw response.message;
-        }
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-            _selectedRole.principalKey, response.body.principalId.trim());
-        await engineer_api_client.ApiClient.setAuthToken(response.body.token);
-        await AppSession.saveSession(
-          token: response.body.token,
-          username: email,
-          role: 'engineer',
-        );
-        await _pushHome(const EngineerPage());
-        return;
-      case AppLoginRole.vendor:
-        final response =
-            await VendorLoginApi.login(email: email, password: password);
-        if (response.status.toUpperCase() != 'SUCCESS') {
-          throw response.message;
-        }
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-            _selectedRole.principalKey, response.body.principalId.trim());
-        await vendor_api_client.ApiClient.setAuthToken(response.body.token);
-        await super_admin_api_client.ApiClient.setAuthToken(
-            response.body.token);
-        await AppSession.saveSession(
-          token: response.body.token,
-          username: email,
-          role: 'vendor',
-        );
-        await _pushHome(const VendorPage());
-        return;
-      case AppLoginRole.analytics:
-        if (email == 'analytics' && password == '123456') {
-          try {
-            final response =
-                await AnalyticsLoginApi.login(email: email, password: password);
-            if (response.status.toUpperCase() == 'SUCCESS') {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setString(
-                  _selectedRole.principalKey, response.body.principalId.trim());
-              await super_admin_api_client.ApiClient.setAuthToken(
-                  response.body.token);
-              await AppSession.saveSession(
-                token: response.body.token,
-                username: email,
-                role: 'analytics',
-              );
-            }
-          } catch (_) {
-            await AppSession.saveSession(
-              token: 'hardcoded_analytics_token',
-              username: email,
-              role: 'analytics',
-            );
-          }
-          await _pushHome(const AnalyticsPage());
-          return;
-        }
-
-        final response =
-            await AnalyticsLoginApi.login(email: email, password: password);
-        if (response.status.toUpperCase() != 'SUCCESS') {
-          throw response.message;
-        }
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-            _selectedRole.principalKey, response.body.principalId.trim());
-        await super_admin_api_client.ApiClient.setAuthToken(
-            response.body.token);
-        await AppSession.saveSession(
-          token: response.body.token,
-          username: email,
-          role: 'analytics',
-        );
-        await _pushHome(const AnalyticsPage());
-        return;
-      case AppLoginRole.analyticsRole:
-        final response =
-            await AnalyticsRoleLoginApi.login(email: email, password: password);
-        if (response.status.toUpperCase() != 'SUCCESS') {
-          throw response.message;
-        }
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-            _selectedRole.principalKey, response.body.principalId.trim());
-        await super_admin_api_client.ApiClient.setAuthToken(
-            response.body.token);
-        await AppSession.saveSession(
-          token: response.body.token,
-          username: email,
-          role: 'analytics_role',
-        );
-        await _pushHome(const AnalyticsRolePage());
-        return;
-      case AppLoginRole.superAdmin:
-        final response =
-            await SuperAdminLoginApi.login(email: email, password: password);
-        if (response.status.toUpperCase() != 'SUCCESS') {
-          throw response.message;
-        }
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-            _selectedRole.principalKey, response.body.principalId.trim());
-        await super_admin_api_client.ApiClient.setAuthToken(
-            response.body.token);
-        await AppSession.saveSession(
-          token: response.body.token,
-          username: email,
-          role: 'super_admin',
-        );
-        await _pushHome(const AdminScreen());
-        return;
+    final response = await AuthApi.login(
+      LoginRequest(
+        email: email,
+        password: password,
+        role: _selectedRole.loginRoleValue,
+      ),
+    );
+    if (response.status.toUpperCase() != 'SUCCESS') {
+      throw response.message;
     }
+
+    final prefs = await SharedPreferences.getInstance();
+    final principalId = response.body.principalId.trim();
+    if (principalId.isNotEmpty) {
+      await prefs.setString(_selectedRole.principalKey, principalId);
+    }
+
+    await ApiClient.setAuthToken(response.body.token);
+    await AppSession.saveSession(
+      token: response.body.token,
+      username: email,
+      role: _selectedRole.sessionValue,
+    );
+    await _pushHome(_homePageForRole(_selectedRole));
   }
 
   Future<void> _openBypassPage() async {
-    switch (_selectedRole) {
-      case AppLoginRole.user:
-        await _pushHome(const UserPage());
-        return;
-      case AppLoginRole.userAdmin:
-        await _pushHome(const UserAdminPage());
-        return;
-      case AppLoginRole.engineer:
-        await _pushHome(const EngineerPage());
-        return;
-      case AppLoginRole.vendor:
-        await _pushHome(const VendorPage());
-        return;
-      case AppLoginRole.analytics:
-        await _pushHome(const AnalyticsPage());
-        return;
-      case AppLoginRole.analyticsRole:
-        await _pushHome(const AnalyticsRolePage());
-        return;
-      case AppLoginRole.superAdmin:
-        await _pushHome(const AdminScreen());
-        return;
-    }
+    await AppSession.saveSession(
+      token: 'bypass_${_selectedRole.sessionValue}',
+      username: _emailController.text.trim().isEmpty
+          ? _selectedRole.emailHint
+          : _emailController.text.trim(),
+      role: _selectedRole.sessionValue,
+    );
+    await _pushHome(_homePageForRole(_selectedRole));
   }
 
   Future<void> _pushHome(Widget page) async {
@@ -464,6 +199,25 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => page),
     );
+  }
+
+  Widget _homePageForRole(AppLoginRole role) {
+    switch (role) {
+      case AppLoginRole.user:
+        return const UserDashboardPage();
+      case AppLoginRole.userAdmin:
+        return const UserAdminDashboardPage();
+      case AppLoginRole.engineer:
+        return const EngineerDashboardPage();
+      case AppLoginRole.vendor:
+        return const VendorDashboardPage();
+      case AppLoginRole.analytics:
+        return const AnalyticsDashboardPage();
+      case AppLoginRole.analyticsRole:
+        return const AnalyticsRoleDashboardPage();
+      case AppLoginRole.admin:
+        return const AdminDashboardPage();
+    }
   }
 
   @override
@@ -882,9 +636,8 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   maxWidth: 1240,
-                  minHeight: stacked
-                      ? (isPhone ? size.height : 0)
-                      : panelMinHeight,
+                  minHeight:
+                      stacked ? (isPhone ? size.height : 0) : panelMinHeight,
                 ),
                 child: stacked
                     ? Container(
@@ -1116,52 +869,54 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 14),
-                    DropdownButtonFormField<AppLoginRole>(
-                      initialValue: _selectedRole,
-                      decoration: InputDecoration(
-                        hintText: 'Select login type',
-                        fillColor: const Color(0xFFF6F8FF),
-                        filled: true,
-                        prefixIcon: Icon(
-                          _selectedRole.icon,
-                          color:
-                              OpsColors.primaryContainer.withValues(alpha: 0.78),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF2B63F1),
-                            width: 1.4,
+                    if (widget.allowRoleSelection) ...[
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<AppLoginRole>(
+                        initialValue: _selectedRole,
+                        decoration: InputDecoration(
+                          hintText: 'Select login type',
+                          fillColor: const Color(0xFFF6F8FF),
+                          filled: true,
+                          prefixIcon: Icon(
+                            _selectedRole.icon,
+                            color: OpsColors.primaryContainer
+                                .withValues(alpha: 0.78),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF2B63F1),
+                              width: 1.4,
+                            ),
                           ),
                         ),
+                        items: AppLoginRole.values
+                            .map(
+                              (role) => DropdownMenuItem<AppLoginRole>(
+                                value: role,
+                                child: Text(role.label),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (role) {
+                          if (role == null) return;
+                          setState(() => _selectedRole = role);
+                        },
                       ),
-                      items: AppLoginRole.values
-                          .map(
-                            (role) => DropdownMenuItem<AppLoginRole>(
-                              value: role,
-                              child: Text(role.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (role) {
-                        if (role == null) return;
-                        setState(() => _selectedRole = role);
-                      },
-                    ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 12),
+                    ],
                     LayoutBuilder(
                       builder: (context, constraints) {
                         return _buildRememberAndForgotRow(
@@ -1426,8 +1181,8 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF245BFF)
-                                .withValues(alpha: 0.20),
+                            color:
+                                const Color(0xFF245BFF).withValues(alpha: 0.20),
                             blurRadius: 22,
                             offset: const Offset(0, 12),
                           ),
@@ -1481,8 +1236,8 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: OpsColors.primaryContainer,
                         side: BorderSide(
-                          color:
-                              OpsColors.primaryContainer.withValues(alpha: 0.42),
+                          color: OpsColors.primaryContainer
+                              .withValues(alpha: 0.42),
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),

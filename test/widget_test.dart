@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:wowguardian/main.dart';
+import 'package:wowguardian/core/auth/app_role.dart';
 import 'package:wowguardian/core/auth/global_login_screen.dart';
 import 'package:wowguardian/main_page.dart';
 
@@ -28,11 +29,11 @@ void main() {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Request Demo').first);
+    await tester.tap(find.text('Login').first);
     await tester.pumpAndSettle();
 
     expect(find.byType(GlobalLoginScreen), findsOneWidget);
-    expect(find.text('Log in to your account'), findsOneWidget);
+    expect(find.text('User Login'), findsOneWidget);
   });
 
   testWidgets('user login stays responsive without overflow on tighter screens',
@@ -49,9 +50,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Project Alpha'), findsOneWidget);
+    expect(find.text('User Login'), findsOneWidget);
     expect(find.text('Remember me'), findsOneWidget);
-    expect(find.text('Log In'), findsOneWidget);
+    expect(find.text('LOGIN'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

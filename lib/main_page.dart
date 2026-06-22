@@ -3,7 +3,6 @@ import 'package:video_player/video_player.dart';
 
 import 'core/auth/global_login_screen.dart';
 import 'core/theme/ops_theme.dart';
-import 'user/screens/user_login_screen.dart';
 
 void main() {
   runApp(const SiteGuardianApp());
@@ -20,7 +19,7 @@ class SiteGuardianApp extends StatelessWidget {
       theme: OpsTheme.light(),
       home: const MainPage(),
       routes: {
-        '/login': (context) => const UserLoginScreen(),
+        '/login': (context) => const GlobalLoginScreen(),
         '/login/global': (context) => const GlobalLoginScreen(),
         '/global-login': (context) => const GlobalLoginScreen(),
       },
@@ -162,9 +161,8 @@ class _MainPageState extends State<MainPage> {
                       : isMobile
                           ? 16
                           : 18,
-                  color: bodyColor.withValues(alpha: bodyColor == Colors.white
-                      ? .88
-                      : 1),
+                  color: bodyColor.withValues(
+                      alpha: bodyColor == Colors.white ? .88 : 1),
                   height: 1.6,
                 ),
               ),
@@ -359,7 +357,8 @@ class _MainPageState extends State<MainPage> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 22, 16, 30),
                           child: LayoutBuilder(
-                            builder: (context, constraints) => _buildHeroContent(
+                            builder: (context, constraints) =>
+                                _buildHeroContent(
                               isMobile: true,
                               isPhone: true,
                               constraints: constraints,
