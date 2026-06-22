@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/ops_theme.dart';
+import '../../shared/widgets/universal_table.dart';
 import '../api/alerts_api.dart';
 import '../api/sensor_api.dart';
 import '../models/alert.dart';
@@ -785,53 +786,43 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
               style: const TextStyle(color: OpsColors.muted),
             )
           else
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: _tableFrame(
-                DataTable(
-                  columns: const [
-                    DataColumn(label: Text('NAME')),
-                    DataColumn(label: Text('DESCRIPTION')),
-                    DataColumn(label: Text('ACTIONS')),
+            UniversalDataTable(
+              minWidth: 680,
+              columns: const [
+                DataColumn(label: UniversalTableHeaderText('NAME')),
+                DataColumn(label: UniversalTableHeaderText('DESCRIPTION')),
+                DataColumn(label: UniversalTableHeaderText('ACTIONS')),
+              ],
+              rows: db.thresholdProfiles.map<DataRow>((profile) {
+                return DataRow(
+                  cells: [
+                    DataCell(
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 220),
+                        child: UniversalTableText(profile.name),
+                      ),
+                    ),
+                    DataCell(
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 340),
+                        child: UniversalTableText(
+                          profile.description.trim().isEmpty
+                              ? '--'
+                              : profile.description,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      IconButton(
+                        tooltip: 'Delete profile',
+                        onPressed: () =>
+                            _deleteThresholdProfile(context, profile.id),
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ),
                   ],
-                  rows: db.thresholdProfiles.map<DataRow>((profile) {
-                    return DataRow(
-                      cells: [
-                        DataCell(
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 220),
-                            child: Text(
-                              profile.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 340),
-                            child: Text(
-                              profile.description.trim().isEmpty
-                                  ? '--'
-                                  : profile.description,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          IconButton(
-                            tooltip: 'Delete profile',
-                            onPressed: () =>
-                                _deleteThresholdProfile(context, profile.id),
-                            icon: const Icon(Icons.delete_outline),
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
-                ),
-              ),
+                );
+              }).toList(),
             ),
           const SizedBox(height: 18),
           Text(
@@ -849,78 +840,64 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
               style: const TextStyle(color: OpsColors.muted),
             )
           else
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: _tableFrame(DataTable(
-                columns: const [
-                  DataColumn(label: Text('PROFILE')),
-                  DataColumn(label: Text('SENSOR PARAMETER')),
-                  DataColumn(label: Text('MIN')),
-                  DataColumn(label: Text('MAX')),
-                  DataColumn(label: Text('WARNING')),
-                  DataColumn(label: Text('CRITICAL')),
-                  DataColumn(label: Text('ACTIONS')),
-                ],
-                rows: db.thresholdValues.map<DataRow>((value) {
-                  final profileName =
-                      profileNameById[value.thresholdProfileId] ??
-                          value.thresholdProfileId;
-                  final parameterName =
-                      sensorParameterLabelById[value.sensorParameterId] ??
-                          value.sensorParameterId;
-                  return DataRow(
-                    cells: [
-                      DataCell(
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 180),
-                          child: Text(
-                            profileName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
+            UniversalDataTable(
+              minWidth: 980,
+              columns: const [
+                DataColumn(label: UniversalTableHeaderText('PROFILE')),
+                DataColumn(label: UniversalTableHeaderText('SENSOR PARAMETER')),
+                DataColumn(label: UniversalTableHeaderText('MIN')),
+                DataColumn(label: UniversalTableHeaderText('MAX')),
+                DataColumn(label: UniversalTableHeaderText('WARNING')),
+                DataColumn(label: UniversalTableHeaderText('CRITICAL')),
+                DataColumn(label: UniversalTableHeaderText('ACTIONS')),
+              ],
+              rows: db.thresholdValues.map<DataRow>((value) {
+                final profileName = profileNameById[value.thresholdProfileId] ??
+                    value.thresholdProfileId;
+                final parameterName =
+                    sensorParameterLabelById[value.sensorParameterId] ??
+                        value.sensorParameterId;
+                return DataRow(
+                  cells: [
+                    DataCell(
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 180),
+                        child: UniversalTableText(profileName),
                       ),
-                      DataCell(
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 180),
-                          child: Text(
-                            parameterName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
+                    ),
+                    DataCell(
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 180),
+                        child: UniversalTableText(parameterName),
                       ),
-                      DataCell(Text(value.minThreshold.toStringAsFixed(2))),
-                      DataCell(Text(value.maxThreshold.toStringAsFixed(2))),
-                      DataCell(Text(value.warningLevel.toStringAsFixed(2))),
-                      DataCell(Text(value.criticalLevel.toStringAsFixed(2))),
-                      DataCell(
-                        IconButton(
-                          tooltip: 'Delete value',
-                          onPressed: () =>
-                              _deleteThresholdValue(context, value.id),
-                          icon: const Icon(Icons.delete_outline),
-                        ),
+                    ),
+                    DataCell(
+                      UniversalTableText(value.minThreshold.toStringAsFixed(2)),
+                    ),
+                    DataCell(
+                      UniversalTableText(value.maxThreshold.toStringAsFixed(2)),
+                    ),
+                    DataCell(
+                      UniversalTableText(value.warningLevel.toStringAsFixed(2)),
+                    ),
+                    DataCell(
+                      UniversalTableText(
+                          value.criticalLevel.toStringAsFixed(2)),
+                    ),
+                    DataCell(
+                      IconButton(
+                        tooltip: 'Delete value',
+                        onPressed: () =>
+                            _deleteThresholdValue(context, value.id),
+                        icon: const Icon(Icons.delete_outline),
                       ),
-                    ],
-                  );
-                }).toList(),
-              )),
+                    ),
+                  ],
+                );
+              }).toList(),
             ),
         ],
       ),
-    );
-  }
-
-  Widget _tableFrame(Widget child) {
-    return Container(
-      decoration: BoxDecoration(
-        color: OpsColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: OpsColors.border),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: child,
     );
   }
 
@@ -989,7 +966,8 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
               ),
               OpsKpiCard(
                 label: 'Sensor Sources',
-                value: '${allAlerts.map((a) => a.sensorId).where((id) => id.trim().isNotEmpty).toSet().length}',
+                value:
+                    '${allAlerts.map((a) => a.sensorId).where((id) => id.trim().isNotEmpty).toSet().length}',
                 helper: 'Distinct sensors',
                 icon: Icons.sensors_outlined,
               ),

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/ops_theme.dart';
 import '../../user/widgets/ops_data_table.dart';
+import '../../shared/widgets/universal_table.dart';
 import '../providers/super_admin_api_riverpod_provider.dart';
 import '../providers/super_admin_riverpod_provider.dart';
 import '../services/analytics_sse_service.dart';
@@ -719,13 +720,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
               OpsKpiCard(
                 label: 'Vendors',
-                value: '${db.users.where((u) => u.role.toLowerCase().contains('vendor')).length}',
+                value:
+                    '${db.users.where((u) => u.role.toLowerCase().contains('vendor')).length}',
                 helper: 'Partner accounts',
                 icon: Icons.storefront_outlined,
               ),
               OpsKpiCard(
                 label: 'Engineers',
-                value: '${db.users.where((u) => u.role.toLowerCase().contains('engineer')).length}',
+                value:
+                    '${db.users.where((u) => u.role.toLowerCase().contains('engineer')).length}',
                 helper: 'Field & support',
                 icon: Icons.engineering_outlined,
                 color: OpsColors.primaryContainer,
@@ -2128,41 +2131,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Container(
-              decoration: BoxDecoration(
-                color: OpsColors.surface,
-                border: Border.all(color: OpsColors.border),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: DataTable(
-                columns: [
-                  _tableHeading(context, 'Type'),
-                  _tableHeading(context, 'Asset'),
-                  _tableHeading(context, 'Organization'),
-                  _tableHeading(context, 'Site'),
-                  _tableHeading(context, 'Zone'),
-                  _tableHeading(context, 'Installed'),
-                ],
-                rows: (recentRows.isEmpty
-                        ? const [
-                            ['--', '--', '--', '--', '--', '--']
-                          ]
-                        : recentRows)
-                    .map((r) {
-                  return DataRow(cells: [
-                    DataCell(Text(r[0])),
-                    DataCell(Text(r[1])),
-                    DataCell(Text(r[2])),
-                    DataCell(Text(r[3])),
-                    DataCell(Text(r[4])),
-                    DataCell(Text(r[5])),
-                  ]);
-                }).toList(),
-              ),
-            ),
+          UniversalDataTable(
+            minWidth: 900,
+            columns: [
+              _tableHeading(context, 'Type'),
+              _tableHeading(context, 'Asset'),
+              _tableHeading(context, 'Organization'),
+              _tableHeading(context, 'Site'),
+              _tableHeading(context, 'Zone'),
+              _tableHeading(context, 'Installed'),
+            ],
+            rows: (recentRows.isEmpty
+                    ? const [
+                        ['--', '--', '--', '--', '--', '--']
+                      ]
+                    : recentRows)
+                .map((r) {
+              return DataRow(cells: [
+                DataCell(UniversalTableText(r[0])),
+                DataCell(UniversalTableText(r[1])),
+                DataCell(UniversalTableText(r[2])),
+                DataCell(UniversalTableText(r[3])),
+                DataCell(UniversalTableText(r[4])),
+                DataCell(UniversalTableText(r[5])),
+              ]);
+            }).toList(),
           ),
         ],
       ),
@@ -2171,7 +2164,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   DataColumn _tableHeading(BuildContext context, String label) {
     return DataColumn(
-      label: Text(
+      label: UniversalTableHeaderText(
         label.toUpperCase(),
       ),
     );
@@ -3353,72 +3346,65 @@ class _AdminLiveFeed extends StatelessWidget {
         alert.sensorId.toString().trim().isEmpty
             ? 'Unknown'
             : alert.sensorId.toString().trim(),
-        color
       );
     }).toList();
 
-    if (display.isEmpty) {
-      return const OpsEmptyState(
-        title: 'No live updates',
-        message: 'There are no unresolved alert events to show right now.',
-        icon: Icons.notifications_none_rounded,
-      );
-    }
-
     return Column(
-      children: display.indexed.map((entry) {
-        final index = entry.$1;
-        final row = entry.$2;
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            border: index == display.length - 1
-                ? null
-                : const Border(
-                    bottom: BorderSide(color: Color(0xFFECEEF0)),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _LiveCameraPreview(
+          activeAlerts: display.length,
+          hasCritical: display.any((entry) => entry.$2 == OpsColors.danger),
+        ),
+        const SizedBox(height: 16),
+        if (display.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: OpsColors.surfaceLow,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: OpsColors.border),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Camera Status',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: OpsColors.text,
                   ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'All monitored zones are stable. No unresolved alert events are linked to the live camera view right now.',
+                  style: TextStyle(
+                    color: OpsColors.muted,
+                    fontSize: 13,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Column(
+            children: display.indexed.map((entry) {
+              final index = entry.$1;
+              final row = entry.$2;
+              return _LiveFeedActivityRow(
+                icon: row.$1,
+                tint: row.$2,
+                title: row.$3,
+                timeLabel: row.$4,
+                assetLabel: row.$5,
+                showDivider: index != display.length - 1,
+              );
+            }).toList(),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                margin: const EdgeInsets.only(right: 12),
-                decoration: BoxDecoration(
-                  color: row.$2.withValues(alpha: .10),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Icon(row.$1, color: row.$2, size: 18),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      row.$3,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(row.$4, style: Theme.of(context).textTheme.labelSmall),
-                  ],
-                ),
-              ),
-              Text(
-                row.$5,
-                style: TextStyle(
-                  color: row.$6,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
+      ],
     );
   }
 
@@ -3439,6 +3425,250 @@ class _AdminLiveFeed extends StatelessWidget {
   }
 }
 
+class _LiveCameraPreview extends StatelessWidget {
+  final int activeAlerts;
+  final bool hasCritical;
+
+  const _LiveCameraPreview({
+    required this.activeAlerts,
+    required this.hasCritical,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = hasCritical ? OpsColors.danger : OpsColors.success;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              'assets/images/construction.jpg',
+              fit: BoxFit.cover,
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.12),
+                    Colors.black.withValues(alpha: 0.20),
+                    Colors.black.withValues(alpha: 0.58),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.36),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.16),
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.videocam_rounded,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              'CAM 01',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: .45,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: accent.withValues(alpha: 0.55),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.circle, size: 8, color: accent),
+                            const SizedBox(width: 6),
+                            Text(
+                              hasCritical ? 'ATTENTION' : 'MONITORING',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: .45,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.40),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.12),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Perimeter Camera View',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                activeAlerts == 0
+                                    ? 'Live site camera linked to the central monitoring console.'
+                                    : '$activeAlerts unresolved event${activeAlerts == 1 ? '' : 's'} detected near the monitored zone.',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.84),
+                                  fontSize: 12.5,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Container(
+                          width: 54,
+                          height: 54,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.center_focus_strong_rounded,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveFeedActivityRow extends StatelessWidget {
+  final IconData icon;
+  final Color tint;
+  final String title;
+  final String timeLabel;
+  final String assetLabel;
+  final bool showDivider;
+
+  const _LiveFeedActivityRow({
+    required this.icon,
+    required this.tint,
+    required this.title,
+    required this.timeLabel,
+    required this.assetLabel,
+    required this.showDivider,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        border: showDivider
+            ? const Border(
+                bottom: BorderSide(color: Color(0xFFECEEF0)),
+              )
+            : null,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            margin: const EdgeInsets.only(right: 12),
+            decoration: BoxDecoration(
+              color: tint.withValues(alpha: .10),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Icon(icon, color: tint, size: 18),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(timeLabel, style: Theme.of(context).textTheme.labelSmall),
+              ],
+            ),
+          ),
+          Text(
+            assetLabel,
+            style: TextStyle(
+              color: tint,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AdminOverviewTable extends StatelessWidget {
   final dynamic db;
 
@@ -3447,8 +3677,9 @@ class _AdminOverviewTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rows = (db.sites as List).map((site) {
-      final siteDevices =
-          (db.devices as List).where((device) => device.siteId == site.id).toList();
+      final siteDevices = (db.devices as List)
+          .where((device) => device.siteId == site.id)
+          .toList();
       final siteDeviceIds = siteDevices.map((device) => device.id).toSet();
       final siteSensors = (db.sensors as List)
           .where((sensor) => siteDeviceIds.contains(sensor.deviceId))

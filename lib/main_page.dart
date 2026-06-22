@@ -64,6 +64,151 @@ class _MainPageState extends State<MainPage> {
     Navigator.pushNamed(context, '/login');
   }
 
+  Widget _buildHeroMedia() {
+    if (_bgController != null && _bgController!.value.isInitialized) {
+      return FittedBox(
+        fit: BoxFit.cover,
+        clipBehavior: Clip.hardEdge,
+        child: SizedBox(
+          width: _bgController!.value.size.width,
+          height: _bgController!.value.size.height,
+          child: VideoPlayer(_bgController!),
+        ),
+      );
+    }
+
+    return Image.asset(
+      'assets/images/construction.jpg',
+      fit: BoxFit.cover,
+    );
+  }
+
+  Widget _buildHeroContent({
+    required bool isMobile,
+    required bool isPhone,
+    required BoxConstraints constraints,
+    Color titleColor = Colors.white,
+    Color bodyColor = Colors.white,
+    bool showBadge = true,
+    bool fullWidthButtons = false,
+  }) {
+    final contentWidth = isMobile ? constraints.maxWidth : 680.0;
+    final compactCtas = fullWidthButtons || constraints.maxWidth < 460;
+    final subtitleWidth = isMobile ? contentWidth : contentWidth * 0.8;
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: contentWidth),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showBadge) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: titleColor == Colors.white
+                      ? Colors.white.withValues(alpha: .12)
+                      : OpsColors.primary.withValues(alpha: .08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: titleColor == Colors.white
+                        ? Colors.white.withValues(alpha: .24)
+                        : OpsColors.primary.withValues(alpha: .20),
+                  ),
+                ),
+                child: Text(
+                  'LIVE CONSTRUCTION MONITORING',
+                  style: TextStyle(
+                    color: titleColor == Colors.white
+                        ? Colors.white
+                        : OpsColors.primary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .7,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+            Text(
+              'Smart Sensors for Safer Construction Sites',
+              softWrap: true,
+              style: TextStyle(
+                fontSize: isPhone
+                    ? 28
+                    : isMobile
+                        ? 36
+                        : 52,
+                fontWeight: FontWeight.w800,
+                color: titleColor,
+                height: 1.15,
+              ),
+            ),
+            const SizedBox(height: 18),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: subtitleWidth),
+              child: Text(
+                'Track air quality, vibration, noise, and worker safety with one connected sensor platform built for industrial job sites.',
+                softWrap: true,
+                style: TextStyle(
+                  fontSize: isPhone
+                      ? 15
+                      : isMobile
+                          ? 16
+                          : 18,
+                  color: bodyColor.withValues(alpha: bodyColor == Colors.white
+                      ? .88
+                      : 1),
+                  height: 1.6,
+                ),
+              ),
+            ),
+            const SizedBox(height: 28),
+            Wrap(
+              spacing: 14,
+              runSpacing: 14,
+              children: [
+                SizedBox(
+                  width: compactCtas ? constraints.maxWidth : null,
+                  child: ElevatedButton(
+                    onPressed: _openLogin,
+                    child: const Text('Login'),
+                  ),
+                ),
+                SizedBox(
+                  width: compactCtas ? constraints.maxWidth : null,
+                  child: OutlinedButton(
+                    onPressed: () => _scrollToSection('features'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: titleColor == Colors.white
+                          ? Colors.white
+                          : OpsColors.primary,
+                      side: BorderSide(
+                        color: titleColor == Colors.white
+                            ? Colors.white.withValues(alpha: .42)
+                            : OpsColors.primary.withValues(alpha: .30),
+                      ),
+                      backgroundColor: titleColor == Colors.white
+                          ? Colors.white.withValues(alpha: .08)
+                          : Colors.white,
+                    ),
+                    child: const Text('Explore Features'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -90,8 +235,10 @@ class _MainPageState extends State<MainPage> {
     final screenSize = MediaQuery.sizeOf(context);
     final screenWidth = screenSize.width;
     final isMobile = screenWidth < 900;
-    final heroHeight =
-        isMobile ? 560.0 : (screenSize.height * 0.78).clamp(560.0, 760.0);
+    final isPhone = screenWidth < 600;
+    final heroHeight = isMobile
+        ? (isPhone ? 500.0 : 560.0)
+        : (screenSize.height * 0.78).clamp(560.0, 760.0);
 
     return Scaffold(
       backgroundColor: OpsColors.background,
@@ -101,7 +248,7 @@ class _MainPageState extends State<MainPage> {
           SliverAppBar(
             pinned: true,
             elevation: 0,
-            toolbarHeight: 76,
+            toolbarHeight: isPhone ? 68 : 76,
             backgroundColor: OpsColors.surface.withValues(alpha: .96),
             surfaceTintColor: Colors.transparent,
             title: const _Brand(),
@@ -181,173 +328,97 @@ class _MainPageState extends State<MainPage> {
             ),
           SliverToBoxAdapter(
             key: _sectionKeys['home'],
-            child: SizedBox(
-              height: heroHeight,
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: OpsColors.text,
-                ),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    if (_bgController != null &&
-                        _bgController!.value.isInitialized)
-                      FittedBox(
-                        fit: BoxFit.cover,
-                        clipBehavior: Clip.hardEdge,
-                        child: SizedBox(
-                          width: _bgController!.value.size.width,
-                          height: _bgController!.value.size.height,
-                          child: VideoPlayer(_bgController!),
-                        ),
-                      )
-                    else
-                      Image.asset(
-                        'assets/images/construction.jpg',
-                        fit: BoxFit.cover,
-                      ),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            OpsColors.text.withValues(alpha: .78),
-                            OpsColors.primary.withValues(alpha: .62),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.center,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1280),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isMobile ? 20 : 32,
-                            vertical: isMobile ? 40 : 84,
-                          ),
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final contentWidth =
-                                  isMobile ? constraints.maxWidth : 680.0;
-                              final compactCtas = constraints.maxWidth < 460;
-                              final subtitleWidth =
-                                  isMobile ? contentWidth : contentWidth * 0.8;
-
-                              return Align(
-                                alignment: Alignment.centerLeft,
-                                child: ConstrainedBox(
-                                  constraints:
-                                      BoxConstraints(maxWidth: contentWidth),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white
-                                              .withValues(alpha: .12),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                          border: Border.all(
-                                            color: Colors.white
-                                                .withValues(alpha: .24),
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          'LIVE CONSTRUCTION MONITORING',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: .7,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 20),
-                                      Text(
-                                        'Smart Sensors for Safer Construction Sites',
-                                        softWrap: true,
-                                        style: TextStyle(
-                                          fontSize: isMobile ? 36 : 52,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.white,
-                                          height: 1.15,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 18),
-                                      ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                          maxWidth: subtitleWidth,
-                                        ),
-                                        child: Text(
-                                          'Track air quality, vibration, noise, and worker safety with one connected sensor platform built for industrial job sites.',
-                                          softWrap: true,
-                                          style: TextStyle(
-                                            fontSize: isMobile ? 16 : 18,
-                                            color: Colors.white
-                                                .withValues(alpha: .88),
-                                            height: 1.6,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 28),
-                                      Wrap(
-                                        spacing: 14,
-                                        runSpacing: 14,
-                                        children: [
-                                          SizedBox(
-                                            width: compactCtas
-                                                ? constraints.maxWidth
-                                                : null,
-                                            child: ElevatedButton(
-                                              onPressed: _openLogin,
-                                              child: const Text('Login'),
-                                            ),
-                                          ),
-                                          SizedBox(
-                                            width: compactCtas
-                                                ? constraints.maxWidth
-                                                : null,
-                                            child: OutlinedButton(
-                                              onPressed: () =>
-                                                  _scrollToSection('features'),
-                                              style: OutlinedButton.styleFrom(
-                                                foregroundColor: Colors.white,
-                                                side: BorderSide(
-                                                  color: Colors.white
-                                                      .withValues(alpha: .42),
-                                                ),
-                                                backgroundColor: Colors.white
-                                                    .withValues(alpha: .08),
-                                              ),
-                                              child: const Text(
-                                                'Explore Features',
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+            child: isPhone
+                ? Container(
+                    color: Colors.white,
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          height: 260,
+                          width: double.infinity,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              _buildHeroMedia(),
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.white.withValues(alpha: .12),
+                                      Colors.transparent,
+                                      OpsColors.text.withValues(alpha: .12),
                                     ],
                                   ),
                                 ),
-                              );
-                            },
+                              ),
+                            ],
                           ),
                         ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 22, 16, 30),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) => _buildHeroContent(
+                              isMobile: true,
+                              isPhone: true,
+                              constraints: constraints,
+                              titleColor: OpsColors.text,
+                              bodyColor: OpsColors.muted,
+                              showBadge: true,
+                              fullWidthButtons: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : SizedBox(
+                    height: heroHeight,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: OpsColors.text,
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _buildHeroMedia(),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  OpsColors.text.withValues(alpha: .78),
+                                  OpsColors.primary.withValues(alpha: .62),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Align(
+                            alignment: Alignment.center,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 1280),
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isMobile ? 20 : 32,
+                                  vertical: isMobile ? 40 : 84,
+                                ),
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) =>
+                                      _buildHeroContent(
+                                    isMobile: isMobile,
+                                    isPhone: false,
+                                    constraints: constraints,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
+                  ),
           ),
           SliverToBoxAdapter(
             key: _sectionKeys['features'],
@@ -467,12 +538,17 @@ class _MainPageState extends State<MainPage> {
                       : constraints.maxWidth >= 640
                           ? 2
                           : 1;
+                  final childAspectRatio = constraints.maxWidth >= 1100
+                      ? 3.4
+                      : constraints.maxWidth >= 640
+                          ? 2.6
+                          : 2.1;
                   return GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: crossAxisCount,
-                      childAspectRatio: 3.4,
+                      childAspectRatio: childAspectRatio,
                       crossAxisSpacing: 20,
                       mainAxisSpacing: 16,
                     ),
@@ -506,11 +582,14 @@ class _Brand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 420;
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 40,
-          height: 40,
+          width: compact ? 34 : 40,
+          height: compact ? 34 : 40,
           decoration: BoxDecoration(
             color: OpsColors.primary,
             borderRadius: BorderRadius.circular(10),
@@ -521,29 +600,34 @@ class _Brand extends StatelessWidget {
             size: 22,
           ),
         ),
-        const SizedBox(width: 12),
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'WowGardian',
-              style: TextStyle(
-                fontSize: 24,
-                height: 1,
-                fontWeight: FontWeight.w900,
-                color: OpsColors.text,
+        SizedBox(width: compact ? 8 : 12),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'WowGardian',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: compact ? 18 : 24,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                  color: OpsColors.text,
+                ),
               ),
-            ),
-            Text(
-              'SENSOR ANALYTICS',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                color: OpsColors.muted,
+              Text(
+                'SENSOR ANALYTICS',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: compact ? 8.5 : 10,
+                  fontWeight: FontWeight.w800,
+                  color: OpsColors.muted,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
@@ -601,9 +685,14 @@ class _SectionBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final isPhone = width < 600;
     return Container(
       color: backgroundColor ?? OpsColors.background,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 64),
+      padding: EdgeInsets.symmetric(
+        horizontal: isPhone ? 16 : 24,
+        vertical: isPhone ? 44 : 64,
+      ),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1280),
@@ -612,8 +701,8 @@ class _SectionBlock extends StatelessWidget {
               Text(
                 title,
                 style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                      fontSize: 34,
-                      height: 42 / 34,
+                      fontSize: isPhone ? 28 : 34,
+                      height: isPhone ? 36 / 28 : 42 / 34,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -956,6 +1045,7 @@ class _ContactSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isPhone = MediaQuery.sizeOf(context).width < 600;
     return _SectionBlock(
       backgroundColor: Colors.white,
       title: 'Contact',
@@ -1005,11 +1095,11 @@ class _ContactSection extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
-                const Text(
+                Text(
                   'Let’s talk about smarter construction monitoring.',
                   style: TextStyle(
                     color: OpsColors.text,
-                    fontSize: 30,
+                    fontSize: isPhone ? 24 : 30,
                     height: 1.2,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1092,7 +1182,6 @@ class _ContactDetailsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: double.infinity,
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1216,11 +1305,16 @@ class _Footer extends StatelessWidget {
                       ),
                     ];
                     return isRow
-                        ? const Row(
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: children
+                                .map((child) => Expanded(child: child))
+                                .toList(),
+                          )
+                        : const Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: children,
-                          )
-                        : const Column(children: children);
+                          );
                   },
                 ),
               ),
@@ -1256,44 +1350,42 @@ class _FooterColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: OpsColors.text,
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (content != null)
             Text(
-              title,
+              content!,
               style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: OpsColors.text,
+                fontSize: 14,
+                color: OpsColors.muted,
               ),
             ),
-            const SizedBox(height: 16),
-            if (content != null)
-              Text(
-                content!,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: OpsColors.muted,
-                ),
-              ),
-            if (links != null)
-              ...links!.map(
-                (link) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    link,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: OpsColors.muted,
-                    ),
+          if (links != null)
+            ...links!.map(
+              (link) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  link,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: OpsColors.muted,
                   ),
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }

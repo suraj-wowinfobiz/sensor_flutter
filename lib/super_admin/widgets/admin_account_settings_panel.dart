@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/auth/app_session.dart';
+import '../../core/theme/ops_theme.dart';
 import '../api/users_api.dart';
 import '../providers/theme_provider.dart';
 
@@ -46,6 +47,11 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
     super.initState();
     _nameController.text = widget.userName;
     _emailController.text = widget.userEmail;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadProfileForm();
+      }
+    });
   }
 
   @override
@@ -223,54 +229,229 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final cardColor = Theme.of(context).cardColor;
-    final titleColor =
-        isLight ? const Color(0xFF102c42) : const Color(0xFFe8f1fc);
-    final subColor =
-        isLight ? const Color(0xFF4f6b82) : const Color(0xFF9db7d2);
-    final headlineSize = width < 640 ? 34.0 : 44.0;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(18),
-      child: Container(
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Theme.of(context).dividerColor),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+    return OpsPage(
+      title: 'Settings',
+      subtitle:
+          'Profile, notification, security, theme, and workspace preferences for the super admin console',
+      actions: [
+        ElevatedButton.icon(
+          onPressed: _profileSaving
+              ? null
+              : () async {
+                  final saved = await _saveProfileForm();
+                  if (!context.mounted || !saved) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Settings saved')),
+                  );
+                },
+          icon: const Icon(Icons.save_outlined, size: 18),
+          label: _profileSaving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save Changes'),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Settings',
-              style: TextStyle(
-                fontSize: headlineSize,
-                fontWeight: FontWeight.w800,
-                color: titleColor,
+      ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final vertical = constraints.maxWidth < 980;
+          final profile = OpsPanel(
+            title: 'Profile Details',
+            subtitle: 'Account identity and current console access',
+            child: _buildProfileSummary(context),
+          );
+          final preferences = OpsPanel(
+            title: 'Preferences',
+            subtitle: 'Theme mode, dark mode, text size, and workspace appearance',
+            child: _buildPreferencesContent(context),
+          );
+          final security = OpsPanel(
+            title: 'Security & Sessions',
+            subtitle: 'Password updates, account status, and logout controls',
+            child: _buildSecurityContent(context),
+          );
+          final notifications = OpsPanel(
+            title: 'Notifications',
+            subtitle: 'Control whether admin notifications are enabled',
+            child: _buildNotificationsContent(context),
+          );
+
+          if (vertical) {
+            return Column(
+              children: [
+                profile,
+                const SizedBox(height: 16),
+                preferences,
+                const SizedBox(height: 16),
+                security,
+                const SizedBox(height: 16),
+                notifications,
+              ],
+            );
+          }
+
+          return Column(
+            children: [
+              _buildPanelPair(left: profile, right: preferences),
+              const SizedBox(height: 16),
+              _buildPanelPair(left: security, right: notifications),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPanelPair({
+    required Widget left,
+    required Widget right,
+  }) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: left),
+          const SizedBox(width: 16),
+          Expanded(child: right),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileSummary(BuildContext context) {
+    final resolvedName = _nameController.text.trim().isNotEmpty
+        ? _nameController.text.trim()
+        : widget.userName;
+    final resolvedEmail = _emailController.text.trim().isNotEmpty
+        ? _emailController.text.trim()
+        : widget.userEmail;
+    final organization = _organizationIdController.text.trim().isEmpty
+        ? '--'
+        : _organizationIdController.text.trim();
+    final maxUsers = _maxUsersAllowedController.text.trim().isEmpty
+        ? '--'
+        : _maxUsersAllowedController.text.trim();
+
+    return Column(
+      children: [
+        _settingsInfoRow('Full Name', resolvedName),
+        _settingsInfoRow('Email Address', resolvedEmail),
+        _settingsInfoRow('Assigned Role', widget.roleLabel),
+        _settingsInfoRow('Organization ID', organization),
+        _settingsInfoRow('Max Users Allowed', maxUsers),
+        _settingsInfoRow('Account Status', _profileActive ? 'Active' : 'Inactive',
+            border: false),
+      ],
+    );
+  }
+
+  Widget _buildPreferencesContent(BuildContext context) {
+    return Column(
+      children: [
+        _buildAppearancePreferences(context),
+      ],
+    );
+  }
+
+  Widget _buildSecurityContent(BuildContext context) {
+    return Column(
+      children: [
+        _settingsActionRow(
+          context,
+          icon: Icons.lock_outline_rounded,
+          title: 'Change Password',
+          subtitle: 'Update sign-in credentials and access protection',
+          onTap: () => _showChangePasswordDialog(context),
+        ),
+        const SizedBox(height: 8),
+        SwitchListTile(
+          value: _profileActive,
+          onChanged: (value) => setState(() => _profileActive = value),
+          contentPadding: EdgeInsets.zero,
+          title: const Text(
+            'Account Active',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          subtitle: const Text('Allow this account to access the admin console'),
+        ),
+        const SizedBox(height: 8),
+        _buildProfileLogoutFooter(context),
+      ],
+    );
+  }
+
+  Widget _buildNotificationsContent(BuildContext context) {
+    return Column(
+      children: [
+        SwitchListTile(
+          value: _notificationsEnabled,
+          onChanged: (value) =>
+              setState(() => _notificationsEnabled = value),
+          contentPadding: EdgeInsets.zero,
+          title: const Text(
+            'Admin Notifications',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          subtitle: const Text(
+            'Receive operational alerts and important system updates',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _settingsInfoRow(
+    String label,
+    String value, {
+    bool border = true,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        border: border
+            ? const Border(bottom: BorderSide(color: OpsColors.border))
+            : null,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label.toUpperCase(),
+              style: const TextStyle(
+                color: OpsColors.outline,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: .4,
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Manage preferences and notifications',
-              style: TextStyle(fontSize: 15, color: subColor),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 16),
-            _buildPreferencesTab(context),
-            const SizedBox(height: 16),
-            _buildNotificationsTab(context),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _settingsActionRow(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: OpsColors.primary),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: onTap,
     );
   }
 
@@ -386,17 +567,9 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
     final subColor =
         isLight ? const Color(0xFF4f6b82) : const Color(0xFF9db7d2);
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Theme.of(context).dividerColor),
-        color: isLight ? const Color(0xFFF6FAFC) : const Color(0xFF203A54),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
           Row(
             children: [
               Container(
@@ -440,7 +613,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const Divider(height: 24, color: OpsColors.border),
           Row(
             children: [
               const Expanded(
@@ -524,8 +697,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
               label: const Text('Advanced'),
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 

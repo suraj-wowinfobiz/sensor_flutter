@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/app_session.dart';
+import '../../core/theme/ops_theme.dart';
 import '../../super_admin/core/responsive/responsive_extensions.dart';
 import '../providers/engineer_riverpod_provider.dart';
 import '../widgets/nav_bar.dart';
@@ -93,6 +94,7 @@ class _EngineerScreenState extends ConsumerState<EngineerScreen>
       ref.read(engineerDatabaseChangeNotifierProvider).loadAlerts();
     }
     setState(() => _currentView = normalized);
+    if (!context.isDesktopLayout) closeMenu();
   }
 
   bool _onScroll(UserScrollNotification notification) {
@@ -148,55 +150,74 @@ class _EngineerScreenState extends ConsumerState<EngineerScreen>
     );
 
     final scaffold = Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: OpsColors.background,
       body: SafeArea(
-        child: Column(
-          children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 280),
-              switchInCurve: Curves.easeOutQuart,
-              switchOutCurve: Curves.easeInQuart,
-              transitionBuilder: (child, animation) {
-                final slide = Tween<Offset>(
-                  begin: const Offset(0, -0.08),
-                  end: Offset.zero,
-                ).animate(animation);
-                return SizeTransition(
-                  sizeFactor: animation,
-                  axisAlignment: -1,
-                  child: FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(position: slide, child: child),
-                  ),
-                );
-              },
-              child: (isDesktop || _showTopNav)
-                  ? navBar
-                  : const SizedBox.shrink(key: ValueKey('hidden-engineer-nav')),
-            ),
-            Expanded(
-              child: NotificationListener<UserScrollNotification>(
-                onNotification: _onScroll,
-                child: isDesktop
-                    ? Row(
+        child: NotificationListener<UserScrollNotification>(
+          onNotification: _onScroll,
+          child: isDesktop
+              ? Row(
+                  children: [
+                    EngineerSideMenu(
+                      animation: const AlwaysStoppedAnimation<double>(1.0),
+                      isOpen: true,
+                      currentView: _currentView,
+                      onViewChanged: _setCurrentView,
+                      onClose: closeMenu,
+                      onLogout: _logout,
+                      showCloseButton: false,
+                    ),
+                    Expanded(
+                      child: Column(
                         children: [
-                          EngineerSideMenu(
-                            animation:
-                                const AlwaysStoppedAnimation<double>(1.0),
-                            isOpen: true,
-                            currentView: _currentView,
-                            onViewChanged: _setCurrentView,
-                            onClose: () {},
-                            onLogout: _logout,
-                            showCloseButton: false,
-                          ),
+                          navBar,
                           Expanded(child: _buildContent(_currentView)),
                         ],
-                      )
-                    : _buildContent(_currentView),
-              ),
-            ),
-          ],
+                      ),
+                    ),
+                  ],
+                )
+              : Stack(
+                  children: [
+                    Column(
+                      children: [
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          child: _showTopNav
+                              ? EngineerNavBar(
+                                  key: const ValueKey('mobile-engineer-nav'),
+                                  onMenuToggle: toggleMenu,
+                                  isMenuOpen: _isMenuOpen,
+                                  showMenuButton: true,
+                                  onUserMenuSettingsTap: () =>
+                                      _setCurrentView('settings'),
+                                  onLogoutTap: _logout,
+                                  notifications: notifications,
+                                  hasNotifications: hasNotifications,
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                        Expanded(child: _buildContent(_currentView)),
+                      ],
+                    ),
+                    if (_isMenuOpen)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          onTap: closeMenu,
+                          child: Container(
+                            color: Colors.black.withValues(alpha: .24),
+                          ),
+                        ),
+                      ),
+                    EngineerSideMenu(
+                      animation: _menuController,
+                      isOpen: _isMenuOpen,
+                      currentView: _currentView,
+                      onViewChanged: _setCurrentView,
+                      onClose: closeMenu,
+                      onLogout: _logout,
+                    ),
+                  ],
+                ),
         ),
       ),
       bottomNavigationBar: isDesktop

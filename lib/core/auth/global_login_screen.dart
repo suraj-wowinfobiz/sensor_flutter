@@ -483,6 +483,7 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
 
   Widget _buildCompactRoleLogin(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
+    final isPhone = width < 420;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final titleColor =
         isLight ? const Color(0xFF1A2B3C) : const Color(0xFFD7E8F6);
@@ -494,14 +495,18 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
         isLight ? const Color(0xFFF8FAFB) : const Color(0xFF1E3A52);
     final borderColor = Theme.of(context).dividerColor;
     final primary = Theme.of(context).colorScheme.primary;
-    final cardPadding = width < 560 ? 28.0 : 48.0;
+    final cardPadding = width < 400
+        ? 20.0
+        : width < 560
+            ? 28.0
+            : 48.0;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(isPhone ? 16 : 24),
             child: Container(
               constraints: const BoxConstraints(maxWidth: 480),
               padding: EdgeInsets.all(cardPadding),
@@ -526,7 +531,11 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                     Text(
                       _selectedRole.label,
                       style: TextStyle(
-                        fontSize: width < 560 ? 38 : 48,
+                        fontSize: width < 400
+                            ? 30
+                            : width < 560
+                                ? 38
+                                : 48,
                         fontWeight: FontWeight.w700,
                         color: titleColor,
                         letterSpacing: -1,
@@ -712,67 +721,129 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                     ),
                     const SizedBox(height: 24),
                     Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 56,
-                            child: OutlinedButton(
-                              onPressed: _isLoading ? null : _skipLogin,
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: primary,
-                                side: BorderSide(color: primary),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              child: const Text(
-                                'Skip',
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: SizedBox(
-                            height: 56,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _submit,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primary,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                elevation: 0,
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                          Colors.white,
-                                        ),
+                      children: isPhone
+                          ? [
+                              Expanded(
+                                child: SizedBox(
+                                  height: 56,
+                                  child: ElevatedButton(
+                                    onPressed: _isLoading ? null : _submit,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: primary,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
                                       ),
-                                    )
-                                  : const Text(
-                                      'Log In',
+                                      elevation: 0,
+                                    ),
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
+                                            ),
+                                          )
+                                        : const Text(
+                                            'Log In',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ]
+                          : [
+                              Expanded(
+                                child: SizedBox(
+                                  height: 56,
+                                  child: OutlinedButton(
+                                    onPressed: _isLoading ? null : _skipLogin,
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: primary,
+                                      side: BorderSide(color: primary),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Skip',
                                       style: TextStyle(
-                                        fontSize: 18,
+                                        fontSize: 17,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: SizedBox(
+                                  height: 56,
+                                  child: ElevatedButton(
+                                    onPressed: _isLoading ? null : _submit,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: primary,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
+                                            ),
+                                          )
+                                        : const Text(
+                                            'Log In',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                    ),
+                    if (isPhone) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: OutlinedButton(
+                          onPressed: _isLoading ? null : _skipLogin,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: primary,
+                            side: BorderSide(color: primary),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Text(
+                            'Skip',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -787,61 +858,103 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
     final size = MediaQuery.sizeOf(context);
     final width = size.width;
     final stacked = width < 960;
+    final isPhone = width < 420;
     final pagePadding = width >= 1280
         ? 48.0
         : width >= 960
             ? 28.0
-            : 16.0;
+            : width >= 640
+                ? 20.0
+                : isPhone
+                    ? 0.0
+                    : 16.0;
     final panelMinHeight =
         stacked ? 0.0 : (size.height - (pagePadding * 2)).clamp(620.0, 760.0);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FC),
+      backgroundColor: isPhone ? Colors.white : const Color(0xFFF6F8FC),
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(pagePadding),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: 1240,
-                minHeight: panelMinHeight,
-              ),
-              child: SizedBox(
-                height: stacked ? null : panelMinHeight,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: OpsColors.surface,
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: const Color(0xFFDDE4F0)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF20325B).withValues(alpha: 0.08),
-                        blurRadius: 40,
-                        offset: const Offset(0, 20),
-                      ),
-                    ],
-                  ),
-                  child: stacked
-                      ? Column(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(pagePadding),
+          child: SizedBox(
+            width: double.infinity,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 1240,
+                  minHeight: stacked
+                      ? (isPhone ? size.height : 0)
+                      : panelMinHeight,
+                ),
+                child: stacked
+                    ? Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: OpsColors.surface,
+                          borderRadius: BorderRadius.circular(isPhone ? 0 : 28),
+                          border: isPhone
+                              ? null
+                              : Border.all(color: const Color(0xFFDDE4F0)),
+                          boxShadow: isPhone
+                              ? const []
+                              : [
+                                  BoxShadow(
+                                    color: const Color(0xFF20325B)
+                                        .withValues(alpha: 0.08),
+                                    blurRadius: 40,
+                                    offset: const Offset(0, 20),
+                                  ),
+                                ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            _buildUserInfoColumn(compact: true),
-                            _buildUserAuthCard(context, compact: true),
-                          ],
-                        )
-                      : Row(
-                          children: [
-                            Expanded(
-                              flex: 11,
-                              child: _buildUserInfoColumn(compact: false),
+                            _buildUserInfoColumn(
+                              compact: true,
+                              fullscreenPhone: isPhone,
                             ),
-                            Expanded(
-                              flex: 7,
-                              child:
-                                  _buildUserAuthCard(context, compact: false),
+                            Transform.translate(
+                              offset: const Offset(0, -26),
+                              child: _buildUserAuthCard(
+                                context,
+                                compact: true,
+                                fullscreenPhone: isPhone,
+                              ),
                             ),
                           ],
                         ),
-                ),
+                      )
+                    : SizedBox(
+                        height: panelMinHeight,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: OpsColors.surface,
+                            borderRadius: BorderRadius.circular(28),
+                            border: Border.all(color: const Color(0xFFDDE4F0)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF20325B)
+                                    .withValues(alpha: 0.08),
+                                blurRadius: 40,
+                                offset: const Offset(0, 20),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                flex: 11,
+                                child: _buildUserInfoColumn(compact: false),
+                              ),
+                              Expanded(
+                                flex: 7,
+                                child:
+                                    _buildUserAuthCard(context, compact: false),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
               ),
             ),
           ),
@@ -850,26 +963,48 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
     );
   }
 
-  Widget _buildUserAuthCard(BuildContext context, {required bool compact}) {
-    final sidePadding = compact ? 28.0 : 44.0;
-    final titleSize = compact ? 30.0 : 38.0;
+  Widget _buildUserAuthCard(
+    BuildContext context, {
+    required bool compact,
+    bool fullscreenPhone = false,
+  }) {
+    final width = MediaQuery.sizeOf(context).width;
+    final isPhone = width < 420;
+    final sidePadding = compact ? (isPhone ? 18.0 : 28.0) : 44.0;
+    final titleSize = compact ? (isPhone ? 26.0 : 30.0) : 38.0;
+    final compactPanelRadius = fullscreenPhone ? 34.0 : 30.0;
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: compact
-            ? const BorderRadius.only(
-                bottomLeft: Radius.circular(28),
-                bottomRight: Radius.circular(28),
+        borderRadius: fullscreenPhone
+            ? BorderRadius.vertical(
+                top: Radius.circular(compactPanelRadius),
               )
-            : const BorderRadius.only(
-                topRight: Radius.circular(28),
-                bottomRight: Radius.circular(28),
-              ),
+            : compact
+                ? const BorderRadius.only(
+                    bottomLeft: Radius.circular(28),
+                    bottomRight: Radius.circular(28),
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
+                  )
+                : const BorderRadius.only(
+                    topRight: Radius.circular(28),
+                    bottomRight: Radius.circular(28),
+                  ),
+        boxShadow: compact
+            ? [
+                BoxShadow(
+                  color: const Color(0xFF20325B).withValues(alpha: 0.08),
+                  blurRadius: 32,
+                  offset: const Offset(0, -4),
+                ),
+              ]
+            : null,
       ),
       padding: EdgeInsets.fromLTRB(
         sidePadding,
-        compact ? 30 : 44,
+        compact ? 26 : 44,
         sidePadding,
         compact ? 28 : 42,
       ),
@@ -880,154 +1015,402 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (compact) ...[
-              const SizedBox(height: 10),
-              const _LoginBrandBadge(
-                sensorLogoAsset: _sensorLogoAsset,
-                compact: true,
-              ),
-            ],
-            SizedBox(height: compact ? 22 : 34),
-            Text(
-              'User Login',
-              style: TextStyle(
-                color: const Color(0xFF10244D),
-                fontSize: titleSize,
-                fontWeight: FontWeight.w700,
-                height: 1.02,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              _selectedRole.description,
-              style: const TextStyle(
-                color: OpsColors.muted,
-                fontSize: 14,
-                height: 1.45,
-              ),
-            ),
-            SizedBox(height: compact ? 28 : 34),
-            _buildRefField(
-              controller: _emailController,
-              hintText: _selectedRole.emailHint,
-              prefixIcon: Icons.person_outline_rounded,
-              keyboardType: TextInputType.emailAddress,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter your username';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 14),
-            _buildRefField(
-              controller: _passwordController,
-              hintText: 'Password',
-              prefixIcon: Icons.lock_outline_rounded,
-              obscureText: _obscurePassword,
-              suffix: IconButton(
-                onPressed: () {
-                  setState(() => _obscurePassword = !_obscurePassword);
-                },
-                icon: Icon(
-                  _obscurePassword
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                  color: OpsColors.outline,
-                  size: 18,
-                ),
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter your password';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 14),
-            DropdownButtonFormField<AppLoginRole>(
-              initialValue: _selectedRole,
-              decoration: InputDecoration(
-                hintText: 'Select login type',
-                fillColor: const Color(0xFFF6F8FF),
-                filled: true,
-                prefixIcon: Icon(
-                  _selectedRole.icon,
-                  color: OpsColors.primaryContainer.withValues(alpha: 0.78),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 16,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF2B63F1),
-                    width: 1.4,
-                  ),
-                ),
-              ),
-              items: AppLoginRole.values
-                  .map(
-                    (role) => DropdownMenuItem<AppLoginRole>(
-                      value: role,
-                      child: Text(role.label),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 5,
+                    height: 34,
+                    margin: const EdgeInsets.only(top: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6B63FF),
+                      borderRadius: BorderRadius.circular(999),
                     ),
-                  )
-                  .toList(),
-              onChanged: (role) {
-                if (role == null) return;
-                setState(() => _selectedRole = role);
-              },
-            ),
-            const SizedBox(height: 12),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                return _buildRememberAndForgotRow(
-                  context,
-                  compact: constraints.maxWidth < 320,
-                  primary: OpsColors.primaryContainer,
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 56,
-                    child: OutlinedButton(
-                      onPressed: _isLoading ? null : _skipLogin,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: OpsColors.primaryContainer,
-                        side: BorderSide(
-                          color: OpsColors.primaryContainer
-                              .withValues(alpha: 0.42),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${_selectedRole.label} Login',
+                          style: TextStyle(
+                            color: const Color(0xFF10244D),
+                            fontSize: isPhone ? 24 : 26,
+                            fontWeight: FontWeight.w700,
+                            height: 1.05,
+                          ),
                         ),
-                        shape: RoundedRectangleBorder(
+                        const SizedBox(height: 8),
+                        Text(
+                          _selectedRole.description,
+                          style: const TextStyle(
+                            color: OpsColors.muted,
+                            fontSize: 14,
+                            height: 1.45,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: EdgeInsets.fromLTRB(
+                  isPhone ? 14 : 16,
+                  isPhone ? 14 : 16,
+                  isPhone ? 14 : 16,
+                  isPhone ? 18 : 20,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFFE6EBF5)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF20325B).withValues(alpha: 0.05),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildRefField(
+                      controller: _emailController,
+                      hintText: _selectedRole.emailHint,
+                      prefixIcon: Icons.person_outline_rounded,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter your username';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    _buildRefField(
+                      controller: _passwordController,
+                      hintText: 'Password',
+                      prefixIcon: Icons.lock_outline_rounded,
+                      obscureText: _obscurePassword,
+                      suffix: IconButton(
+                        onPressed: () {
+                          setState(() => _obscurePassword = !_obscurePassword);
+                        },
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: OpsColors.outline,
+                          size: 18,
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter your password';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<AppLoginRole>(
+                      initialValue: _selectedRole,
+                      decoration: InputDecoration(
+                        hintText: 'Select login type',
+                        fillColor: const Color(0xFFF6F8FF),
+                        filled: true,
+                        prefixIcon: Icon(
+                          _selectedRole.icon,
+                          color:
+                              OpsColors.primaryContainer.withValues(alpha: 0.78),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                        border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF2B63F1),
+                            width: 1.4,
+                          ),
                         ),
                       ),
-                      child: const Text(
-                        'SKIP',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+                      items: AppLoginRole.values
+                          .map(
+                            (role) => DropdownMenuItem<AppLoginRole>(
+                              value: role,
+                              child: Text(role.label),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (role) {
+                        if (role == null) return;
+                        setState(() => _selectedRole = role);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        return _buildRememberAndForgotRow(
+                          context,
+                          compact: constraints.maxWidth < 420,
+                          primary: OpsColors.primaryContainer,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final stackButtons = constraints.maxWidth < 390;
+                        final loginButton = SizedBox(
+                          height: 56,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(18),
+                              gradient: const LinearGradient(
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                                colors: [
+                                  Color(0xFF245BFF),
+                                  OpsColors.primaryContainer,
+                                  Color(0xFF8D56D8),
+                                ],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF245BFF)
+                                      .withValues(alpha: 0.20),
+                                  blurRadius: 22,
+                                  offset: const Offset(0, 12),
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _submit,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                              ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  : const Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          'LOGIN',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                        SizedBox(width: 10),
+                                        Icon(
+                                          Icons.arrow_forward_rounded,
+                                          size: 18,
+                                        ),
+                                      ],
+                                    ),
+                            ),
+                          ),
+                        );
+                        final skipButton = SizedBox(
+                          height: 56,
+                          child: OutlinedButton(
+                            onPressed: _isLoading ? null : _skipLogin,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: OpsColors.primaryContainer,
+                              side: BorderSide(
+                                color: OpsColors.primaryContainer.withValues(
+                                  alpha: 0.42,
+                                ),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                            ),
+                            child: const Text(
+                              'SKIP',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        );
+
+                        if (stackButtons) {
+                          return Column(
+                            children: [
+                              SizedBox(
+                                width: double.infinity,
+                                child: loginButton,
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: skipButton,
+                              ),
+                            ],
+                          );
+                        }
+
+                        return Row(
+                          children: [
+                            Expanded(child: loginButton),
+                            const SizedBox(width: 12),
+                            Expanded(child: skipButton),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              SizedBox(height: compact ? 22 : 34),
+              Text(
+                'User Login',
+                style: TextStyle(
+                  color: const Color(0xFF10244D),
+                  fontSize: titleSize,
+                  fontWeight: FontWeight.w700,
+                  height: 1.02,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _selectedRole.description,
+                style: const TextStyle(
+                  color: OpsColors.muted,
+                  fontSize: 14,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 34),
+              _buildRefField(
+                controller: _emailController,
+                hintText: _selectedRole.emailHint,
+                prefixIcon: Icons.person_outline_rounded,
+                keyboardType: TextInputType.emailAddress,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter your username';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 14),
+              _buildRefField(
+                controller: _passwordController,
+                hintText: 'Password',
+                prefixIcon: Icons.lock_outline_rounded,
+                obscureText: _obscurePassword,
+                suffix: IconButton(
+                  onPressed: () {
+                    setState(() => _obscurePassword = !_obscurePassword);
+                  },
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    color: OpsColors.outline,
+                    size: 18,
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter your password';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<AppLoginRole>(
+                initialValue: _selectedRole,
+                decoration: InputDecoration(
+                  hintText: 'Select login type',
+                  fillColor: const Color(0xFFF6F8FF),
+                  filled: true,
+                  prefixIcon: Icon(
+                    _selectedRole.icon,
+                    color: OpsColors.primaryContainer.withValues(alpha: 0.78),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF2B63F1),
+                      width: 1.4,
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: SizedBox(
+                items: AppLoginRole.values
+                    .map(
+                      (role) => DropdownMenuItem<AppLoginRole>(
+                        value: role,
+                        child: Text(role.label),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (role) {
+                  if (role == null) return;
+                  setState(() => _selectedRole = role);
+                },
+              ),
+              const SizedBox(height: 12),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return _buildRememberAndForgotRow(
+                    context,
+                    compact: constraints.maxWidth < 420,
+                    primary: OpsColors.primaryContainer,
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final stackButtons = constraints.maxWidth < 390;
+                  final loginButton = SizedBox(
                     height: 56,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -1043,8 +1426,8 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color:
-                                const Color(0xFF245BFF).withValues(alpha: 0.20),
+                            color: const Color(0xFF245BFF)
+                                .withValues(alpha: 0.20),
                             blurRadius: 22,
                             offset: const Offset(0, 12),
                           ),
@@ -1082,80 +1465,134 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                                     ),
                                   ),
                                   SizedBox(width: 10),
-                                  Icon(Icons.arrow_forward_rounded, size: 18),
+                                  Icon(
+                                    Icons.arrow_forward_rounded,
+                                    size: 18,
+                                  ),
                                 ],
                               ),
                       ),
                     ),
-                  ),
-                ),
-              ],
-            ),
+                  );
+                  final skipButton = SizedBox(
+                    height: 56,
+                    child: OutlinedButton(
+                      onPressed: _isLoading ? null : _skipLogin,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: OpsColors.primaryContainer,
+                        side: BorderSide(
+                          color:
+                              OpsColors.primaryContainer.withValues(alpha: 0.42),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      child: const Text(
+                        'SKIP',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  );
+
+                  if (stackButtons) {
+                    return Column(
+                      children: [
+                        SizedBox(width: double.infinity, child: loginButton),
+                        const SizedBox(height: 12),
+                        SizedBox(width: double.infinity, child: skipButton),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      Expanded(child: skipButton),
+                      const SizedBox(width: 12),
+                      Expanded(child: loginButton),
+                    ],
+                  );
+                },
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildUserInfoColumn({required bool compact}) {
+  Widget _buildUserInfoColumn({
+    required bool compact,
+    bool fullscreenPhone = false,
+  }) {
     return Container(
-      constraints: BoxConstraints(minHeight: compact ? 300 : 620),
+      height: compact ? 220.0 : null,
+      constraints: compact ? null : const BoxConstraints(minHeight: 620),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: compact
-            ? const BorderRadius.only(
-                topLeft: Radius.circular(28),
-                topRight: Radius.circular(28),
-              )
-            : const BorderRadius.only(
-                topLeft: Radius.circular(28),
-                bottomLeft: Radius.circular(28),
-              ),
+        borderRadius: fullscreenPhone
+            ? BorderRadius.zero
+            : compact
+                ? const BorderRadius.only(
+                    topLeft: Radius.circular(28),
+                    topRight: Radius.circular(28),
+                  )
+                : const BorderRadius.only(
+                    topLeft: Radius.circular(28),
+                    bottomLeft: Radius.circular(28),
+                  ),
       ),
       child: ClipRRect(
-        borderRadius: compact
-            ? const BorderRadius.only(
-                topLeft: Radius.circular(28),
-                topRight: Radius.circular(28),
-              )
-            : const BorderRadius.only(
-                topLeft: Radius.circular(28),
-                bottomLeft: Radius.circular(28),
+        borderRadius: fullscreenPhone
+            ? BorderRadius.zero
+            : compact
+                ? const BorderRadius.only(
+                    topLeft: Radius.circular(28),
+                    topRight: Radius.circular(28),
+                  )
+                : const BorderRadius.only(
+                    topLeft: Radius.circular(28),
+                    bottomLeft: Radius.circular(28),
+                  ),
+        child: SizedBox.expand(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              const _LoginHeroImage(
+                videoAsset: _loginHeroVideoAsset,
+                fallbackAsset: _loginHeroFallbackAsset,
               ),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            const _LoginHeroImage(
-              videoAsset: _loginHeroVideoAsset,
-              fallbackAsset: _loginHeroFallbackAsset,
-            ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    Colors.white.withValues(alpha: 0.00),
-                    Colors.white.withValues(alpha: 0.06),
-                    Colors.white.withValues(alpha: 0.24),
-                  ],
-                  stops: const [0, 0.62, 1],
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.20),
+                      Colors.white.withValues(alpha: 0.06),
+                      Colors.white.withValues(alpha: 0.00),
+                    ],
+                    stops: const [0, 0.42, 1],
+                  ),
                 ),
               ),
-            ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    Colors.white.withValues(alpha: 0.14),
-                    Colors.transparent,
-                  ],
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.14),
+                      Colors.transparent,
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1285,75 +1722,6 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
         const SizedBox(width: 16),
         forgot,
       ],
-    );
-  }
-}
-
-class _LoginBrandBadge extends StatelessWidget {
-  final String sensorLogoAsset;
-  final bool compact;
-
-  const _LoginBrandBadge({
-    required this.sensorLogoAsset,
-    this.compact = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        compact ? 0 : 16,
-        compact ? 0 : 16,
-        compact ? 0 : 20,
-        compact ? 0 : 16,
-      ),
-      decoration: BoxDecoration(
-        color:
-            compact ? Colors.transparent : Colors.white.withValues(alpha: 0.96),
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: compact
-            ? const []
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: 24,
-                  offset: const Offset(0, 14),
-                ),
-              ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: compact ? 48 : 52,
-            height: compact ? 48 : 52,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF4F7FF),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(11),
-              child: Image.asset(
-                sensorLogoAsset,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: OpsColors.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.grid_view_rounded,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

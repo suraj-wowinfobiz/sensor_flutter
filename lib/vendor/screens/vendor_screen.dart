@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as p;
 
 import '../../core/auth/app_session.dart';
+import '../../core/theme/ops_theme.dart';
 import '../../super_admin/core/responsive/responsive_extensions.dart';
 import '../../super_admin/core/theme/custom_theme_tokens.dart';
 import '../../super_admin/providers/super_admin_backend_provider.dart';
@@ -56,6 +57,15 @@ class _VendorScreenState extends ConsumerState<VendorScreen>
     AppSession.logoutToLanding(context);
   }
 
+  void closeMenu() {
+    if (_isMenuOpen) {
+      setState(() {
+        _isMenuOpen = false;
+        _menuController.reverse();
+      });
+    }
+  }
+
   void _setCurrentView(String view) {
     final normalized = _normalizeView(view);
     if (_currentView == normalized) return;
@@ -72,6 +82,7 @@ class _VendorScreenState extends ConsumerState<VendorScreen>
       db.loadSensorTypes();
     }
     setState(() => _currentView = normalized);
+    if (!context.isDesktopLayout) closeMenu();
   }
 
   Future<void> _loadUsersPageData() async {
@@ -160,67 +171,101 @@ class _VendorScreenState extends ConsumerState<VendorScreen>
 
     final tokens = Theme.of(context).extension<CustomThemeTokens>()!;
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: OpsColors.background,
       body: SafeArea(
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                tokens.softPanel.withValues(alpha: 0.34),
-                Theme.of(context).scaffoldBackgroundColor,
-              ],
-            ),
-          ),
-          child: Column(
-            children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 280),
-                switchInCurve: Curves.easeOutQuart,
-                switchOutCurve: Curves.easeInQuart,
-                transitionBuilder: (child, animation) {
-                  final slide = Tween<Offset>(
-                    begin: const Offset(0, -0.08),
-                    end: Offset.zero,
-                  ).animate(animation);
-                  return SizeTransition(
-                    sizeFactor: animation,
-                    axisAlignment: -1,
-                    child: FadeTransition(
-                      opacity: animation,
-                      child: SlideTransition(position: slide, child: child),
+        child: NotificationListener<UserScrollNotification>(
+          onNotification: _onScroll,
+          child: isDesktop
+              ? Row(
+                  children: [
+                    _VendorSideMenu(
+                      animation: const AlwaysStoppedAnimation<double>(1.0),
+                      isOpen: true,
+                      currentView: _currentView,
+                      onViewChanged: _setCurrentView,
+                      onClose: closeMenu,
+                      onLogout: _logout,
+                      showCloseButton: false,
                     ),
-                  );
-                },
-                child: (isDesktop || _showTopNav)
-                    ? navBar
-                    : const SizedBox.shrink(key: ValueKey('hidden-vendor-nav')),
-              ),
-              Expanded(
-                child: NotificationListener<UserScrollNotification>(
-                  onNotification: _onScroll,
-                  child: isDesktop
-                      ? Row(
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              tokens.softPanel.withValues(alpha: 0.34),
+                              Theme.of(context).scaffoldBackgroundColor,
+                            ],
+                          ),
+                        ),
+                        child: Column(
                           children: [
-                            _VendorSideMenu(
-                              animation:
-                                  const AlwaysStoppedAnimation<double>(1.0),
-                              isOpen: true,
-                              currentView: _currentView,
-                              onViewChanged: _setCurrentView,
-                              onClose: () {},
-                              onLogout: _logout,
-                              showCloseButton: false,
-                            ),
+                            navBar,
                             Expanded(child: _buildContent(_currentView)),
                           ],
-                        )
-                      : _buildContent(_currentView),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Stack(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            tokens.softPanel.withValues(alpha: 0.34),
+                            Theme.of(context).scaffoldBackgroundColor,
+                          ],
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 220),
+                            child: _showTopNav
+                                ? UserNavBar(
+                                    key: const ValueKey('mobile-vendor-nav'),
+                                    onMenuToggle: toggleMenu,
+                                    isMenuOpen: _isMenuOpen,
+                                    showMenuButton: true,
+                                    onTopSettingsTap: () =>
+                                        _setCurrentView('settings'),
+                                    onLogoutTap: _logout,
+                                    notifications: notifications,
+                                    hasNotifications: hasNotifications,
+                                    profileName: 'vendor.operator',
+                                    profileRole: 'Vendor',
+                                    profileInitial: 'V',
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                          Expanded(child: _buildContent(_currentView)),
+                        ],
+                      ),
+                    ),
+                    if (_isMenuOpen)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          onTap: closeMenu,
+                          child: Container(
+                            color: Colors.black.withValues(alpha: .24),
+                          ),
+                        ),
+                      ),
+                    _VendorSideMenu(
+                      animation: _menuController,
+                      isOpen: _isMenuOpen,
+                      currentView: _currentView,
+                      onViewChanged: _setCurrentView,
+                      onClose: closeMenu,
+                      onLogout: _logout,
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
       bottomNavigationBar: isDesktop
@@ -414,6 +459,9 @@ class _VendorScreenState extends ConsumerState<VendorScreen>
 }
 
 class _VendorSideMenu extends StatelessWidget {
+  static const double desktopWidth = 284;
+  static const double desktopHeaderHeight = 78;
+
   final Animation<double> animation;
   final bool isOpen;
   final String currentView;
@@ -434,19 +482,8 @@ class _VendorSideMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final isLight = theme.brightness == Brightness.light;
     final menuWidth =
-        context.narrowerThan(420) ? context.screenWidth * 0.88 : 312.0;
-    final panelColor = Color.alphaBlend(
-      scheme.surface.withValues(alpha: isLight ? 0.94 : 0.98),
-      theme.scaffoldBackgroundColor,
-    );
-    final softSurface = Color.alphaBlend(
-      scheme.primary.withValues(alpha: isLight ? 0.08 : 0.16),
-      theme.cardColor,
-    );
+        context.narrowerThan(420) ? context.screenWidth * 0.88 : desktopWidth;
 
     return IgnorePointer(
       ignoring: !isOpen,
@@ -461,46 +498,67 @@ class _VendorSideMenu extends StatelessWidget {
         child: Container(
           width: menuWidth,
           height: double.infinity,
-          decoration: BoxDecoration(
-            color: panelColor,
+          decoration: const BoxDecoration(
+            color: OpsColors.surfaceLow,
             border: Border(
-              right: BorderSide(color: theme.dividerColor, width: 2),
+              right: BorderSide(color: OpsColors.border),
             ),
-            boxShadow: [
-              BoxShadow(
-                color:
-                    theme.shadowColor.withValues(alpha: isLight ? 0.1 : 0.22),
-                blurRadius: 20,
-                offset: const Offset(4, 0),
-              ),
-            ],
           ),
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
+                height: desktopHeaderHeight,
+                padding: const EdgeInsets.fromLTRB(20, 0, 16, 0),
+                decoration: const BoxDecoration(
                   border: Border(
-                    bottom: BorderSide(color: theme.dividerColor, width: 2),
+                    bottom: BorderSide(color: OpsColors.border),
                   ),
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.storefront_outlined,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 26,
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: OpsColors.primaryContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.storefront_outlined,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Vendor Panel',
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: scheme.onSurface,
-                        ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'WowGardian',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 16,
+                              height: 1.0,
+                              fontWeight: FontWeight.w800,
+                              color: OpsColors.text,
+                            ),
+                          ),
+                          SizedBox(height: 5),
+                          Text(
+                            'Vendor Console',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              height: 1.0,
+                              fontWeight: FontWeight.w600,
+                              color: OpsColors.muted,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     if (showCloseButton) const SizedBox(width: 8),
@@ -511,9 +569,9 @@ class _VendorSideMenu extends StatelessWidget {
                           width: 34,
                           height: 34,
                           decoration: BoxDecoration(
-                            color: softSurface,
+                            color: OpsColors.surface,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: theme.dividerColor),
+                            border: Border.all(color: OpsColors.border),
                           ),
                           child: const Icon(Icons.close, size: 18),
                         ),
@@ -523,80 +581,50 @@ class _VendorSideMenu extends StatelessWidget {
               ),
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                   children: [
-                    _buildMenuItem(
-                      context,
-                      'Dashboard',
-                      Icons.dashboard,
-                      'dashboard',
-                    ),
-                    _buildMenuItem(
-                      context,
-                      'Users',
-                      Icons.people_outline,
-                      'users',
-                    ),
-                    _buildMenuItem(
-                      context,
-                      'Analytics',
-                      Icons.analytics_outlined,
-                      'analytics',
-                    ),
-                    _buildMenuItem(
-                      context,
-                      'Map',
-                      Icons.map_outlined,
-                      'map',
-                    ),
-                    _buildMenuItem(
-                      context,
-                      'Organizations',
-                      Icons.business_outlined,
-                      'organizations',
-                    ),
-                    _buildMenuItem(
-                      context,
-                      'Settings',
-                      Icons.settings_applications,
-                      'settings',
-                    ),
+                    _buildMenuSection(context, [
+                      _buildMenuItem(context, 'Dashboard',
+                          Icons.dashboard_rounded, 'dashboard'),
+                      _buildMenuItem(context, 'Users',
+                          Icons.people_outline_rounded, 'users'),
+                      _buildMenuItem(context, 'Analytics',
+                          Icons.analytics_outlined, 'analytics'),
+                      _buildMenuItem(context, 'Map', Icons.map_outlined, 'map'),
+                      _buildMenuItem(context, 'Organizations',
+                          Icons.business_outlined, 'organizations'),
+                      _buildMenuItem(context, 'Settings',
+                          Icons.settings_outlined, 'settings'),
+                    ]),
                   ],
                 ),
               ),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
-                decoration: BoxDecoration(
-                  border: Border(
-                    top: BorderSide(color: theme.dividerColor, width: 1),
-                  ),
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
                 child: GestureDetector(
                   onTap: onLogout,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 11,
-                    ),
+                    height: 48,
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
                     decoration: BoxDecoration(
-                      color: softSurface,
+                      color: const Color(0xFFEAF0FE),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: theme.dividerColor),
+                      border: Border.all(color: OpsColors.border),
                     ),
-                    child: Row(
+                    child: const Row(
                       children: [
                         Icon(
-                          Icons.logout,
-                          size: 16,
-                          color: scheme.onSurface.withValues(alpha: 0.74),
+                          Icons.logout_rounded,
+                          size: 18,
+                          color: OpsColors.muted,
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 12),
                         Text(
                           'Logout',
                           style: TextStyle(
-                            fontSize: 12.5,
-                            color: scheme.onSurface,
+                            fontSize: 13,
+                            color: OpsColors.text,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -605,10 +633,42 @@ class _VendorSideMenu extends StatelessWidget {
                   ),
                 ),
               ),
+              if (showCloseButton)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 0, 18, 18),
+                  child: GestureDetector(
+                    onTap: onClose,
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.chevron_left_rounded,
+                          size: 20,
+                          color: OpsColors.muted,
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          'Collapse',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: OpsColors.muted,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildMenuSection(BuildContext context, List<Widget> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: items,
     );
   }
 
@@ -618,39 +678,39 @@ class _VendorSideMenu extends StatelessWidget {
     IconData icon,
     String view,
   ) {
-    final scheme = Theme.of(context).colorScheme;
     final isActive = currentView == view;
+    const inactiveIconColor = Color(0xFF53627A);
+    const inactiveTextColor = Color(0xFF53627A);
+    final iconColor = isActive ? Colors.white : inactiveIconColor;
+    final textColor = isActive ? Colors.white : inactiveTextColor;
 
     return GestureDetector(
       onTap: () => onViewChanged(view),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        height: 56,
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: isActive
-              ? Theme.of(context).colorScheme.primary
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: isActive ? OpsColors.primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
             Icon(
               icon,
-              size: 16,
-              color: isActive
-                  ? scheme.onPrimary
-                  : scheme.onSurface.withValues(alpha: 0.72),
+              size: 21,
+              color: iconColor,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 14),
             Expanded(
               child: Text(
                 title,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 13.5,
                   decoration: TextDecoration.none,
-                  color: isActive ? scheme.onPrimary : scheme.onSurface,
-                  fontWeight: FontWeight.w600,
+                  color: textColor,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
                 ),
               ),
             ),

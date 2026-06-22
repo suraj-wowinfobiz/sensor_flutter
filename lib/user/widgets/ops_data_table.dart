@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../core/theme/ops_theme.dart';
+import '../../shared/widgets/universal_table.dart';
 
 class OpsTableColumnSpec {
   final String title;
@@ -36,17 +36,12 @@ class OpsTableCellSpec {
   }) {
     return OpsTableCellSpec(
       center: center,
-      child: Text(
+      child: UniversalTableText(
         text,
+        color: color,
+        bold: bold,
         maxLines: maxLines,
-        overflow: TextOverflow.ellipsis,
         textAlign: center ? TextAlign.center : TextAlign.start,
-        style: TextStyle(
-          color: color ?? OpsColors.text,
-          fontSize: 12,
-          height: 16 / 12,
-          fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-        ),
       ),
     );
   }
@@ -83,66 +78,57 @@ class OpsDataTable extends StatelessWidget {
         final tableWidth = math.max(minWidth, constraints.maxWidth);
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: SizedBox(
+          child: UniversalTableFrame(
             width: tableWidth,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: OpsColors.surface,
-                border: Border.all(color: OpsColors.border),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Column(
-                  children: [
-                    Container(
-                      height: headerHeight,
-                      color: OpsColors.surfaceLow,
-                      padding: horizontalPadding,
-                      child: Row(
-                        children: List.generate(
-                          columns.length,
-                          (index) => _HeaderCell(
-                            column: columns[index],
-                          ),
+            child: Column(
+              children: [
+                Container(
+                  height: headerHeight,
+                  color: UniversalTablePalette.of(context).headerSurface,
+                  padding: horizontalPadding,
+                  child: Row(
+                    children: List.generate(
+                      columns.length,
+                      (index) => _HeaderCell(
+                        column: columns[index],
+                      ),
+                    ),
+                  ),
+                ),
+                ...List.generate(rows.length, (index) {
+                  final row = rows[index];
+                  final palette = UniversalTablePalette.of(context);
+                  return Container(
+                    height: rowHeight,
+                    padding: horizontalPadding,
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: index == rows.length - 1
+                              ? Colors.transparent
+                              : palette.border,
                         ),
                       ),
                     ),
-                    ...List.generate(rows.length, (index) {
-                      final row = rows[index];
-                      return Container(
-                        height: rowHeight,
-                        padding: horizontalPadding,
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(
-                              color: index == rows.length - 1
-                                  ? Colors.transparent
-                                  : OpsColors.border,
-                            ),
+                    child: Row(
+                      children: List.generate(columns.length, (cellIndex) {
+                        final column = columns[cellIndex];
+                        final cell = row.cells[cellIndex];
+                        final center = cell.center ?? column.center;
+                        return Expanded(
+                          flex: column.flex,
+                          child: Align(
+                            alignment: center
+                                ? Alignment.center
+                                : Alignment.centerLeft,
+                            child: cell.child,
                           ),
-                        ),
-                        child: Row(
-                          children: List.generate(columns.length, (cellIndex) {
-                            final column = columns[cellIndex];
-                            final cell = row.cells[cellIndex];
-                            final center = cell.center ?? column.center;
-                            return Expanded(
-                              flex: column.flex,
-                              child: Align(
-                                alignment: center
-                                    ? Alignment.center
-                                    : Alignment.centerLeft,
-                                child: cell.child,
-                              ),
-                            );
-                          }),
-                        ),
-                      );
-                    }),
-                  ],
-                ),
-              ),
+                        );
+                      }),
+                    ),
+                  );
+                }),
+              ],
             ),
           ),
         );
@@ -160,18 +146,10 @@ class _HeaderCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       flex: column.flex,
-      child: Text(
+      child: UniversalTableHeaderText(
         column.title,
         maxLines: column.maxLines,
-        overflow: TextOverflow.ellipsis,
         textAlign: column.center ? TextAlign.center : TextAlign.start,
-        style: const TextStyle(
-          color: OpsColors.outline,
-          fontSize: 11,
-          height: 14 / 11,
-          letterSpacing: .45,
-          fontWeight: FontWeight.w800,
-        ),
       ),
     );
   }

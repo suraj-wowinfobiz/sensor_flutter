@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/ops_theme.dart';
+import '../../shared/widgets/universal_table.dart';
 import '../core/responsive/adaptive_text.dart';
 import '../core/responsive/responsive_extensions.dart';
 import '../core/responsive/responsive_values.dart';
@@ -64,26 +64,12 @@ class _CrudTableState extends State<CrudTable>
       large: 164,
     );
     final outerGap = ResponsiveValues.gap(context);
-    const cardRadius = 8.0;
+    final palette = UniversalTablePalette.of(context);
 
     return FadeTransition(
       opacity: _fadeAnimation,
-      child: Container(
-        width: double.infinity,
-        margin: EdgeInsets.all(outerGap),
-        padding: EdgeInsets.all(outerGap * 1.4),
-        decoration: BoxDecoration(
-          color: OpsColors.surface,
-          borderRadius: BorderRadius.circular(cardRadius),
-          border: Border.all(color: OpsColors.border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 3,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
+      child: UniversalTableFrame(
+        padding: EdgeInsets.all(outerGap),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -100,10 +86,10 @@ class _CrudTableState extends State<CrudTable>
                     SizedBox(width: outerGap),
                     AdaptiveText(
                       widget.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: OpsColors.text,
+                        color: palette.text,
                       ),
                     ),
                   ],
@@ -148,23 +134,17 @@ class _CrudTableState extends State<CrudTable>
                         scrollDirection: Axis.horizontal,
                         child: ConstrainedBox(
                           constraints: BoxConstraints(minWidth: minTableWidth),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(color: OpsColors.border),
-                              borderRadius: BorderRadius.circular(cardRadius),
-                            ),
-                            clipBehavior: Clip.antiAlias,
+                          child: UniversalTableFrame(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 24, vertical: 16),
-                                  decoration: const BoxDecoration(
-                                    color: OpsColors.surfaceLow,
+                                  decoration: BoxDecoration(
+                                    color: palette.headerSurface,
                                     border: Border(
-                                      bottom:
-                                          BorderSide(color: OpsColors.border),
+                                      bottom: BorderSide(color: palette.border),
                                     ),
                                   ),
                                   child: Row(
@@ -175,15 +155,8 @@ class _CrudTableState extends State<CrudTable>
                                                 padding:
                                                     const EdgeInsets.symmetric(
                                                         horizontal: 8),
-                                                child: Text(
+                                                child: UniversalTableHeaderText(
                                                   column.toUpperCase(),
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    height: 16 / 12,
-                                                    fontWeight: FontWeight.w800,
-                                                    letterSpacing: .45,
-                                                    color: OpsColors.outline,
-                                                  ),
                                                 ),
                                               )),
                                       const SizedBox(
@@ -191,18 +164,11 @@ class _CrudTableState extends State<CrudTable>
                                       ),
                                       SizedBox(
                                         width: actionsWidth,
-                                        child: const Padding(
+                                        child: Padding(
                                           padding: EdgeInsets.symmetric(
                                               horizontal: 8),
-                                          child: Text(
+                                          child: UniversalTableHeaderText(
                                             'ACTIONS',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              height: 16 / 12,
-                                              fontWeight: FontWeight.w800,
-                                              letterSpacing: .45,
-                                              color: OpsColors.outline,
-                                            ),
                                           ),
                                         ),
                                       ),
@@ -211,10 +177,10 @@ class _CrudTableState extends State<CrudTable>
                                 ),
                                 ...List.generate(widget.data.length, (index) {
                                   return Container(
-                                    decoration: const BoxDecoration(
+                                    decoration: BoxDecoration(
                                       border: Border(
                                         bottom: BorderSide(
-                                          color: OpsColors.border,
+                                          color: palette.border,
                                         ),
                                       ),
                                     ),
@@ -227,15 +193,8 @@ class _CrudTableState extends State<CrudTable>
                                               padding: const EdgeInsets.all(12),
                                               child: cell is Widget
                                                   ? cell
-                                                  : Text(
+                                                  : UniversalTableText(
                                                       cell.toString(),
-                                                      style: const TextStyle(
-                                                        fontSize: 14,
-                                                        height: 20 / 14,
-                                                        fontWeight:
-                                                            FontWeight.w500,
-                                                        color: OpsColors.text,
-                                                      ),
                                                     ),
                                             ),
                                           );
@@ -264,9 +223,8 @@ class _CrudTableState extends State<CrudTable>
                                                             BorderRadius
                                                                 .circular(30),
                                                         border: Border.all(
-                                                            color: Theme.of(
-                                                                    context)
-                                                                .dividerColor),
+                                                          color: palette.border,
+                                                        ),
                                                       ),
                                                       child: Icon(
                                                         Icons.edit,
@@ -334,14 +292,11 @@ class _CrudTableState extends State<CrudTable>
                                                                     alpha: 0.3),
                                                           ),
                                                         ),
-                                                        child: const Text(
+                                                        child:
+                                                            const UniversalTableText(
                                                           'Resolve',
-                                                          style: TextStyle(
-                                                            color: Colors.green,
-                                                            fontSize: 12,
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                          ),
+                                                          bold: true,
+                                                          color: Colors.green,
                                                         ),
                                                       ),
                                                     ),
