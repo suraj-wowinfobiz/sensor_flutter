@@ -1,105 +1,120 @@
-name: Deploy Flutter Web to Windows VM (IIS)
+name: Deploy Frontend Docker Image to Linux Server
 
 on:
   push:
     branches:
-      - master
+      - main
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker/**"
+      - "lib/**"
+      - "web/**"
+      - "assets/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - ".github/workflows/main.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: frontend-deploy-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      VM_PORT: 12856
-      IIS_SITE_NAME: SensorWeb
-      IIS_SITE_PORT: 8097
-      IIS_SITE_ROOT: C:\Users\Administrator\Desktop\sensor_web\website
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSHPASS: ${{ secrets.SSH_PASSWORD }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/sensor-frontend' }}
+      IMAGE_NAME: sensor-frontend
+      CONTAINER_NAME: sensor-frontend
+      HOST_PORT: 8096
+      CONTAINER_PORT: 80
+      IMAGE_TAR_NAME: sensor-frontend.tar
+      REMOTE_DOCKER: ${{ secrets.REMOTE_DOCKER || 'docker' }}
+      ADMIN_API_BASE_URL: ${{ secrets.ADMIN_API_BASE_URL || 'http://103.211.202.145:8097' }}
+      USER_API_BASE_URL: ${{ secrets.USER_API_BASE_URL || 'http://103.211.202.145:8097' }}
+      USER_ADMIN_API_BASE_URL: ${{ secrets.USER_ADMIN_API_BASE_URL || 'http://103.211.202.145:8097' }}
+      ENGINEER_API_BASE_URL: ${{ secrets.ENGINEER_API_BASE_URL || 'http://103.211.202.145:8097' }}
+      VENDOR_API_BASE_URL: ${{ secrets.VENDOR_API_BASE_URL || 'http://103.211.202.145:8097' }}
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Check out source
+        uses: actions/checkout@v4
 
-    - name: Setup Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        flutter-version: '3.27.0'
-        channel: 'stable'
+      - name: Install sshpass
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y sshpass
 
-    - name: Install dependencies
-      run: flutter pub get
+      - name: Build frontend docker image
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_REF="${IMAGE_NAME}:${GITHUB_SHA}"
+          docker build \
+            --build-arg ADMIN_API_BASE_URL="$ADMIN_API_BASE_URL" \
+            --build-arg USER_API_BASE_URL="$USER_API_BASE_URL" \
+            --build-arg USER_ADMIN_API_BASE_URL="$USER_ADMIN_API_BASE_URL" \
+            --build-arg ENGINEER_API_BASE_URL="$ENGINEER_API_BASE_URL" \
+            --build-arg VENDOR_API_BASE_URL="$VENDOR_API_BASE_URL" \
+            -t "$IMAGE_REF" .
 
-    - name: Create env file
-      run: |
-        mkdir -p assets
-        echo "API_BASE_URL=http://103.211.202.145:8091/user-auth-service" > assets/.env
+      - name: Save frontend image archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          IMAGE_REF="${IMAGE_NAME}:${GITHUB_SHA}"
+          docker save "$IMAGE_REF" -o "release/${IMAGE_TAR_NAME}"
 
-    - name: Build Flutter Web
-      run: flutter build web --release
+      - name: Trust remote host
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
 
-    - name: Prepare deploy files
-      run: |
-        TMP_DIR=$GITHUB_WORKSPACE/deploy-files
-        mkdir -p $TMP_DIR
+      - name: Ensure remote frontend directory exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          sshpass -e ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "mkdir -p '$DEPLOY_PATH'"
 
-        # Keep hidden files too (if present)
-        cp -R build/web/. "$TMP_DIR/"
+      - name: Stop existing frontend container
+        shell: bash
+        run: |
+          set -euo pipefail
+          sshpass -e ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "set -e; if $REMOTE_DOCKER ps -a --format '{{.Names}}' | grep -qx '$CONTAINER_NAME'; then $REMOTE_DOCKER stop '$CONTAINER_NAME' >/dev/null 2>&1 || true; $REMOTE_DOCKER rm '$CONTAINER_NAME' >/dev/null 2>&1 || true; fi"
 
-        # Ensure IIS serves Flutter static assets correctly
-        cat > "$TMP_DIR/web.config" << 'EOF'
-        <?xml version="1.0" encoding="UTF-8"?>
-        <configuration>
-          <system.webServer>
-            <defaultDocument>
-              <files>
-                <clear />
-                <add value="index.html" />
-              </files>
-            </defaultDocument>
-            <staticContent>
-              <mimeMap fileExtension=".wasm" mimeType="application/wasm" />
-              <mimeMap fileExtension=".json" mimeType="application/json" />
-              <mimeMap fileExtension=".webp" mimeType="image/webp" />
-            </staticContent>
-          </system.webServer>
-        </configuration>
-        EOF
+      - name: Free frontend host port
+        shell: bash
+        run: |
+          set -euo pipefail
+          sshpass -e ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "set -e; PORT_CONTAINERS=\$($REMOTE_DOCKER ps -a --filter \"publish=$HOST_PORT\" --format '{{.Names}}'); for c in \$PORT_CONTAINERS; do if [ \"\$c\" != '$CONTAINER_NAME' ]; then $REMOTE_DOCKER stop \"\$c\" >/dev/null 2>&1 || true; $REMOTE_DOCKER rm \"\$c\" >/dev/null 2>&1 || true; fi; done"
 
-        chmod -R 755 $TMP_DIR
-        ls -la $TMP_DIR
+      - name: Upload frontend image
+        shell: bash
+        run: |
+          set -euo pipefail
+          sshpass -e rsync -az -e "ssh -p $SSH_PORT" "release/${IMAGE_TAR_NAME}" "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/${IMAGE_TAR_NAME}"
 
-    - name: Cleanup and prepare target directory
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.VM_HOST }}
-        username: ${{ secrets.VM_USER }}
-        key: ${{ secrets.VM_SSH_KEY }}
-        port: ${{ env.VM_PORT }}
-        script_stop: true
-        script: |
-          powershell -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; $root = '${{ env.IIS_SITE_ROOT }}'; New-Item -ItemType Directory -Path $root -Force | Out-Null; Remove-Item -Path ($root + '\*') -Recurse -Force -ErrorAction SilentlyContinue"
+      - name: Load new frontend image and prune old tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_REF="${IMAGE_NAME}:${GITHUB_SHA}"
+          sshpass -e ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "set -e; cd '$DEPLOY_PATH'; $REMOTE_DOCKER load -i '$IMAGE_TAR_NAME'; rm -f '$IMAGE_TAR_NAME'; for img in \$($REMOTE_DOCKER images '$IMAGE_NAME' --format '{{.Repository}}:{{.Tag}}' | grep -vFx '$IMAGE_REF' || true); do $REMOTE_DOCKER rmi -f \"\$img\" >/dev/null 2>&1 || true; done"
 
-    - name: Copy files to Windows VM
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ secrets.VM_HOST }}
-        username: ${{ secrets.VM_USER }}
-        key: ${{ secrets.VM_SSH_KEY }}
-        port: ${{ env.VM_PORT }}
-        source: "deploy-files/*"
-        target: "C:/Users/Administrator/Desktop/sensor_web/website"
-        strip_components: 1
-
-    - name: Configure IIS and verify deployment
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.VM_HOST }}
-        username: ${{ secrets.VM_USER }}
-        key: ${{ secrets.VM_SSH_KEY }}
-        port: ${{ env.VM_PORT }}
-        script_stop: true
-        script: |
-          powershell -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; Import-Module WebAdministration; $siteName='${{ env.IIS_SITE_NAME }}'; $port=${{ env.IIS_SITE_PORT }}; $root='${{ env.IIS_SITE_ROOT }}'; if (-not (Test-Path $root)) { throw 'Site root does not exist: ' + $root }; if (Get-WebSite -Name $siteName -ErrorAction SilentlyContinue) { Remove-WebSite -Name $siteName }; New-WebSite -Name $siteName -Port $port -PhysicalPath $root -Force | Out-Null; Set-ItemProperty ('IIS:\Sites\' + $siteName) -Name applicationPool -Value 'DefaultAppPool'; Start-WebSite -Name $siteName"
-          netsh advfirewall firewall delete rule name="${{ env.IIS_SITE_NAME }} Port ${{ env.IIS_SITE_PORT }}" protocol=TCP localport=${{ env.IIS_SITE_PORT }} || echo Firewall rule did not exist
-          netsh advfirewall firewall add rule name="${{ env.IIS_SITE_NAME }} Port ${{ env.IIS_SITE_PORT }}" dir=in action=allow protocol=TCP localport=${{ env.IIS_SITE_PORT }}
-          icacls "C:\Users\Administrator\Desktop\sensor_web\website" /grant IIS_IUSRS:(OI)(CI)RX /T
-          dir "C:\Users\Administrator\Desktop\sensor_web\website"
-          echo Site is running on http://103.211.202.145:${{ env.IIS_SITE_PORT }}
+      - name: Run frontend container
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_REF="${IMAGE_NAME}:${GITHUB_SHA}"
+          sshpass -e ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "set -e; cd '$DEPLOY_PATH'; $REMOTE_DOCKER run -d --name '$CONTAINER_NAME' --restart unless-stopped -p '$HOST_PORT:$CONTAINER_PORT' '$IMAGE_REF'"
