@@ -70,7 +70,8 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
     setState(() => _profileLoading = true);
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userId = (prefs.getString('admin_principal_id') ??
+      final userId = (prefs.getString('user_admin_principal_id') ??
+                  prefs.getString('admin_principal_id') ??
                   prefs.getString('super_admin_principal_id'))
               ?.trim() ??
           '';

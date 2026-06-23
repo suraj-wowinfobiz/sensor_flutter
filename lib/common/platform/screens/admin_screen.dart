@@ -43,6 +43,8 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
   bool _showBottomNav = true;
   final List<String> _openedViews = ['dashboard'];
   late AnimationController _menuController;
+  String _profileName = '';
+  String _profileInitial = '';
 
   List<RoleNavigationItem> get _navigationItems => widget.role.navigationItems;
   Set<String> get _allowedViews =>
@@ -57,6 +59,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
     );
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      await _loadSessionProfile();
       final db = ref.read(superAdminBackendChangeNotifierProvider);
       try {
         await Future.wait([
@@ -70,6 +73,38 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
         // Keep the shell responsive even if one preload request fails.
       }
     });
+  }
+
+  Future<void> _loadSessionProfile() async {
+    final sessionData = await AppSession.getSessionData();
+    final username = (sessionData['username'] ?? '').trim();
+    if (!mounted || username.isEmpty) return;
+
+    final displayName = _displayNameFromUsername(username);
+    setState(() {
+      _profileName = displayName;
+      _profileInitial = _initialsFromName(displayName);
+    });
+  }
+
+  String _displayNameFromUsername(String username) {
+    final localPart = username.split('@').first.trim();
+    return localPart.isEmpty ? username : localPart;
+  }
+
+  String _initialsFromName(String value) {
+    final parts = value
+        .split(RegExp(r'[.\s_-]+'))
+        .where((part) => part.trim().isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return widget.role.profileInitial;
+    if (parts.length == 1) {
+      final word = parts.first;
+      return word.length >= 2
+          ? word.substring(0, 2).toUpperCase()
+          : word.toUpperCase();
+    }
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 
   void toggleMenu() {
@@ -171,8 +206,11 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
       hasNotifications: hasNotifications,
       workspaceTitle: widget.role.headerTitle,
       workspaceIcon: widget.role.icon,
+      profileName:
+          _profileName.isNotEmpty ? _profileName : widget.role.profileTitle,
       profileRole: widget.role.profileTitle,
-      profileInitial: widget.role.profileInitial,
+      profileInitial:
+          _profileInitial.isNotEmpty ? _profileInitial : widget.role.profileInitial,
     );
 
     return Scaffold(
@@ -224,8 +262,13 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
                                   hasNotifications: hasNotifications,
                                   workspaceTitle: widget.role.headerTitle,
                                   workspaceIcon: widget.role.icon,
+                                  profileName: _profileName.isNotEmpty
+                                      ? _profileName
+                                      : widget.role.profileTitle,
                                   profileRole: widget.role.profileTitle,
-                                  profileInitial: widget.role.profileInitial,
+                                  profileInitial: _profileInitial.isNotEmpty
+                                      ? _profileInitial
+                                      : widget.role.profileInitial,
                                 )
                               : const SizedBox.shrink(),
                         ),
@@ -342,7 +385,16 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
       case 'dashboard':
         return RoleDashboardScreen(role: widget.role);
       case 'users':
-        return const UsersScreen();
+        if (widget.role == AppLoginRole.userAdmin) {
+          return const UsersScreen(
+            createDefaultRole: 'user',
+            selectableRoles: ['user'],
+          );
+        }
+        return const UsersScreen(
+          createDefaultRole: 'admin',
+          selectableRoles: ['admin', 'vendor', 'vendor_engineer', 'user'],
+        );
       case 'organizations':
         return const OrganizationsScreen();
       case 'map':

@@ -1,8 +1,13 @@
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'api_client.dart';
 
 class UsersApi {
   static Future<Map<String, dynamic>> getUserById(String userId) async {
-    final response = await ApiClient.get('/api/v1/users/$userId');
+    final currentPrincipalId = await _currentPrincipalId();
+    final response = userId.trim() == currentPrincipalId
+        ? await ApiClient.get('/api/v1/auth/me')
+        : await ApiClient.get('/api/v1/users/$userId');
     return _asMap(response.body);
   }
 
@@ -43,6 +48,22 @@ class UsersApi {
     required String password,
     int? maxUsersAllowed,
   }) async {
+    final normalizedRole = _normalizeRole(role);
+    final currentBackendRole = await _currentBackendRole();
+
+    if (currentBackendRole == 'vendor' && normalizedRole == 'vendor_engineer') {
+      final response = await ApiClient.post(
+        '/api/v1/vendors-engineer/engineers',
+        data: {
+          'name': name,
+          'email': email,
+          'password': password,
+          'organizationId': _organizationIdValue(organizationId),
+        },
+      );
+      return _asMap(response.body);
+    }
+
     final response = await ApiClient.post(
       '/api/v1/admins/users',
       data: {
@@ -51,7 +72,6 @@ class UsersApi {
         'password': password,
         if (maxUsersAllowed != null) 'maxUsersAllowed': maxUsersAllowed,
         'organizationId': _organizationIdValue(organizationId),
-        'role': role,
       },
     );
     return _asMap(response.body);
@@ -104,12 +124,12 @@ class UsersApi {
     required String role,
     String? password,
   }) async {
+    final normalizedRole = _normalizeRole(role);
     final response = await ApiClient.put(
-      '/api/v1/users/$id',
+      _updatePathForRole(normalizedRole, id),
       data: {
         'name': name,
         'email': email,
-        'role': role,
         if (password != null && password.trim().isNotEmpty)
           'password': password.trim(),
       },
@@ -127,7 +147,7 @@ class UsersApi {
     required bool active,
   }) async {
     final response = await ApiClient.put(
-      '/api/v1/users/$userId',
+      '/api/v1/auth/me',
       data: {
         'name': name,
         'email': email,
@@ -141,8 +161,10 @@ class UsersApi {
     return _asMap(response.body);
   }
 
-  static Future<void> deleteUser(String id) async {
-    await ApiClient.delete('/api/v1/users/$id');
+  static Future<void> deleteUser(String id, {String? role}) async {
+    await ApiClient.delete(
+      _deletePathForRole(_normalizeRole(role ?? ''), id),
+    );
   }
 
   static Future<Map<String, dynamic>> assignAccess({
@@ -266,6 +288,78 @@ class UsersApi {
     if (body is Map<String, dynamic>) return body;
     if (body is Map) return body.cast<String, dynamic>();
     return const {};
+  }
+
+  static String _normalizeRole(String role) {
+    final normalized = role.trim().toLowerCase();
+    if (normalized == 'engineer') return 'vendor_engineer';
+    return normalized;
+  }
+
+  static String _updatePathForRole(String role, String id) {
+    switch (role) {
+      case 'admin':
+        return '/api/v1/super-admins/admins/$id';
+      case 'vendor':
+        return '/api/v1/vendors/$id';
+      case 'vendor_engineer':
+        return '/api/v1/vendors-engineer/engineers/$id';
+      default:
+        return '/api/v1/users/$id';
+    }
+  }
+
+  static String _deletePathForRole(String role, String id) {
+    switch (role) {
+      case 'admin':
+        return '/api/v1/super-admins/admins/$id';
+      case 'vendor':
+        return '/api/v1/vendors/$id';
+      case 'vendor_engineer':
+        return '/api/v1/vendors-engineer/engineers/$id';
+      default:
+        return '/api/v1/users/$id';
+    }
+  }
+
+  static Future<String> _currentBackendRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    final sessionRole = (prefs.getString('app_session_role') ?? '').trim();
+    switch (sessionRole) {
+      case 'admin':
+        return 'super_admin';
+      case 'user_admin':
+        return 'admin';
+      case 'engineer':
+        return 'vendor_engineer';
+      default:
+        return sessionRole;
+    }
+  }
+
+  static Future<String> _currentPrincipalId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final backendRole = await _currentBackendRole();
+    switch (backendRole) {
+      case 'super_admin':
+        return (prefs.getString('admin_principal_id') ??
+                prefs.getString('super_admin_principal_id') ??
+                '')
+            .trim();
+      case 'admin':
+        return (prefs.getString('user_admin_principal_id') ??
+                prefs.getString('admin_principal_id') ??
+                '')
+            .trim();
+      case 'vendor':
+        return (prefs.getString('vendor_principal_id') ?? '').trim();
+      case 'vendor_engineer':
+        return (prefs.getString('engineer_principal_id') ?? '').trim();
+      case 'user':
+        return (prefs.getString('user_principal_id') ?? '').trim();
+      default:
+        return '';
+    }
   }
 
   static dynamic _organizationIdValue(String organizationId) {

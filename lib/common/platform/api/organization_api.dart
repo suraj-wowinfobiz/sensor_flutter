@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api/admin_api_config.dart';
 
 class OrgServiceApi {
-  static const String baseUrl = '${AdminApiConfig.apiV1Base}/org';
+  static String get baseUrl => '${AdminApiConfig.apiV1Base}/org';
   static const String _tokenStorageKey = 'platform_auth_token';
   static const Duration _requestDeadline = Duration(seconds: 30);
 
@@ -86,7 +86,7 @@ class OrgServiceApi {
   // Sites
   static Future<ApiResponse> getAllSites() async {
     final res = await _send(http.get(
-      Uri.parse('$baseUrl/site/'),
+      Uri.parse('$baseUrl/site'),
       headers: await _headers(),
     ));
     return _handleResponse(res);
@@ -103,9 +103,9 @@ class OrgServiceApi {
   static Future<ApiResponse> createSite(
       String orgId, String name, String location) async {
     final res = await _send(http.post(
-      Uri.parse('$baseUrl/site/'),
+      Uri.parse('$baseUrl/organization/$orgId/sites'),
       headers: await _headers(json: true),
-      body: jsonEncode({'orgId': orgId, 'name': name, 'location': location}),
+      body: jsonEncode({'name': name, 'location': location}),
     ));
     return _handleResponse(res);
   }
@@ -151,7 +151,7 @@ class OrgServiceApi {
 
   // Zones
   static Future<ApiResponse> getZonesBySite(String siteId) async {
-    final uri = Uri.parse('$baseUrl/zone/').replace(
+    final uri = Uri.parse('$baseUrl/zone').replace(
       queryParameters: {'siteId': siteId},
     );
     final res = await _send(http.get(uri, headers: await _headers()));
@@ -168,7 +168,7 @@ class OrgServiceApi {
 
   static Future<ApiResponse> createZone(String siteId, String name) async {
     final res = await _send(http.post(
-      Uri.parse('$baseUrl/zone/'),
+      Uri.parse('$baseUrl/zone'),
       headers: await _headers(json: true),
       body: jsonEncode({'siteId': siteId, 'name': name}),
     ));

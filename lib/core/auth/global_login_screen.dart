@@ -33,7 +33,6 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   static const _rememberEmailKey = 'global_login_email';
   static const _rememberRoleKey = 'global_login_role';
   static const _rememberEnabledKey = 'global_login_remember';
-  static const _apiEnabledKey = 'global_login_api_enabled';
   static const _loginHeroVideoAsset = 'assets/images/login_background.mp4';
   static const _loginHeroFallbackAsset = 'assets/images/construction.jpg';
   static const _sensorLogoAsset = 'assets/icons/sensor_icon.png';
@@ -45,7 +44,6 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   late AppLoginRole _selectedRole;
   bool _obscurePassword = true;
   bool _rememberMe = true;
-  bool _useApiAuth = true;
   bool _isLoading = false;
   bool _didPrecacheLoginAssets = false;
 
@@ -59,7 +57,6 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   Future<void> _loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
     final rememberMe = prefs.getBool(_rememberEnabledKey) ?? true;
-    final useApiAuth = prefs.getBool(_apiEnabledKey) ?? true;
     final rememberedEmail = prefs.getString(_rememberEmailKey) ?? '';
     final rememberedRole = prefs.getString(_rememberRoleKey);
     AppLoginRole? matchedRole;
@@ -73,7 +70,6 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
     if (!mounted) return;
     setState(() {
       _rememberMe = rememberMe;
-      _useApiAuth = useApiAuth;
       if (rememberMe && rememberedEmail.isNotEmpty) {
         _emailController.text = rememberedEmail;
       }
@@ -99,7 +95,6 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   Future<void> _storePreferences() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_rememberEnabledKey, _rememberMe);
-    await prefs.setBool(_apiEnabledKey, _useApiAuth);
     await prefs.setString(_rememberRoleKey, _selectedRole.rememberValue);
 
     if (_rememberMe) {
@@ -118,34 +113,11 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
 
     try {
       await _storePreferences();
-      if (_useApiAuth) {
-        await _loginWithApi();
-      } else {
-        await _openBypassPage();
-      }
+      await _loginWithApi();
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Login failed: $error')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  Future<void> _skipLogin() async {
-    FocusScope.of(context).unfocus();
-    setState(() => _isLoading = true);
-
-    try {
-      await _storePreferences();
-      await _openBypassPage();
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Skip failed: $error')),
       );
     } finally {
       if (mounted) {
@@ -178,17 +150,6 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
     await AppSession.saveSession(
       token: response.body.token,
       username: email,
-      role: _selectedRole.sessionValue,
-    );
-    await _pushHome(_homePageForRole(_selectedRole));
-  }
-
-  Future<void> _openBypassPage() async {
-    await AppSession.saveSession(
-      token: 'bypass_${_selectedRole.sessionValue}',
-      username: _emailController.text.trim().isEmpty
-          ? _selectedRole.emailHint
-          : _emailController.text.trim(),
       role: _selectedRole.sessionValue,
     );
     await _pushHome(_homePageForRole(_selectedRole));
@@ -514,90 +475,42 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                               ),
                             ]
                           : [
-                              Expanded(
-                                child: SizedBox(
-                                  height: 56,
-                                  child: OutlinedButton(
-                                    onPressed: _isLoading ? null : _skipLogin,
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: primary,
-                                      side: BorderSide(color: primary),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 56,
+                                child: ElevatedButton(
+                                  onPressed: _isLoading ? null : _submit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: primary,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
                                     ),
-                                    child: const Text(
-                                      'Skip',
-                                      style: TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
+                                    elevation: 0,
                                   ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: SizedBox(
-                                  height: 56,
-                                  child: ElevatedButton(
-                                    onPressed: _isLoading ? null : _submit,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: primary,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      elevation: 0,
-                                    ),
-                                    child: _isLoading
-                                        ? const SizedBox(
-                                            width: 24,
-                                            height: 24,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                Colors.white,
-                                              ),
-                                            ),
-                                          )
-                                        : const Text(
-                                            'Log In',
-                                            style: TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.w700,
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
                                             ),
                                           ),
-                                  ),
+                                        )
+                                      : const Text(
+                                          'Log In',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
                                 ),
                               ),
                             ],
                     ),
-                    if (isPhone) ...[
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: OutlinedButton(
-                          onPressed: _isLoading ? null : _skipLogin,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: primary,
-                            side: BorderSide(color: primary),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: const Text(
-                            'Skip',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -929,7 +842,6 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                     const SizedBox(height: 24),
                     LayoutBuilder(
                       builder: (context, constraints) {
-                        final stackButtons = constraints.maxWidth < 390;
                         final loginButton = SizedBox(
                           height: 56,
                           child: DecoratedBox(
@@ -996,53 +908,9 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                             ),
                           ),
                         );
-                        final skipButton = SizedBox(
-                          height: 56,
-                          child: OutlinedButton(
-                            onPressed: _isLoading ? null : _skipLogin,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: OpsColors.primaryContainer,
-                              side: BorderSide(
-                                color: OpsColors.primaryContainer.withValues(
-                                  alpha: 0.42,
-                                ),
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                            ),
-                            child: const Text(
-                              'SKIP',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        );
-
-                        if (stackButtons) {
-                          return Column(
-                            children: [
-                              SizedBox(
-                                width: double.infinity,
-                                child: loginButton,
-                              ),
-                              const SizedBox(height: 12),
-                              SizedBox(
-                                width: double.infinity,
-                                child: skipButton,
-                              ),
-                            ],
-                          );
-                        }
-
-                        return Row(
-                          children: [
-                            Expanded(child: loginButton),
-                            const SizedBox(width: 12),
-                            Expanded(child: skipButton),
-                          ],
+                        return SizedBox(
+                          width: double.infinity,
+                          child: loginButton,
                         );
                       },
                     ),
@@ -1164,7 +1032,6 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
               const SizedBox(height: 24),
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final stackButtons = constraints.maxWidth < 390;
                   final loginButton = SizedBox(
                     height: 56,
                     child: DecoratedBox(
@@ -1229,46 +1096,9 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
                       ),
                     ),
                   );
-                  final skipButton = SizedBox(
-                    height: 56,
-                    child: OutlinedButton(
-                      onPressed: _isLoading ? null : _skipLogin,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: OpsColors.primaryContainer,
-                        side: BorderSide(
-                          color: OpsColors.primaryContainer
-                              .withValues(alpha: 0.42),
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                      ),
-                      child: const Text(
-                        'SKIP',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  );
-
-                  if (stackButtons) {
-                    return Column(
-                      children: [
-                        SizedBox(width: double.infinity, child: loginButton),
-                        const SizedBox(height: 12),
-                        SizedBox(width: double.infinity, child: skipButton),
-                      ],
-                    );
-                  }
-
-                  return Row(
-                    children: [
-                      Expanded(child: skipButton),
-                      const SizedBox(width: 12),
-                      Expanded(child: loginButton),
-                    ],
+                  return SizedBox(
+                    width: double.infinity,
+                    child: loginButton,
                   );
                 },
               ),

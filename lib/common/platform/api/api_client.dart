@@ -5,7 +5,6 @@ import '../core/api/admin_api_config.dart';
 class ApiClient {
   ApiClient._();
 
-  static const String baseUrl = AdminApiConfig.baseUrl;
   static const String _tokenStorageKey = 'platform_auth_token';
   static const Duration _requestDeadline = Duration(seconds: 30);
   static String? _authToken;
@@ -13,7 +12,7 @@ class ApiClient {
 
   static final Dio _dio = Dio(
     BaseOptions(
-      baseUrl: baseUrl,
+      baseUrl: AdminApiConfig.baseUrl,
       connectTimeout: const Duration(seconds: 20),
       receiveTimeout: const Duration(seconds: 20),
       headers: {
@@ -26,6 +25,7 @@ class ApiClient {
   );
 
   static Future<void> _ensureTokenLoaded() async {
+    _dio.options.baseUrl = AdminApiConfig.baseUrl;
     if (_tokenLoaded) return;
     final prefs = await SharedPreferences.getInstance();
     _authToken = prefs.getString(_tokenStorageKey);

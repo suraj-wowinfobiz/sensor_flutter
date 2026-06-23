@@ -1,5 +1,6 @@
-import 'dart:math';
 import 'dart:convert';
+import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -103,6 +104,59 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     return const <String, dynamic>{};
   }
 
+  Map<String, dynamic> _asMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return raw.cast<String, dynamic>();
+    return const <String, dynamic>{};
+  }
+
+  Site? _siteFromPayload(
+    dynamic raw, {
+    String fallbackOrganizationId = '',
+  }) {
+    final json = _asMap(raw);
+    if (json.isEmpty) return null;
+
+    final id = _asString(json['sitesID'] ?? json['siteId'] ?? json['id']);
+    if (id.isEmpty) return null;
+
+    final organization = _asMap(json['organization']);
+    final organizationId = _asString(
+      json['organizationId'] ??
+          json['organization_id'] ??
+          organization['organizationId'] ??
+          organization['id'],
+      fallbackOrganizationId,
+    );
+
+    return Site(
+      id: id,
+      organizationId: organizationId,
+      name: _asString(json['name']),
+      location: _asString(json['location'], 'N/A'),
+      createdAt: _asDate(json['createdAt'] ?? json['created_at']),
+    );
+  }
+
+  void _upsertSite(Site site) {
+    final index = sites.indexWhere((item) => item.id == site.id);
+    if (index >= 0) {
+      sites[index] = site;
+      return;
+    }
+    sites = [...sites, site];
+  }
+
+  void _refreshSitesSoon() {
+    unawaited(() async {
+      try {
+        await loadSites();
+      } catch (e) {
+        print('Error refreshing sites: $e');
+      }
+    }());
+  }
+
   void _initializeData() {
     organizations = [];
     sites = [];
@@ -178,60 +232,32 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     if (_loadSitesTask != null) return _loadSitesTask!;
     final task = () async {
       try {
-        final res = await org_api.OrgServiceApi.getAllSites();
-        if (res.body == null) {
+        if (organizations.isEmpty) {
           sites = [];
           return;
         }
-        final mappedSites = <String, Site>{};
-        for (final json in (res.body as List)) {
-          final org = json['organization'];
-          final site = Site(
-            id: json['sitesID'],
-            organizationId:
-                org != null && org is Map ? org['organizationId'] : '',
-            name: json['name'],
-            location: json['location'],
-            createdAt: DateTime.parse(json['createdAt']),
-          );
-          mappedSites[site.id] = site;
-        }
 
-        // Some backend responses from /site/ do not include organization relation.
-        // Enrich missing organizationId by querying sites scoped per organization.
-        final hasMissingOrganization = mappedSites.values.any(
-          (s) => s.organizationId.trim().isEmpty,
-        );
-        if (hasMissingOrganization && organizations.isNotEmpty) {
-          for (final org in organizations) {
-            try {
-              final orgSitesRes =
-                  await org_api.OrgServiceApi.getOrganizationSites(org.id);
-              final body = orgSitesRes.body;
-              if (body is! Map) continue;
-              final rawSites = body['sites'];
-              if (rawSites is! List) continue;
-              for (final raw in rawSites) {
-                if (raw is! Map) continue;
-                final id = _asString(raw['sitesID']);
-                if (id.isEmpty) continue;
-                final existing = mappedSites[id];
-                final createdAtRaw = raw['createdAt'];
-                final createdAt = createdAtRaw is String
-                    ? (DateTime.tryParse(createdAtRaw) ?? DateTime.now())
-                    : (existing?.createdAt ?? DateTime.now());
-                mappedSites[id] = Site(
-                  id: id,
-                  organizationId: org.id,
-                  name: _asString(raw['name'], existing?.name ?? ''),
-                  location:
-                      _asString(raw['location'], existing?.location ?? ''),
-                  createdAt: createdAt,
-                );
-              }
-            } catch (_) {
-              // Ignore per-org enrichment failures and keep base list.
+        final mappedSites = <String, Site>{};
+
+        for (final org in organizations) {
+          try {
+            final orgSitesRes = await org_api.OrgServiceApi.getOrganizationSites(
+              org.id,
+            );
+            final body = _asMap(orgSitesRes.body);
+            final rawSites = body['sites'];
+            if (rawSites is! List) continue;
+
+            for (final raw in rawSites) {
+              final site = _siteFromPayload(
+                raw,
+                fallbackOrganizationId: org.id,
+              );
+              if (site == null) continue;
+              mappedSites[site.id] = site;
             }
+          } catch (_) {
+            // Keep loading other organizations even if one scoped call fails.
           }
         }
 
@@ -529,12 +555,19 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         break;
       case 'sites':
         final organizationId = data['organization_id'] as String;
-        await org_api.OrgServiceApi.createSiteForOrganization(
+        final res = await org_api.OrgServiceApi.createSiteForOrganization(
           organizationId,
           data['name'] as String,
           data['location'] as String,
         );
-        await loadSites();
+        final createdSite = _siteFromPayload(
+          res.body,
+          fallbackOrganizationId: organizationId,
+        );
+        if (createdSite != null) {
+          _upsertSite(createdSite);
+        }
+        _refreshSitesSoon();
         break;
       case 'zones':
         final siteId = data['site_id'] as String;
@@ -661,9 +694,8 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         } else if (role == 'engineer' ||
             role == 'user' ||
             role == 'vendor_engineer') {
-          final createRole = role == 'vendor_engineer'
-              ? 'Vendor_engineer'
-              : (role == 'user' ? 'user' : role);
+          final createRole =
+              role == 'user' ? 'user' : 'vendor_engineer';
           await UsersApi.createUser(
             name: name,
             email: email,
@@ -731,7 +763,17 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           data['location'] as String,
           orgId: data['organization_id'] as String,
         );
-        await loadSites();
+        final existingSite = sites.where((item) => item.id == id).firstOrNull;
+        if (existingSite != null) {
+          _upsertSite(
+            existingSite.copyWith(
+              name: data['name'] as String,
+              location: data['location'] as String,
+              organizationId: data['organization_id'] as String,
+            ),
+          );
+        }
+        _refreshSitesSoon();
         break;
       case 'zones':
         await org_api.OrgServiceApi.updateZone(
@@ -811,11 +853,15 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         await loadSensorParameters();
         break;
       case 'users':
+        final existingRole = users
+            .where((item) => item.id == id)
+            .map((item) => item.role)
+            .firstOrNull;
         await UsersApi.updateUser(
           id: id,
           name: data['name'] as String,
           email: data['email'] as String,
-          role: _asString(data['role'], 'operator'),
+          role: _asString(data['role'], existingRole ?? 'user'),
           password: _asString(data['password']),
         );
         await loadUsers();
@@ -833,8 +879,9 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         break;
       case 'sites':
         await org_api.OrgServiceApi.deleteSite(id);
-        await loadSites();
+        sites.removeWhere((item) => item.id == id);
         zones.removeWhere((z) => z.siteId == id);
+        _refreshSitesSoon();
         break;
       case 'zones':
         await org_api.OrgServiceApi.deleteZone(id);
@@ -860,7 +907,11 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         await loadThresholdValues();
         break;
       case 'users':
-        await UsersApi.deleteUser(id);
+        final existingRole = users
+            .where((item) => item.id == id)
+            .map((item) => item.role)
+            .firstOrNull;
+        await UsersApi.deleteUser(id, role: existingRole);
         await loadUsers();
         break;
       case 'audit':

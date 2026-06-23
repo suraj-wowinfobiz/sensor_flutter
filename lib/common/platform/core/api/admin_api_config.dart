@@ -3,6 +3,6 @@ import '../../../../core/config/app_api_endpoints.dart';
 class AdminApiConfig {
   AdminApiConfig._();
 
-  static const String baseUrl = AppApiEndpoints.adminBaseUrl;
-  static const String apiV1Base = '$baseUrl/api/v1';
+  static String get baseUrl => AppApiEndpoints.adminBaseUrl;
+  static String get apiV1Base => '${AppApiEndpoints.adminBaseUrl}/api/v1';
 }

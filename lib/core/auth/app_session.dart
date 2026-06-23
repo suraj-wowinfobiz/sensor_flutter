@@ -10,7 +10,6 @@ class AppSession {
   static const _sessionTokenKey = 'app_session_token';
   static const _sessionUserKey = 'app_session_user';
   static const _sessionRoleKey = 'app_session_role';
-  static const _sessionExpiryKey = 'app_session_expiry';
 
   static const _principalKeys = <String>[
     'user_principal_id',
@@ -28,30 +27,19 @@ class AppSession {
     required String token,
     required String username,
     required String role,
-    Duration sessionDuration = const Duration(hours: 24),
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    final expiryTime =
-        DateTime.now().add(sessionDuration).millisecondsSinceEpoch;
 
     await prefs.setString(_sessionTokenKey, token);
     await prefs.setString(_sessionUserKey, username);
     await prefs.setString(_sessionRoleKey, role);
-    await prefs.setInt(_sessionExpiryKey, expiryTime);
   }
 
-  /// Check if session is valid
+  /// Keep the user logged in until they explicitly log out.
   static Future<bool> isSessionValid() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(_sessionTokenKey);
-    final expiryTime = prefs.getInt(_sessionExpiryKey);
-
-    if (token == null || expiryTime == null) {
-      return false;
-    }
-
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return now < expiryTime;
+    return token != null && token.trim().isNotEmpty;
   }
 
   /// Get current session data
@@ -64,13 +52,6 @@ class AppSession {
     };
   }
 
-  /// Extend session expiry
-  static Future<void> extendSession(Duration duration) async {
-    final prefs = await SharedPreferences.getInstance();
-    final expiryTime = DateTime.now().add(duration).millisecondsSinceEpoch;
-    await prefs.setInt(_sessionExpiryKey, expiryTime);
-  }
-
   static Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -78,7 +59,6 @@ class AppSession {
     await prefs.remove(_sessionTokenKey);
     await prefs.remove(_sessionUserKey);
     await prefs.remove(_sessionRoleKey);
-    await prefs.remove(_sessionExpiryKey);
 
     // Clear principal keys
     for (final key in _principalKeys) {

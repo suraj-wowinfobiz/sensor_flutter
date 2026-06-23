@@ -13,7 +13,7 @@ class UsersScreen extends StatefulWidget {
   const UsersScreen({
     super.key,
     this.createDefaultRole = 'admin',
-    this.selectableRoles = const ['admin', 'vendor'],
+    this.selectableRoles = const ['admin', 'vendor', 'vendor_engineer', 'user'],
   });
 
   @override
@@ -105,37 +105,40 @@ class _UsersScreenState extends State<UsersScreen> {
 
     String normalizeRole(String value) {
       final lower = value.trim().toLowerCase();
-      if (lower == 'vendor_engineer') return 'Vendor_engineer';
-      if (lower == 'engineer') return 'engineer';
+      if (lower == 'vendor_engineer' || lower == 'engineer') {
+        return 'vendor_engineer';
+      }
       if (lower == 'vendor') return 'vendor';
+      if (lower == 'admin') return 'admin';
+      if (lower == 'user') return 'user';
       final fallback = widget.selectableRoles.isNotEmpty
           ? widget.selectableRoles.first
           : widget.createDefaultRole;
-      if (fallback.trim().toLowerCase() == 'vendor_engineer') {
-        return 'Vendor_engineer';
-      }
+      if (fallback.trim().toLowerCase() == 'engineer') return 'vendor_engineer';
       return fallback.trim().toLowerCase();
     }
 
-    List<DropdownMenuItem<String>> roleItems() {
-      String labelFor(String role) {
-        switch (role) {
-          case 'vendor_engineer':
-            return 'Vendor Engineer';
-          case 'admin':
-            return 'User Admin';
-          case 'vendor':
-            return 'Vendor';
-          default:
-            return role;
-        }
+    String labelForRole(String role) {
+      switch (role) {
+        case 'vendor_engineer':
+          return 'Vendor Engineer';
+        case 'admin':
+          return 'User Admin';
+        case 'vendor':
+          return 'Vendor';
+        case 'user':
+          return 'User';
+        default:
+          return role;
       }
+    }
 
+    List<DropdownMenuItem<String>> roleItems() {
       return widget.selectableRoles
           .map(
             (role) => DropdownMenuItem<String>(
               value: role,
-              child: Text(labelFor(role)),
+              child: Text(labelForRole(role)),
             ),
           )
           .toList();
@@ -303,18 +306,9 @@ class _UsersScreenState extends State<UsersScreen> {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        _inputBox(
-                          child: TextField(
-                            controller: nameController,
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding:
-                                  EdgeInsets.symmetric(vertical: 12),
-                              hintText: 'John Doe',
-                            ),
-                            textAlignVertical: TextAlignVertical.center,
-                          ),
+                        _textInput(
+                          controller: nameController,
+                          hintText: 'John Doe',
                         ),
                         const SizedBox(height: 10),
                         Text(
@@ -328,18 +322,9 @@ class _UsersScreenState extends State<UsersScreen> {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        _inputBox(
-                          child: TextField(
-                            controller: emailController,
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding:
-                                  EdgeInsets.symmetric(vertical: 12),
-                              hintText: 'john@example.com',
-                            ),
-                            textAlignVertical: TextAlignVertical.center,
-                          ),
+                        _textInput(
+                          controller: emailController,
+                          hintText: 'john@example.com',
                         ),
                         const SizedBox(height: 10),
                         Text(
@@ -353,27 +338,44 @@ class _UsersScreenState extends State<UsersScreen> {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        _inputBox(
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: widget.selectableRoles.contains(
-                                      normalizeRole(roleController.text))
-                                  ? normalizeRole(roleController.text)
-                                  : (widget.selectableRoles.isNotEmpty
-                                      ? widget.selectableRoles.first
-                                      : normalizeRole(roleController.text)),
-                              isExpanded: true,
-                              items: roleItems(),
-                              onChanged: (value) {
-                                if (value != null) {
-                                  setState(() {
-                                    roleController.text = value;
-                                  });
-                                }
-                              },
+                        if (widget.selectableRoles.length == 1)
+                          _selectBox(
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                labelForRole(widget.selectableRoles.first),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isLight
+                                      ? const Color(0xFF1B313D)
+                                      : const Color(0xFFE2EDF8),
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          _selectBox(
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: widget.selectableRoles.contains(
+                                        normalizeRole(roleController.text))
+                                    ? normalizeRole(roleController.text)
+                                    : (widget.selectableRoles.isNotEmpty
+                                        ? widget.selectableRoles.first
+                                        : normalizeRole(roleController.text)),
+                                isExpanded: true,
+                                isDense: true,
+                                items: roleItems(),
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    setState(() {
+                                      roleController.text = value;
+                                    });
+                                  }
+                                },
+                              ),
                             ),
                           ),
-                        ),
                         const SizedBox(height: 10),
                         Text(
                           'Organization',
@@ -386,7 +388,7 @@ class _UsersScreenState extends State<UsersScreen> {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        _inputBox(
+                        _selectBox(
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
                               value: db.organizations.any(
@@ -396,6 +398,7 @@ class _UsersScreenState extends State<UsersScreen> {
                                   : null,
                               isExpanded: true,
                               hint: const Text('Select organization'),
+                              isDense: true,
                               items: db.organizations
                                   .map((org) => DropdownMenuItem<String>(
                                         value: org.id,
@@ -430,19 +433,10 @@ class _UsersScreenState extends State<UsersScreen> {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          _inputBox(
-                            child: TextField(
-                              controller: passwordController,
-                              obscureText: true,
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                isDense: true,
-                                contentPadding:
-                                    EdgeInsets.symmetric(vertical: 12),
-                                hintText: 'Enter password',
-                              ),
-                              textAlignVertical: TextAlignVertical.center,
-                            ),
+                          _textInput(
+                            controller: passwordController,
+                            hintText: 'Enter password',
+                            obscureText: true,
                           ),
                         ],
                         if (_editingId == null) ...[
@@ -458,19 +452,10 @@ class _UsersScreenState extends State<UsersScreen> {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          _inputBox(
-                            child: TextField(
-                              controller: maxUsersAllowedController,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                isDense: true,
-                                contentPadding:
-                                    EdgeInsets.symmetric(vertical: 12),
-                                hintText: '20',
-                              ),
-                              textAlignVertical: TextAlignVertical.center,
-                            ),
+                          _textInput(
+                            controller: maxUsersAllowedController,
+                            hintText: '20',
+                            keyboardType: TextInputType.number,
                           ),
                         ],
                         const SizedBox(height: 14),
@@ -557,7 +542,66 @@ class _UsersScreenState extends State<UsersScreen> {
     );
   }
 
-  Widget _inputBox({required Widget child}) {
+  InputDecoration _fieldDecoration({
+    required String hintText,
+    bool filled = true,
+  }) {
+    final theme = Theme.of(context);
+    final isLight = theme.brightness == Brightness.light;
+    final fillColor =
+        isLight ? const Color(0xFFF7FAFC) : const Color(0xFF1A3347);
+    final borderColor = theme.dividerColor;
+
+    OutlineInputBorder border([Color? color, double width = 1]) {
+      return OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(
+          color: color ?? borderColor,
+          width: width,
+        ),
+      );
+    }
+
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: TextStyle(
+        color: isLight ? const Color(0xFF607A88) : const Color(0xFF9FB4C6),
+      ),
+      filled: filled,
+      fillColor: fillColor,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: border(),
+      enabledBorder: border(),
+      focusedBorder: border(theme.colorScheme.primary.withValues(alpha: 0.55), 1.4),
+      errorBorder: border(theme.colorScheme.error),
+      focusedErrorBorder:
+          border(theme.colorScheme.error.withValues(alpha: 0.85), 1.4),
+    );
+  }
+
+  Widget _textInput({
+    required TextEditingController controller,
+    required String hintText,
+    bool obscureText = false,
+    TextInputType? keyboardType,
+  }) {
+    final theme = Theme.of(context);
+    final isLight = theme.brightness == Brightness.light;
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      textAlignVertical: TextAlignVertical.center,
+      style: TextStyle(
+        fontSize: 14,
+        color: isLight ? const Color(0xFF1B313D) : const Color(0xFFE2EDF8),
+      ),
+      decoration: _fieldDecoration(hintText: hintText),
+    );
+  }
+
+  Widget _selectBox({required Widget child}) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     return Container(
       height: 46,
@@ -567,7 +611,10 @@ class _UsersScreenState extends State<UsersScreen> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Theme.of(context).dividerColor),
       ),
-      child: child,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: child,
+      ),
     );
   }
 
@@ -579,16 +626,63 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   List<User> _applyFilters(List<User> users) {
+    final allowedRoles = widget.selectableRoles.map((role) {
+      if (role == 'engineer') return 'vendor_engineer';
+      return role.trim().toLowerCase();
+    }).toSet();
+
     return users.where((u) {
+      final normalizedRole = u.role.trim().toLowerCase();
+      final matchesAllowedRoles =
+          allowedRoles.isEmpty || allowedRoles.contains(normalizedRole);
       final matchesSearch = _searchText.isEmpty ||
           u.name.toLowerCase().contains(_searchText.toLowerCase()) ||
           u.email.toLowerCase().contains(_searchText.toLowerCase());
-      final matchesRole = _roleFilter == 'all' || u.role == _roleFilter;
+      final matchesRole = _roleFilter == 'all' || normalizedRole == _roleFilter;
       final isRestricted = _restrictedUsers.contains(u.id);
       final status = isRestricted ? 'restricted' : 'active';
       final matchesStatus = _statusFilter == 'all' || _statusFilter == status;
-      return matchesSearch && matchesRole && matchesStatus;
+      return matchesAllowedRoles &&
+          matchesSearch &&
+          matchesRole &&
+          matchesStatus;
     }).toList();
+  }
+
+  List<DropdownMenuItem<String>> _roleFilterItems() {
+    final items = <DropdownMenuItem<String>>[
+      const DropdownMenuItem(value: 'all', child: Text('All Roles')),
+    ];
+
+    for (final role in widget.selectableRoles) {
+      switch (role) {
+        case 'admin':
+          items.add(
+            const DropdownMenuItem(value: 'admin', child: Text('User Admin')),
+          );
+          break;
+        case 'vendor':
+          items.add(
+            const DropdownMenuItem(value: 'vendor', child: Text('Vendor')),
+          );
+          break;
+        case 'vendor_engineer':
+          items.add(
+            const DropdownMenuItem(
+              value: 'vendor_engineer',
+              child: Text('Vendor Engineer'),
+            ),
+          );
+          break;
+        case 'user':
+          items.add(
+            const DropdownMenuItem(value: 'user', child: Text('User')),
+          );
+          break;
+      }
+    }
+
+    return items;
   }
 
   Map<String, Set<String>> _defaultAccessForUser(
@@ -1677,14 +1771,7 @@ class _UsersScreenState extends State<UsersScreen> {
                         _dropdown(
                           value: _roleFilter,
                           width: dropdownWidth,
-                          items: const [
-                            DropdownMenuItem(
-                                value: 'all', child: Text('All Roles')),
-                            DropdownMenuItem(
-                                value: 'admin', child: Text('User Admin')),
-                            DropdownMenuItem(
-                                value: 'vendor', child: Text('Vendor')),
-                          ],
+                          items: _roleFilterItems(),
                           onChanged: (value) =>
                               setState(() => _roleFilter = value!),
                         ),
@@ -1737,14 +1824,7 @@ class _UsersScreenState extends State<UsersScreen> {
                             child: _dropdown(
                               value: _roleFilter,
                               width: double.infinity,
-                              items: const [
-                                DropdownMenuItem(
-                                    value: 'all', child: Text('All Roles')),
-                                DropdownMenuItem(
-                                    value: 'admin', child: Text('User Admin')),
-                                DropdownMenuItem(
-                                    value: 'vendor', child: Text('Vendor')),
-                              ],
+                              items: _roleFilterItems(),
                               onChanged: (value) =>
                                   setState(() => _roleFilter = value!),
                             ),

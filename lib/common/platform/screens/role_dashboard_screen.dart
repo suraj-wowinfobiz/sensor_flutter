@@ -77,52 +77,46 @@ class RoleDashboardScreen extends ConsumerWidget {
           LayoutBuilder(
             builder: (context, constraints) {
               final stacked = constraints.maxWidth < 1080;
-              final primary = Expanded(
-                flex: 3,
-                child: OpsPanel(
-                  title: _primaryPanelTitle(role),
-                  subtitle: 'Role-specific priorities',
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: _highlightsFor(role)
-                        .map(
-                          (item) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _HighlightTile(
-                              title: item.title,
-                              body: item.body,
-                              icon: item.icon,
-                            ),
+              final primaryPanel = OpsPanel(
+                title: _primaryPanelTitle(role),
+                subtitle: 'Role-specific priorities',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _highlightsFor(role)
+                      .map(
+                        (item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _HighlightTile(
+                            title: item.title,
+                            body: item.body,
+                            icon: item.icon,
                           ),
-                        )
-                        .toList(),
-                  ),
+                        ),
+                      )
+                      .toList(),
                 ),
               );
-              final secondary = Expanded(
-                flex: 2,
-                child: OpsPanel(
-                  title: 'Operational Snapshot',
-                  subtitle: 'Live shared platform data',
-                  child: _SnapshotList(
-                    items: [
-                      _SnapshotItem('Active alerts', '$activeAlerts'),
-                      _SnapshotItem(
-                          'Organizations', '${db.organizations.length}'),
-                      _SnapshotItem('Sites', '${db.sites.length}'),
-                      _SnapshotItem('Zones', '${db.zones.length}'),
-                      _SnapshotItem('Users', '${db.users.length}'),
-                    ],
-                  ),
+              final secondaryPanel = OpsPanel(
+                title: 'Operational Snapshot',
+                subtitle: 'Live shared platform data',
+                child: _SnapshotList(
+                  items: [
+                    _SnapshotItem('Active alerts', '$activeAlerts'),
+                    _SnapshotItem('Organizations', '${db.organizations.length}'),
+                    _SnapshotItem('Sites', '${db.sites.length}'),
+                    _SnapshotItem('Zones', '${db.zones.length}'),
+                    _SnapshotItem('Users', '${db.users.length}'),
+                  ],
                 ),
               );
 
               if (stacked) {
                 return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    primary,
+                    primaryPanel,
                     const SizedBox(height: 16),
-                    secondary,
+                    secondaryPanel,
                   ],
                 );
               }
@@ -130,9 +124,15 @@ class RoleDashboardScreen extends ConsumerWidget {
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  primary,
+                  Expanded(
+                    flex: 3,
+                    child: primaryPanel,
+                  ),
                   const SizedBox(width: 16),
-                  secondary,
+                  Expanded(
+                    flex: 2,
+                    child: secondaryPanel,
+                  ),
                 ],
               );
             },

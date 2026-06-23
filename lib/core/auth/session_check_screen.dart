@@ -8,8 +8,8 @@ import '../../common/pages/dashboard/user_admin_dashboard.dart';
 import '../../common/pages/dashboard/user_dashboard.dart';
 import '../../common/pages/dashboard/vendor_dashboard.dart';
 import '../../common/platform/api/api_client.dart';
+import '../../main_page.dart';
 import 'app_session.dart';
-import 'global_login_screen.dart';
 
 class SessionCheckScreen extends StatefulWidget {
   const SessionCheckScreen({super.key});
@@ -76,7 +76,7 @@ class _SessionCheckScreenState extends State<SessionCheckScreen> {
     if (mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => const GlobalLoginScreen(),
+          builder: (_) => const MainPage(),
         ),
       );
     }

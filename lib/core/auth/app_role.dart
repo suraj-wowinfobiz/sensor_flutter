@@ -41,7 +41,7 @@ extension AppLoginRoleX on AppLoginRole {
       case AppLoginRole.analyticsRole:
         return 'Analytics Role';
       case AppLoginRole.admin:
-        return 'Admin';
+        return 'Super Admin';
     }
   }
 
@@ -126,13 +126,13 @@ extension AppLoginRoleX on AppLoginRole {
       case AppLoginRole.admin:
         return 'super_admin';
       case AppLoginRole.userAdmin:
-        return 'user_admin';
+        return 'admin';
+      case AppLoginRole.engineer:
+        return 'vendor_engineer';
       case AppLoginRole.analyticsRole:
         return 'analytics_role';
       case AppLoginRole.user:
         return 'user';
-      case AppLoginRole.engineer:
-        return 'engineer';
       case AppLoginRole.vendor:
         return 'vendor';
       case AppLoginRole.analytics:
@@ -172,7 +172,7 @@ extension AppLoginRoleX on AppLoginRole {
   String get profileTitle {
     switch (this) {
       case AppLoginRole.admin:
-        return 'Platform Admin';
+        return 'Super Admin';
       default:
         return label;
     }

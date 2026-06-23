@@ -20,6 +20,14 @@ Flutter admin dashboard for the sensor monitoring platform.
 3. Run the app:
    - `flutter run`
 
+Local API defaults:
+- Web/Desktop will call `http://localhost:8091`
+- Android emulator will call `http://10.0.2.2:8091`
+
+Override manually when needed:
+- `flutter run --dart-define=ADMIN_API_BASE_URL=http://localhost:8091`
+- Add the same pattern for `USER_API_BASE_URL`, `USER_ADMIN_API_BASE_URL`, `ENGINEER_API_BASE_URL`, and `VENDOR_API_BASE_URL` if you want to point roles at different services
+
 ## Run with Docker
 
 This project is set up to run as a Flutter Web app inside Docker.
@@ -38,11 +46,11 @@ The Docker build supports per-role API endpoints through build args.
 Example:
 
 ```bash
-ADMIN_API_BASE_URL=http://your-admin-api:8091 \
-USER_API_BASE_URL=http://your-user-api:8091 \
-USER_ADMIN_API_BASE_URL=http://your-user-admin-api:8091 \
-ENGINEER_API_BASE_URL=http://your-engineer-api:8091 \
-VENDOR_API_BASE_URL=http://your-vendor-api:8091 \
+ADMIN_API_BASE_URL=http://host.docker.internal:8091 \
+USER_API_BASE_URL=http://host.docker.internal:8091 \
+USER_ADMIN_API_BASE_URL=http://host.docker.internal:8091 \
+ENGINEER_API_BASE_URL=http://host.docker.internal:8091 \
+VENDOR_API_BASE_URL=http://host.docker.internal:8091 \
 APP_PORT=8080 \
 docker compose up --build
 ```
@@ -53,11 +61,11 @@ You can also place those values in a `.env` file next to `docker-compose.yml`.
 
 ```bash
 docker build \
-  --build-arg ADMIN_API_BASE_URL=http://your-admin-api:8091 \
-  --build-arg USER_API_BASE_URL=http://your-user-api:8091 \
-  --build-arg USER_ADMIN_API_BASE_URL=http://your-user-admin-api:8091 \
-  --build-arg ENGINEER_API_BASE_URL=http://your-engineer-api:8091 \
-  --build-arg VENDOR_API_BASE_URL=http://your-vendor-api:8091 \
+  --build-arg ADMIN_API_BASE_URL=http://host.docker.internal:8091 \
+  --build-arg USER_API_BASE_URL=http://host.docker.internal:8091 \
+  --build-arg USER_ADMIN_API_BASE_URL=http://host.docker.internal:8091 \
+  --build-arg ENGINEER_API_BASE_URL=http://host.docker.internal:8091 \
+  --build-arg VENDOR_API_BASE_URL=http://host.docker.internal:8091 \
   -t sensor-platform-flutter .
 docker run --rm -p 8080:80 sensor-platform-flutter
 ```

@@ -9,8 +9,8 @@ import 'common/platform/core/providers/theme_riverpod_provider.dart';
 import 'common/platform/providers/super_admin_riverpod_provider.dart';
 import 'core/auth/app_role.dart';
 import 'core/auth/global_login_screen.dart';
+import 'core/auth/session_check_screen.dart';
 import 'core/theme/ops_theme.dart';
-import 'main_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -76,7 +76,7 @@ class _AppRoot extends ConsumerWidget {
             child: child ?? const SizedBox.shrink(),
           );
         },
-        home: const MainPage(),
+        home: const SessionCheckScreen(),
         routes: {
           '/login': (context) => const GlobalLoginScreen(),
           '/login/global': (context) => const GlobalLoginScreen(),
