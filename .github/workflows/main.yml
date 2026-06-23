@@ -79,7 +79,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
-          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          ssh-keyscan -T 20 -p "$SSH_PORT" -H "$SSH_HOST" 2>&1 | tee /tmp/frontend-ssh-keyscan.log >> ~/.ssh/known_hosts
+          test -s ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
       - name: Ensure remote frontend directory exists
