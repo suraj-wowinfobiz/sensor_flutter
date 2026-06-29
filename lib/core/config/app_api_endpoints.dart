@@ -52,21 +52,20 @@ class AppApiEndpoints {
   static String _defaultLocalBaseUrl() {
     if (kIsWeb) {
       final rawHost = Uri.base.host.trim();
-      final host = rawHost.isEmpty || rawHost == '0.0.0.0'
-          ? 'localhost'
-          : rawHost;
-      return 'http://$host:8091';
+      final host =
+          rawHost.isEmpty || rawHost == '0.0.0.0' ? 'localhost' : rawHost;
+      return 'http://$host:8097';
     }
 
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        return 'http://10.0.2.2:8091';
+        return 'http://10.0.2.2:8097';
       case TargetPlatform.iOS:
       case TargetPlatform.macOS:
       case TargetPlatform.windows:
       case TargetPlatform.linux:
       case TargetPlatform.fuchsia:
-        return 'http://localhost:8091';
+        return 'http://localhost:8097';
     }
   }
 }

@@ -36,11 +36,11 @@ jobs:
       CONTAINER_PORT: 80
       IMAGE_TAR_NAME: sensor-frontend.tar
       REMOTE_DOCKER: ${{ secrets.REMOTE_DOCKER || 'docker' }}
-      ADMIN_API_BASE_URL: ${{ secrets.ADMIN_API_BASE_URL || 'http://103.211.202.145:8097' }}
-      USER_API_BASE_URL: ${{ secrets.USER_API_BASE_URL || 'http://103.211.202.145:8097' }}
-      USER_ADMIN_API_BASE_URL: ${{ secrets.USER_ADMIN_API_BASE_URL || 'http://103.211.202.145:8097' }}
-      ENGINEER_API_BASE_URL: ${{ secrets.ENGINEER_API_BASE_URL || 'http://103.211.202.145:8097' }}
-      VENDOR_API_BASE_URL: ${{ secrets.VENDOR_API_BASE_URL || 'http://103.211.202.145:8097' }}
+      ADMIN_API_BASE_URL: ${{ secrets.ADMIN_API_BASE_URL || 'http://103.185.75.179:8097' }}
+      USER_API_BASE_URL: ${{ secrets.USER_API_BASE_URL || 'http://103.185.75.179:8097' }}
+      USER_ADMIN_API_BASE_URL: ${{ secrets.USER_ADMIN_API_BASE_URL || 'http://103.185.75.179:8097' }}
+      ENGINEER_API_BASE_URL: ${{ secrets.ENGINEER_API_BASE_URL || 'http://103.185.75.179:8097' }}
+      VENDOR_API_BASE_URL: ${{ secrets.VENDOR_API_BASE_URL || 'http://103.185.75.179:8097' }}
 
     steps:
       - name: Check out source
