@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SSH_HOST: ${{ secrets.SSH_HOST }}
-      SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+      SSH_PORT: ${{ secrets.SSH_PORT || '8521' }}
       SSH_USER: ${{ secrets.SSH_USER }}
       SSHPASS: ${{ secrets.SSH_PASSWORD }}
       DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/sensor-frontend' }}
