@@ -1,7 +1,10 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider;
 
+import '../core/api/admin_api_config.dart';
 import '../../../core/theme/ops_theme.dart';
 import '../api/sensor_parameter_api.dart';
 import '../models/sensor.dart';
@@ -36,6 +39,102 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
   final Set<String> _inactiveSensors = {};
   int _refreshKey = 0;
 
+  String _generateClientSensorId() {
+    const chars = '0123456789abcdef';
+    final random = Random.secure();
+    String hex(int count) =>
+        List.generate(count, (_) => chars[random.nextInt(chars.length)]).join();
+    return '${hex(8)}-${hex(4)}-4${hex(3)}-${'89ab'[random.nextInt(4)]}${hex(3)}-${hex(12)}';
+  }
+
+  int _javaStringHash(String value) {
+    var hash = 0;
+    for (final codeUnit in value.codeUnits) {
+      hash = (31 * hash + codeUnit) & 0x7fffffff;
+    }
+    return hash;
+  }
+
+  String _slugify(String value) {
+    final trimmed = value.trim().toLowerCase();
+    final normalized = trimmed
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+'), '')
+        .replaceAll(RegExp(r'-+$'), '')
+        .replaceAll(RegExp(r'-{2,}'), '-');
+    return normalized.isEmpty ? 'item' : normalized;
+  }
+
+  String _buildAbsoluteUrl(String path) {
+    final base = AdminApiConfig.baseUrl.replaceAll(RegExp(r'/$'), '');
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    return '$base$normalizedPath';
+  }
+
+  Map<String, String> _endpointPreview({
+    required String sensorId,
+    required String sensorName,
+    required String serialNumber,
+    required String deviceId,
+    required SuperAdminBackendProvider db,
+  }) {
+    final device = db.devices.where((item) => item.id == deviceId).firstOrNull;
+    final deviceLabel = (device?.serialNumber.trim().isNotEmpty ?? false)
+        ? device!.serialNumber.trim()
+        : (device?.deviceCode ?? 'device');
+    final sensorLabel = sensorName.trim().isNotEmpty
+        ? sensorName.trim()
+        : (serialNumber.trim().isNotEmpty ? serialNumber.trim() : 'Sensor');
+    final uid = (_javaStringHash(sensorId) % 100000).toString().padLeft(5, '0');
+    final endpointKey =
+        '$uid-${_slugify(sensorLabel)}-${_slugify(deviceLabel)}';
+    final ingestion = _buildAbsoluteUrl('/api/v1/ingestion/$endpointKey');
+    final ingestionLive =
+        _buildAbsoluteUrl('/api/v1/ingestion/readings/live/$endpointKey');
+    final processingLive =
+        _buildAbsoluteUrl('/api/v1/processing/readings/live/$endpointKey');
+    final analyticsLive =
+        _buildAbsoluteUrl('/api/v1/analytics/events/live/$endpointKey');
+    return {
+      'endpointKey': endpointKey,
+      'ingestion': ingestion,
+      'ingestionLive': ingestionLive,
+      'processingLive': processingLive,
+      'analyticsLive': analyticsLive,
+    };
+  }
+
+  Future<void> _showSensorEndpointsDialog(
+    BuildContext context,
+    Sensor sensor,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sensor Endpoints'),
+        content: SizedBox(
+          width: 640,
+          child: SingleChildScrollView(
+            child: _endpointPanel(
+              context,
+              endpointKey: sensor.endpointKey,
+              ingestionEndpoint: sensor.ingestionEndpoint,
+              ingestionLiveEndpoint: sensor.ingestionLiveEndpoint,
+              processingLiveEndpoint: sensor.processingLiveEndpoint,
+              analyticsLiveEndpoint: sensor.analyticsLiveEndpoint,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +154,7 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
     final defaultDeviceId = db.devices.isNotEmpty ? db.devices.first.id : '';
     final defaultTypeId =
         db.sensorTypes.isNotEmpty ? db.sensorTypes.first.id : '';
+    final draftSensorId = sensor?.id ?? _generateClientSensorId();
     String sensorParameterId = '';
     List<Map<String, dynamic>> sensorParametersForType = [];
     bool sensorParametersLoading = false;
@@ -171,6 +271,13 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
           final theme = Theme.of(context);
           final isDialogLight = theme.brightness == Brightness.light;
           final cornerRadius = BorderRadius.circular(22);
+          final preview = _endpointPreview(
+            sensorId: draftSensorId,
+            sensorName: _sensorName,
+            serialNumber: _serialNumber,
+            deviceId: _deviceId,
+            db: db,
+          );
           return Dialog(
             backgroundColor: Colors.transparent,
             insetPadding:
@@ -374,6 +481,20 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      _endpointPanel(
+                        context,
+                        endpointKey: preview['endpointKey'] ?? '',
+                        ingestionEndpoint: preview['ingestion'] ?? '',
+                        ingestionLiveEndpoint: preview['ingestionLive'] ?? '',
+                        processingLiveEndpoint: preview['processingLive'] ?? '',
+                        analyticsLiveEndpoint: preview['analyticsLive'] ?? '',
+                        helperText: _deviceId.trim().isEmpty
+                            ? 'Select a device to generate the exact sensor URLs.'
+                            : (_editingId == null
+                                ? 'These exact URLs will be created for this sensor when you save it.'
+                                : 'These are the exact live endpoints for this sensor.'),
+                      ),
                       const SizedBox(height: 16),
                       LayoutBuilder(
                         builder: (context, constraints) {
@@ -470,6 +591,8 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
 
                                   if (_editingId == null) {
                                     await backend.create('sensors', {
+                                      'sensor_id': draftSensorId,
+                                      'sensorId': draftSensorId,
                                       'name': _sensorName.trim(),
                                       'serial_number': _serialNumber.trim(),
                                       'device_id': _deviceId,
@@ -484,6 +607,8 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                                   } else {
                                     await backend
                                         .update('sensors', _editingId!, {
+                                      'sensor_id': draftSensorId,
+                                      'sensorId': draftSensorId,
                                       'name': _sensorName.trim(),
                                       'serial_number': _serialNumber.trim(),
                                       'device_id': _deviceId,
@@ -495,6 +620,19 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                                       'status': 'ACTIVE',
                                       'unit': '',
                                     });
+                                  }
+                                  final savedSensorId =
+                                      _editingId?.trim().isNotEmpty == true
+                                          ? _editingId!
+                                          : draftSensorId;
+                                  final savedSensor = backend.sensors
+                                      .where((item) => item.id == savedSensorId)
+                                      .firstOrNull;
+                                  if (savedSensor != null && context.mounted) {
+                                    await _showSensorEndpointsDialog(
+                                      context,
+                                      savedSensor,
+                                    );
                                   }
                                   if (context.mounted) Navigator.pop(context);
                                   this.setState(() => _refreshKey++);
@@ -910,6 +1048,87 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _endpointPanel(
+    BuildContext context, {
+    required String endpointKey,
+    required String ingestionEndpoint,
+    required String ingestionLiveEndpoint,
+    required String processingLiveEndpoint,
+    required String analyticsLiveEndpoint,
+    String? helperText,
+  }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final textColor =
+        isLight ? const Color(0xFF1B313D) : const Color(0xFFE2EDF8);
+    final mutedColor =
+        isLight ? const Color(0xFF5A6F7D) : const Color(0xFFAEC4D7);
+
+    Widget endpointRow(String label, String value) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: mutedColor,
+            ),
+          ),
+          const SizedBox(height: 4),
+          SelectableText(
+            value,
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.35,
+              color: textColor,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isLight ? const Color(0xFFF7FAFC) : const Color(0xFF1A3347),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Exact Sensor URLs',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: textColor,
+            ),
+          ),
+          if ((helperText ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              helperText!,
+              style: TextStyle(fontSize: 12.5, color: mutedColor),
+            ),
+          ],
+          const SizedBox(height: 10),
+          endpointRow('Endpoint Key', endpointKey),
+          const SizedBox(height: 10),
+          endpointRow('POST Ingestion', ingestionEndpoint),
+          const SizedBox(height: 10),
+          endpointRow('Live Ingestion SSE', ingestionLiveEndpoint),
+          const SizedBox(height: 10),
+          endpointRow('Live Processing SSE', processingLiveEndpoint),
+          const SizedBox(height: 10),
+          endpointRow('Live Analytics SSE', analyticsLiveEndpoint),
+        ],
+      ),
     );
   }
 
@@ -1570,6 +1789,7 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
               title: _sensorCodeFor(globalIndex < 0 ? index : globalIndex),
               sensorType: type,
               serial: sensor.serialNumber,
+              endpointKey: sensor.endpointKey,
               connectedDevice: deviceName,
               channel: _channelFor(globalIndex < 0 ? index : globalIndex),
               unit: _unitForType(type),
@@ -1636,7 +1856,8 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
             ? const Color(0xFF0ca15f)
             : (isLight ? const Color(0xFF8397a3) : const Color(0xFF9FB4C6));
         final metaLine =
-            '${sensor.serialNumber} • $deviceName • ${_channelFor(safeIndex)} • ${_unitForType(type)} • $siteName';
+            '${sensor.serialNumber} • $deviceName • ${_channelFor(safeIndex)} • ${_unitForType(type)} • $siteName'
+            '${sensor.endpointKey.trim().isEmpty ? '' : ' • ${sensor.endpointKey}'}';
 
         return Container(
           padding: const EdgeInsets.all(14),
@@ -1753,6 +1974,7 @@ class _SensorCard extends StatelessWidget {
   final String title;
   final String sensorType;
   final String serial;
+  final String endpointKey;
   final String connectedDevice;
   final int channel;
   final String unit;
@@ -1767,6 +1989,7 @@ class _SensorCard extends StatelessWidget {
     required this.title,
     required this.sensorType,
     required this.serial,
+    required this.endpointKey,
     required this.connectedDevice,
     required this.channel,
     required this.unit,
@@ -1781,7 +2004,6 @@ class _SensorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = status == 'active';
-    final isLight = Theme.of(context).brightness == Brightness.light;
     final statusColor =
         isActive ? const Color(0xFF0ca15f) : const Color(0xFF8397a3);
 
@@ -1864,6 +2086,10 @@ class _SensorCard extends StatelessWidget {
           const SizedBox(height: 16),
           _meta(context, 'Serial Number', serial),
           const SizedBox(height: 8),
+          if (endpointKey.trim().isNotEmpty) ...[
+            _meta(context, 'Endpoint Key', endpointKey),
+            const SizedBox(height: 8),
+          ],
           _meta(context, 'Connected Device', connectedDevice),
           const SizedBox(height: 8),
           Row(

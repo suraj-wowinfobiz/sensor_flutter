@@ -104,10 +104,42 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     return const <String, dynamic>{};
   }
 
+  Map<String, dynamic> _sensorPayloadFrom(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return raw.cast<String, dynamic>();
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is Map) return decoded.cast<String, dynamic>();
+      } catch (_) {
+        // Ignore malformed JSON string and fallback to empty map.
+      }
+    }
+    return const <String, dynamic>{};
+  }
+
   Map<String, dynamic> _asMap(dynamic raw) {
     if (raw is Map<String, dynamic>) return raw;
     if (raw is Map) return raw.cast<String, dynamic>();
     return const <String, dynamic>{};
+  }
+
+  String _extractCreatedUserId(Map<String, dynamic> response) {
+    final candidateMaps = [
+      response,
+      _asMap(response['admin']),
+      _asMap(response['user']),
+      _asMap(response['data']),
+      _asMap(response['body']),
+    ];
+    for (final map in candidateMaps) {
+      final id = _asString(
+        map['id'] ?? map['userId'] ?? map['adminId'] ?? response['adminId'],
+      );
+      if (id.isNotEmpty) return id;
+    }
+    return '';
   }
 
   Site? _siteFromPayload(
@@ -398,21 +430,56 @@ class SuperAdminBackendProvider extends ChangeNotifier {
       try {
         final body = await SensorApi.getAllSensors();
         final loadedSensors = body.map((json) {
-          final rawType = json['sensorType'];
+          final nested = _sensorPayloadFrom(json['data']);
+          final data = nested.isNotEmpty ? nested : json;
+          final rawType = data['sensorType'];
           return Sensor(
-            id: _asString(json['sensorId'] ?? json['id'], _uuid()),
-            deviceId: _asString(json['deviceId'] ?? json['device_id']),
+            id: _asString(
+                data['sensorId'] ?? data['id'] ?? json['id'], _uuid()),
+            deviceId: _asString(data['deviceId'] ?? data['device_id']),
             sensorTypeId: _asString(
-              json['sensorTypeId'] ??
-                  json['sensor_type_id'] ??
+              data['sensorTypeId'] ??
+                  data['sensor_type_id'] ??
                   (rawType is Map ? rawType['sensorTypeId'] : null),
             ),
+            sensorParameterId: _asString(
+              data['sensorParameterId'] ?? data['sensor_parameter_id'],
+            ),
+            name: _asString(
+              data['name'] ?? data['sensorName'] ?? data['serialNumber'],
+              'Sensor',
+            ),
             serialNumber: _asString(
-              json['name'] ?? json['serial_number'],
+              data['serialNumber'] ?? data['serial_number'] ?? data['name'],
               'SEN-${_uuid().substring(0, 8)}',
             ),
-            installedAt: _asDate(json['createdAt'] ?? json['installed_at']),
-            lastReading: (json['last_reading'] as num?)?.toDouble() ?? 0,
+            deviceName: _asString(data['deviceName'] ?? data['device_name']),
+            channelNumber: int.tryParse(
+                  _asString(
+                      data['channelNumber'] ?? data['channel_number'], '0'),
+                ) ??
+                0,
+            endpointUid: _asString(data['endpointUid'] ?? data['endpoint_uid']),
+            endpointKey: _asString(data['endpointKey'] ?? data['endpoint_key']),
+            ingestionEndpoint: _asString(
+              data['ingestionEndpoint'] ?? data['ingestion_endpoint'],
+            ),
+            ingestionLiveEndpoint: _asString(
+              data['ingestionLiveEndpoint'] ?? data['ingestion_live_endpoint'],
+            ),
+            processingLiveEndpoint: _asString(
+              data['processingLiveEndpoint'] ??
+                  data['processing_live_endpoint'],
+            ),
+            analyticsLiveEndpoint: _asString(
+              data['analyticsLiveEndpoint'] ?? data['analytics_live_endpoint'],
+            ),
+            installedAt: _asDate(
+              data['createdAt'] ?? data['installedAt'] ?? data['installed_at'],
+            ),
+            lastReading: _asDouble(
+              data['lastReading'] ?? data['last_reading'],
+            ),
           );
         }).toList();
         final deduped = <String, Sensor>{};
@@ -420,6 +487,14 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           deduped[sensor.id] = sensor;
         }
         sensors = deduped.values.toList();
+
+        final backendRole = await UsersApi.currentBackendRole();
+        if (backendRole == 'user') {
+          final allowedSensorIds = (await UsersApi.getMySensorAccess()).toSet();
+          sensors = sensors
+              .where((sensor) => allowedSensorIds.contains(sensor.id))
+              .toList();
+        }
       } catch (e) {
         print('Error loading sensors: $e');
         sensors = [];
@@ -697,7 +772,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
             role == 'user' ||
             role == 'vendor_engineer') {
           final createRole = role == 'user' ? 'user' : 'vendor_engineer';
-          await UsersApi.createUser(
+          final response = await UsersApi.createUser(
             name: name,
             email: email,
             role: createRole,
@@ -705,6 +780,21 @@ class SuperAdminBackendProvider extends ChangeNotifier {
             password: password,
             maxUsersAllowed: maxUsersAllowed,
           );
+          if (createRole == 'user') {
+            final userId = _extractCreatedUserId(response);
+            final sensorIds = (data['sensor_ids'] is List
+                    ? (data['sensor_ids'] as List)
+                    : const <dynamic>[])
+                .map((value) => value.toString().trim())
+                .where((value) => value.isNotEmpty)
+                .toList();
+            if (userId.isNotEmpty) {
+              await UsersApi.updateUserSensorAccess(
+                userId: userId,
+                sensorIds: sensorIds,
+              );
+            }
+          }
         } else if (role == 'vendor') {
           await UsersApi.createVendor(
             name: name,
@@ -866,6 +956,19 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           role: _asString(data['role'], existingRole ?? 'user'),
           password: _asString(data['password']),
         );
+        if (_asString(data['role'], existingRole ?? 'user').toLowerCase() ==
+            'user') {
+          final sensorIds = (data['sensor_ids'] is List
+                  ? (data['sensor_ids'] as List)
+                  : const <dynamic>[])
+              .map((value) => value.toString().trim())
+              .where((value) => value.isNotEmpty)
+              .toList();
+          await UsersApi.updateUserSensorAccess(
+            userId: id,
+            sensorIds: sensorIds,
+          );
+        }
         await loadUsers();
         break;
     }

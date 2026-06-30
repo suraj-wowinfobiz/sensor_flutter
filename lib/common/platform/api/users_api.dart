@@ -3,6 +3,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
 
 class UsersApi {
+  static Future<String> currentBackendRole() => _currentBackendRole();
+
+  static Future<String> currentPrincipalId() => _currentPrincipalId();
+
   static Future<Map<String, dynamic>> getUserById(String userId) async {
     final currentPrincipalId = await _currentPrincipalId();
     final response = userId.trim() == currentPrincipalId
@@ -161,6 +165,32 @@ class UsersApi {
     return _asMap(response.body);
   }
 
+  static Future<List<String>> getUserSensorAccess(String userId) async {
+    final response = await ApiClient.get('/api/v1/users/$userId/sensor-access');
+    return _extractSensorIds(response.body);
+  }
+
+  static Future<List<String>> getMySensorAccess() async {
+    final response = await ApiClient.get('/api/v1/auth/me/sensor-access');
+    return _extractSensorIds(response.body);
+  }
+
+  static Future<Map<String, dynamic>> updateUserSensorAccess({
+    required String userId,
+    required List<String> sensorIds,
+  }) async {
+    final response = await ApiClient.put(
+      '/api/v1/users/$userId/sensor-access',
+      data: {
+        'sensorIds': sensorIds
+            .map((sensorId) => sensorId.trim())
+            .where((sensorId) => sensorId.isNotEmpty)
+            .toList(),
+      },
+    );
+    return _asMap(response.body);
+  }
+
   static Future<void> deleteUser(String id, {String? role}) async {
     await ApiClient.delete(
       _deletePathForRole(_normalizeRole(role ?? ''), id),
@@ -288,6 +318,16 @@ class UsersApi {
     if (body is Map<String, dynamic>) return body;
     if (body is Map) return body.cast<String, dynamic>();
     return const {};
+  }
+
+  static List<String> _extractSensorIds(dynamic body) {
+    final map = _asMap(body);
+    final rawSensorIds = map['sensorIds'];
+    if (rawSensorIds is! List) return const [];
+    return rawSensorIds
+        .map((value) => value?.toString().trim() ?? '')
+        .where((value) => value.isNotEmpty)
+        .toList();
   }
 
   static String _normalizeRole(String role) {

@@ -293,6 +293,9 @@ _UserDashboardModel _buildDashboardModel({
   for (final event in recentEvents) {
     final sensorId = _extractSensorId(event);
     final sensor = sensorId == null ? null : sensorById[sensorId];
+    if (sensorId != null && sensorId.isNotEmpty && sensor == null) {
+      continue;
+    }
     final device = sensor == null ? null : deviceById[sensor.deviceId];
     final siteId = device?.siteId ?? '';
     final receivedAt = _extractEventDateTime(event);

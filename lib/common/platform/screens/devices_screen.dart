@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider;
 import 'dart:convert';
 
+import '../core/api/admin_api_config.dart';
 import '../../../core/theme/ops_theme.dart';
 import '../api/device_api.dart';
 import '../models/device.dart';
+import '../models/sensor.dart';
 import '../providers/super_admin_backend_provider.dart';
 import '../providers/super_admin_riverpod_provider.dart';
 
@@ -98,6 +100,100 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
     return source;
   }
 
+  String _absoluteUrl(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return trimmed;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    final base = AdminApiConfig.baseUrl.replaceAll(RegExp(r'/$'), '');
+    final path = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+    return '$base$path';
+  }
+
+  Widget _sensorEndpointPanel(
+    BuildContext context, {
+    required String title,
+    required String endpointKey,
+    required String ingestionEndpoint,
+    required String ingestionLiveEndpoint,
+    required String processingLiveEndpoint,
+    required String analyticsLiveEndpoint,
+  }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final textColor =
+        isLight ? const Color(0xFF1B313D) : const Color(0xFFE2EDF8);
+    final mutedColor =
+        isLight ? const Color(0xFF5A6F7D) : const Color(0xFFAEC4D7);
+
+    Widget endpointRow(String label, String value) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: mutedColor,
+            ),
+          ),
+          const SizedBox(height: 4),
+          SelectableText(
+            value,
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.35,
+              color: textColor,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isLight ? const Color(0xFFF7FAFC) : const Color(0xFF1A3347),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: textColor,
+            ),
+          ),
+          const SizedBox(height: 10),
+          endpointRow('Endpoint Key', endpointKey),
+          const SizedBox(height: 10),
+          endpointRow('POST Ingestion', _absoluteUrl(ingestionEndpoint)),
+          const SizedBox(height: 10),
+          endpointRow(
+            'Live Ingestion SSE',
+            _absoluteUrl(ingestionLiveEndpoint),
+          ),
+          const SizedBox(height: 10),
+          endpointRow(
+            'Live Processing SSE',
+            _absoluteUrl(processingLiveEndpoint),
+          ),
+          const SizedBox(height: 10),
+          endpointRow(
+            'Live Analytics SSE',
+            _absoluteUrl(analyticsLiveEndpoint),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -109,6 +205,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
         provider.Provider.of<SuperAdminBackendProvider>(context, listen: false);
     await db.loadOrganizations();
     await db.loadSites();
+    await db.loadSensors();
     if (!mounted) return;
 
     final isLight = Theme.of(context).brightness == Brightness.light;
@@ -187,6 +284,13 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
               .where((s) => s.organizationId == organizationId)
               .toList();
           final siteZones = db.zones.where((z) => z.siteId == siteId).toList();
+          final attachedSensors = editingId.isEmpty
+              ? const <Sensor>[]
+              : (db.sensors
+                  .where((sensor) => sensor.deviceId == editingId)
+                  .toList()
+                ..sort((a, b) =>
+                    a.name.toLowerCase().compareTo(b.name.toLowerCase())));
           return Dialog(
             backgroundColor: Colors.transparent,
             insetPadding:
@@ -289,6 +393,69 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                         label: 'Webhook URL',
                         controller: webhookUrlCtrl,
                       ),
+                      const SizedBox(height: 12),
+                      if (editingId.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: theme.brightness == Brightness.light
+                                ? const Color(0xFFF7FAFC)
+                                : const Color(0xFF1A3347),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: theme.dividerColor),
+                          ),
+                          child: const Text(
+                            'Exact ingestion and live SSE URLs appear here after you attach a sensor to this device.',
+                            style: TextStyle(fontSize: 12.5, height: 1.35),
+                          ),
+                        )
+                      else if (attachedSensors.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: theme.brightness == Brightness.light
+                                ? const Color(0xFFF7FAFC)
+                                : const Color(0xFF1A3347),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: theme.dividerColor),
+                          ),
+                          child: const Text(
+                            'No sensors are attached to this device yet. Attach a sensor and its exact URLs will show here.',
+                            style: TextStyle(fontSize: 12.5, height: 1.35),
+                          ),
+                        )
+                      else
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Attached Sensor URLs',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ...attachedSensors.expand((sensor) => [
+                                  _sensorEndpointPanel(
+                                    context,
+                                    title: sensor.name,
+                                    endpointKey: sensor.endpointKey,
+                                    ingestionEndpoint: sensor.ingestionEndpoint,
+                                    ingestionLiveEndpoint:
+                                        sensor.ingestionLiveEndpoint,
+                                    processingLiveEndpoint:
+                                        sensor.processingLiveEndpoint,
+                                    analyticsLiveEndpoint:
+                                        sensor.analyticsLiveEndpoint,
+                                  ),
+                                  const SizedBox(height: 10),
+                                ]),
+                          ],
+                        ),
                       const SizedBox(height: 12),
                       Row(
                         children: [

@@ -44,6 +44,8 @@ class _UsersScreenState extends State<UsersScreen> {
       final db = context.read<SuperAdminBackendProvider>();
       await db.loadOrganizations();
       await db.loadSites();
+      await db.loadDevices();
+      await db.loadSensors();
       for (final site in db.sites) {
         await db.loadZones(site.id);
       }
@@ -79,6 +81,11 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   Future<void> _showUserModal({User? user}) async {
+    String readString(dynamic value, [String fallback = '']) {
+      final parsed = value?.toString().trim() ?? '';
+      return parsed.isEmpty ? fallback : parsed;
+    }
+
     if (user != null) {
       _editingId = user.id;
       _name = user.name;
@@ -100,8 +107,29 @@ class _UsersScreenState extends State<UsersScreen> {
 
     final parentContext = context;
     final db = parentContext.read<SuperAdminBackendProvider>();
-    var selectedOrganizationId =
-        db.organizations.isNotEmpty ? db.organizations.first.id : '';
+    await db.loadDevices();
+    await db.loadSensors();
+
+    Map<String, dynamic> existingUserProfile = const {};
+    var selectedSensorIds = <String>{};
+    if (user != null) {
+      try {
+        existingUserProfile = await UsersApi.getUserById(user.id);
+      } catch (_) {
+        existingUserProfile = const {};
+      }
+      try {
+        selectedSensorIds =
+            (await UsersApi.getUserSensorAccess(user.id)).toSet();
+      } catch (_) {
+        selectedSensorIds = <String>{};
+      }
+    }
+
+    var selectedOrganizationId = readString(
+      existingUserProfile['organizationId'],
+      db.organizations.isNotEmpty ? db.organizations.first.id : '',
+    );
 
     String normalizeRole(String value) {
       final lower = value.trim().toLowerCase();
@@ -144,6 +172,28 @@ class _UsersScreenState extends State<UsersScreen> {
           .toList();
     }
 
+    List<SensorOption> sensorOptionsForOrganization(String organizationId) {
+      final deviceById = {for (final device in db.devices) device.id: device};
+      final siteById = {for (final site in db.sites) site.id: site};
+      final options = db.sensors.where((sensor) {
+        final device = deviceById[sensor.deviceId];
+        if (device == null) return false;
+        final site = siteById[device.siteId];
+        return site?.organizationId == organizationId;
+      }).map((sensor) {
+        final device = deviceById[sensor.deviceId];
+        return SensorOption(
+          id: sensor.id,
+          label:
+              '${sensor.name} • ${(device?.deviceCode ?? sensor.deviceName).trim().isEmpty ? sensor.serialNumber : (device?.deviceCode ?? sensor.deviceName)}',
+        );
+      }).toList()
+        ..sort(
+            (a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+      return options;
+    }
+
+    if (!parentContext.mounted) return;
     await showDialog(
       context: parentContext,
       builder: (dialogContext) => StatefulBuilder(
@@ -151,6 +201,13 @@ class _UsersScreenState extends State<UsersScreen> {
           final theme = Theme.of(dialogContext);
           final isLight = theme.brightness == Brightness.light;
           final isDialogLight = theme.brightness == Brightness.light;
+          final normalizedRole = normalizeRole(roleController.text);
+          final sensorOptions =
+              sensorOptionsForOrganization(selectedOrganizationId);
+          final allowedSensorIds =
+              sensorOptions.map((option) => option.id).toSet();
+          selectedSensorIds =
+              selectedSensorIds.where(allowedSensorIds.contains).toSet();
 
           Future<void> saveUser() async {
             final name = nameController.text.trim();
@@ -159,6 +216,7 @@ class _UsersScreenState extends State<UsersScreen> {
             final maxUsersAllowed =
                 int.tryParse(maxUsersAllowedController.text.trim());
             final password = passwordController.text.trim();
+            final visibleSensorIds = selectedSensorIds.toList()..sort();
 
             if (name.isEmpty || email.isEmpty) {
               ScaffoldMessenger.of(parentContext).showSnackBar(
@@ -204,6 +262,7 @@ class _UsersScreenState extends State<UsersScreen> {
               if (_editingId != null && password.isNotEmpty)
                 'password': password,
               if (_editingId == null) 'maxUsersAllowed': maxUsersAllowed,
+              if (role == 'user') 'sensor_ids': visibleSensorIds,
             };
             try {
               if (_editingId == null) {
@@ -370,6 +429,9 @@ class _UsersScreenState extends State<UsersScreen> {
                                   if (value != null) {
                                     setState(() {
                                       roleController.text = value;
+                                      if (normalizeRole(value) != 'user') {
+                                        selectedSensorIds = <String>{};
+                                      }
                                     });
                                   }
                                 },
@@ -412,12 +474,78 @@ class _UsersScreenState extends State<UsersScreen> {
                                     final org = db.organizations
                                         .firstWhere((o) => o.id == value);
                                     organizationController.text = org.name;
+                                    final allowed =
+                                        sensorOptionsForOrganization(
+                                      value,
+                                    ).map((option) => option.id).toSet();
+                                    selectedSensorIds = selectedSensorIds
+                                        .where(allowed.contains)
+                                        .toSet();
                                   });
                                 }
                               },
                             ),
                           ),
                         ),
+                        if (normalizedRole == 'user') ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            'Visible Sensors',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isLight
+                                  ? const Color(0xFF1B313D)
+                                  : const Color(0xFFE2EDF8),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          if (sensorOptions.isEmpty)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isLight
+                                    ? const Color(0xFFF7FAFC)
+                                    : const Color(0xFF1A3347),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: Theme.of(context).dividerColor,
+                                ),
+                              ),
+                              child: Text(
+                                'No sensors available in the selected organization.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isLight
+                                      ? const Color(0xFF506775)
+                                      : const Color(0xFFBBD0E0),
+                                ),
+                              ),
+                            )
+                          else
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: sensorOptions.map((option) {
+                                final isSelected =
+                                    selectedSensorIds.contains(option.id);
+                                return FilterChip(
+                                  label: Text(option.label),
+                                  selected: isSelected,
+                                  onSelected: (value) {
+                                    setState(() {
+                                      if (value) {
+                                        selectedSensorIds.add(option.id);
+                                      } else {
+                                        selectedSensorIds.remove(option.id);
+                                      }
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                        ],
                         ...[
                           const SizedBox(height: 10),
                           Text(
@@ -573,7 +701,8 @@ class _UsersScreenState extends State<UsersScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: border(),
       enabledBorder: border(),
-      focusedBorder: border(theme.colorScheme.primary.withValues(alpha: 0.55), 1.4),
+      focusedBorder:
+          border(theme.colorScheme.primary.withValues(alpha: 0.55), 1.4),
       errorBorder: border(theme.colorScheme.error),
       focusedErrorBorder:
           border(theme.colorScheme.error.withValues(alpha: 0.85), 1.4),
@@ -2530,4 +2659,14 @@ class _UsersScreenState extends State<UsersScreen> {
       ),
     );
   }
+}
+
+class SensorOption {
+  const SensorOption({
+    required this.id,
+    required this.label,
+  });
+
+  final String id;
+  final String label;
 }
