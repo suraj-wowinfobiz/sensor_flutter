@@ -247,6 +247,12 @@ extension AppLoginRoleX on AppLoginRole {
             view: 'analytics',
           ),
           RoleNavigationItem(
+            label: 'Live Analytics',
+            icon: Icons.monitor_heart_outlined,
+            view: 'liveAnalytics',
+            badge: 'Live',
+          ),
+          RoleNavigationItem(
             label: 'Users',
             icon: Icons.people_outline_rounded,
             view: 'users',
@@ -347,6 +353,12 @@ extension AppLoginRoleX on AppLoginRole {
             label: 'Analytics',
             icon: Icons.analytics_outlined,
             view: 'analytics',
+          ),
+          RoleNavigationItem(
+            label: 'Live Analytics',
+            icon: Icons.monitor_heart_outlined,
+            view: 'liveAnalytics',
+            badge: 'Live',
           ),
           RoleNavigationItem(
             label: 'Reports',

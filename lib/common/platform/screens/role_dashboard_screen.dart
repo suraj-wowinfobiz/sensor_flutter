@@ -16,7 +16,7 @@ class RoleDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (role == AppLoginRole.admin) {
+    if (role == AppLoginRole.admin || role == AppLoginRole.user) {
       return const DashboardScreen();
     }
 
@@ -102,7 +102,8 @@ class RoleDashboardScreen extends ConsumerWidget {
                 child: _SnapshotList(
                   items: [
                     _SnapshotItem('Active alerts', '$activeAlerts'),
-                    _SnapshotItem('Organizations', '${db.organizations.length}'),
+                    _SnapshotItem(
+                        'Organizations', '${db.organizations.length}'),
                     _SnapshotItem('Sites', '${db.sites.length}'),
                     _SnapshotItem('Zones', '${db.zones.length}'),
                     _SnapshotItem('Users', '${db.users.length}'),

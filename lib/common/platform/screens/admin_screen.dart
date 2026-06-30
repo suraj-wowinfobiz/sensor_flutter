@@ -16,6 +16,7 @@ import 'audit_screen.dart';
 import 'config_screen.dart';
 import 'dashboard_screen.dart';
 import 'devices_screen.dart';
+import 'live_analytics_screen.dart';
 import 'map_screen.dart';
 import 'organizations_screen.dart';
 import 'reports_screen.dart';
@@ -209,8 +210,9 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
       profileName:
           _profileName.isNotEmpty ? _profileName : widget.role.profileTitle,
       profileRole: widget.role.profileTitle,
-      profileInitial:
-          _profileInitial.isNotEmpty ? _profileInitial : widget.role.profileInitial,
+      profileInitial: _profileInitial.isNotEmpty
+          ? _profileInitial
+          : widget.role.profileInitial,
     );
 
     return Scaffold(
@@ -407,6 +409,8 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
         return const AlertsScreen();
       case 'analytics':
         return const AnalyticsScreen();
+      case 'liveAnalytics':
+        return const LiveAnalyticsScreen();
       case 'reports':
         return const ReportsScreen();
       case 'audit':
