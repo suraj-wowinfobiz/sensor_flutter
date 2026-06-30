@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,6 +12,8 @@ import '../models/site.dart';
 import '../providers/super_admin_api_riverpod_provider.dart';
 import '../providers/super_admin_backend_provider.dart';
 import '../providers/super_admin_riverpod_provider.dart';
+import '../services/analytics_sse_service.dart';
+import '../services/generic_sse_service.dart';
 
 class UserDashboardScreen extends ConsumerWidget {
   const UserDashboardScreen({super.key});
@@ -1191,68 +1194,373 @@ class _SiteRow extends StatelessWidget {
   }
 }
 
-class _HealthTrend extends StatelessWidget {
+class _HealthTrend extends StatefulWidget {
   const _HealthTrend({required this.points});
 
   final List<_TrendPoint> points;
 
   @override
+  State<_HealthTrend> createState() => _HealthTrendState();
+}
+
+class _HealthTrendState extends State<_HealthTrend> {
+  static const int _maxPoints = 65;
+
+  final AnalyticsSseService _analyticsSseService = AnalyticsSseService();
+  final GenericSseService _processedSseService =
+      GenericSseService('/api/v1/processing/readings/live');
+  final List<FlSpot> _processedTiltData = <FlSpot>[];
+  final List<FlSpot> _analyzedTiltData = <FlSpot>[];
+
+  int _processedIndex = 0;
+  int _analyzedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _connectStreams();
+  }
+
+  Future<void> _connectStreams() async {
+    await _analyticsSseService.connect();
+    _analyticsSseService.stream.listen((data) {
+      if (!mounted) return;
+      final tilt = _extractAnalyzedTilt(data);
+      if (tilt == null) return;
+      setState(() {
+        _appendPoint(_analyzedTiltData, tilt, isProcessed: false);
+      });
+    });
+
+    await _processedSseService.connect();
+    _processedSseService.stream.listen((data) {
+      if (!mounted) return;
+      final tilt = _extractProcessedTilt(data);
+      if (tilt == null) return;
+      setState(() {
+        _appendPoint(_processedTiltData, tilt, isProcessed: true);
+      });
+    });
+  }
+
+  void _appendPoint(
+    List<FlSpot> points,
+    double value, {
+    required bool isProcessed,
+  }) {
+    final index = isProcessed ? _processedIndex : _analyzedIndex;
+    points.add(FlSpot(index.toDouble(), value));
+    while (points.length > _maxPoints) {
+      points.removeAt(0);
+    }
+    for (var i = 0; i < points.length; i++) {
+      points[i] = FlSpot(i.toDouble(), points[i].y);
+    }
+    if (isProcessed) {
+      _processedIndex = points.length;
+    } else {
+      _analyzedIndex = points.length;
+    }
+  }
+
+  double? _extractProcessedTilt(dynamic payload) {
+    for (final candidate in _candidateMaps(payload)) {
+      final processedPayload = candidate['processedPayload'];
+      if (processedPayload is! Map) continue;
+
+      final tilt = _asDouble(
+        processedPayload['tiltFromVerticalDegrees'] ??
+            processedPayload['inclinationDegrees'] ??
+            processedPayload['tilt'] ??
+            processedPayload['z'],
+      );
+      if (tilt != null) return tilt;
+
+      final roll = _asDouble(
+        processedPayload['rollDegrees'] ?? processedPayload['roll'],
+      );
+      final pitch = _asDouble(
+        processedPayload['pitchDegrees'] ?? processedPayload['pitch'],
+      );
+      if (roll != null && pitch != null) {
+        return math.sqrt((roll * roll) + (pitch * pitch));
+      }
+    }
+    return null;
+  }
+
+  double? _extractAnalyzedTilt(dynamic payload) {
+    for (final candidate in _candidateMaps(payload)) {
+      final values = <String, double>{};
+
+      final series = candidate['series'];
+      if (series is List) {
+        for (final item in series) {
+          if (item is! Map) continue;
+          final name = item['name']?.toString();
+          final value = _asDouble(item['value']);
+          if (name == null || value == null) continue;
+          values[name] = value;
+        }
+      }
+
+      final evaluations = candidate['evaluations'];
+      if (evaluations is List) {
+        for (final item in evaluations) {
+          if (item is! Map) continue;
+          final name = item['parameterName']?.toString() ??
+              item['name']?.toString();
+          final value = _asDouble(item['value']);
+          if (name == null || value == null) continue;
+          values[name] = value;
+        }
+      }
+
+      final tilt = values['tiltFromVerticalDegrees'] ??
+          values['inclinationDegrees'] ??
+          values['tilt'];
+      if (tilt != null) return tilt;
+
+      final roll = values['rollDegrees'] ?? values['roll'];
+      final pitch = values['pitchDegrees'] ?? values['pitch'];
+      if (roll != null && pitch != null) {
+        return math.sqrt((roll * roll) + (pitch * pitch));
+      }
+    }
+    return null;
+  }
+
+  Iterable<Map<String, dynamic>> _candidateMaps(
+    dynamic payload, {
+    int depth = 0,
+  }) sync* {
+    if (payload == null || depth > 6) return;
+
+    if (payload is Map<String, dynamic>) {
+      yield payload;
+      for (final key in const [
+        'body',
+        'data',
+        'payload',
+        'event',
+        'processedPayload',
+        'parameters',
+      ]) {
+        final next = payload[key];
+        if (next != null) {
+          yield* _candidateMaps(next, depth: depth + 1);
+        }
+      }
+      return;
+    }
+
+    if (payload is Map) {
+      yield* _candidateMaps(payload.cast<String, dynamic>(), depth: depth);
+      return;
+    }
+
+    if (payload is List) {
+      for (final item in payload) {
+        yield* _candidateMaps(item, depth: depth + 1);
+      }
+    }
+  }
+
+  double? _asDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+
+  @override
+  void dispose() {
+    _analyticsSseService.dispose();
+    _processedSseService.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final hasLiveData =
+        _processedTiltData.isNotEmpty || _analyzedTiltData.isNotEmpty;
+
     return SizedBox(
       height: 286,
-      child: Stack(
-        children: [
-          const Positioned(
-            top: 0,
-            right: 0,
-            child: Row(
-              children: [
-                _LegendDot('Online', OpsColors.success),
-                SizedBox(width: 14),
-                _LegendDot('Warning', OpsColors.amber),
+      child: hasLiveData
+          ? _buildLiveChart(context)
+          : _buildFallbackTrend(),
+    );
+  }
+
+  Widget _buildLiveChart(BuildContext context) {
+    final allValues = [
+      ..._processedTiltData.map((point) => point.y),
+      ..._analyzedTiltData.map((point) => point.y),
+    ];
+    final minY = allValues.isEmpty ? 0.0 : allValues.reduce(math.min);
+    final maxY = allValues.isEmpty ? 10.0 : allValues.reduce(math.max);
+    final span = (maxY - minY).abs();
+    final chartMinY = minY - math.max(span * 0.12, 0.5);
+    final chartMaxY = maxY + math.max(span * 0.12, 0.5);
+    final maxX = math.max(
+      _processedTiltData.isNotEmpty ? _processedTiltData.last.x : 0.0,
+      _analyzedTiltData.isNotEmpty ? _analyzedTiltData.last.x : 0.0,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Align(
+          alignment: Alignment.topRight,
+          child: Wrap(
+            spacing: 14,
+            runSpacing: 8,
+            children: [
+              _LegendDot('Processed Tilt', OpsColors.primary),
+              _LegendDot('Analyzed Tilt', OpsColors.success),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Expanded(
+          child: LineChart(
+            LineChartData(
+              minX: 0,
+              maxX: maxX <= 0 ? 1 : maxX,
+              minY: chartMinY,
+              maxY: chartMaxY <= chartMinY ? chartMinY + 1 : chartMaxY,
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval:
+                    (((chartMaxY - chartMinY).abs()) / 4).clamp(0.5, 9999),
+                getDrawingHorizontalLine: (_) => const FlLine(
+                  color: OpsColors.border,
+                  strokeWidth: 1,
+                ),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: const Border(
+                  left: BorderSide(color: OpsColors.border),
+                  bottom: BorderSide(color: OpsColors.border),
+                  top: BorderSide.none,
+                  right: BorderSide.none,
+                ),
+              ),
+              titlesData: FlTitlesData(
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 38,
+                    getTitlesWidget: (value, _) => Text(
+                      value.toStringAsFixed(1),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: OpsColors.muted,
+                      ),
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 24,
+                    interval: 10,
+                    getTitlesWidget: (value, _) => Text(
+                      value.toInt().toString(),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: OpsColors.muted,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              lineBarsData: [
+                if (_processedTiltData.isNotEmpty)
+                  LineChartBarData(
+                    spots: _processedTiltData,
+                    isCurved: true,
+                    color: OpsColors.primary,
+                    barWidth: 2.4,
+                    dotData: const FlDotData(show: false),
+                  ),
+                if (_analyzedTiltData.isNotEmpty)
+                  LineChartBarData(
+                    spots: _analyzedTiltData,
+                    isCurved: true,
+                    color: OpsColors.success,
+                    barWidth: 2.4,
+                    dotData: const FlDotData(show: false),
+                  ),
               ],
             ),
           ),
-          const Positioned(
-            top: 26,
-            bottom: 32,
-            left: 0,
-            width: 30,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('100%'),
-                Text('75%'),
-                Text('50%'),
-                Text('25%'),
-                Text('0%'),
-              ],
-            ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFallbackTrend() {
+    final points = widget.points;
+    return Stack(
+      children: [
+        const Positioned(
+          top: 0,
+          right: 0,
+          child: Row(
+            children: [
+              _LegendDot('Online', OpsColors.success),
+              SizedBox(width: 14),
+              _LegendDot('Warning', OpsColors.amber),
+            ],
           ),
-          Positioned(
-            top: 26,
-            bottom: 38,
-            left: 38,
-            right: 0,
-            child: CustomPaint(
-              painter: _TrendPainter(points: points),
-              child: const SizedBox.expand(),
-            ),
+        ),
+        const Positioned(
+          top: 26,
+          bottom: 32,
+          left: 0,
+          width: 30,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('100%'),
+              Text('75%'),
+              Text('50%'),
+              Text('25%'),
+              Text('0%'),
+            ],
           ),
-          Positioned(
-            bottom: 0,
-            left: 38,
-            right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: points
-                  .map((point) => Text(point.label))
-                  .toList(growable: false),
-            ),
+        ),
+        Positioned(
+          top: 26,
+          bottom: 38,
+          left: 38,
+          right: 0,
+          child: CustomPaint(
+            painter: _TrendPainter(points: points),
+            child: const SizedBox.expand(),
           ),
-        ],
-      ),
+        ),
+        Positioned(
+          bottom: 0,
+          left: 38,
+          right: 0,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children:
+                points.map((point) => Text(point.label)).toList(growable: false),
+          ),
+        ),
+      ],
     );
   }
 }
