@@ -1260,7 +1260,7 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
           ],
           const SizedBox(height: 4),
           Text(
-            'Use a valid userId as the final path segment. These endpoints now verify that user before returning data.',
+            'Use the sensor endpoint key first, then the userId. The userId can be the displayed 6-digit ID or the full UUID.',
             style: TextStyle(fontSize: 12.5, color: mutedColor),
           ),
           const SizedBox(height: 10),
