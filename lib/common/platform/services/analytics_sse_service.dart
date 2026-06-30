@@ -12,6 +12,7 @@ class AnalyticsSseService {
       StreamController<dynamic>.broadcast();
   http.Client? _client;
   StreamSubscription<String>? _streamSubscription;
+  Future<void>? _connectTask;
   bool _isConnected = false;
 
   Stream<dynamic> get stream => _controller.stream;
@@ -30,7 +31,24 @@ class AnalyticsSseService {
 
   Future<void> connect() async {
     if (_isConnected) return;
+    final inFlight = _connectTask;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
 
+    final task = _connectInternal();
+    _connectTask = task;
+    try {
+      await task;
+    } finally {
+      if (identical(_connectTask, task)) {
+        _connectTask = null;
+      }
+    }
+  }
+
+  Future<void> _connectInternal() async {
     debugPrint('🔌 Connecting to SSE endpoint...');
     _client = http.Client();
 
@@ -98,6 +116,7 @@ class AnalyticsSseService {
     _streamSubscription = null;
     _client?.close();
     _client = null;
+    _connectTask = null;
     _isConnected = false;
   }
 

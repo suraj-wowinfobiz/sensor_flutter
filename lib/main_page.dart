@@ -1,10 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
 
 import 'core/auth/global_login_screen.dart';
+import 'core/navigation/app_route_observer.dart';
 import 'core/theme/ops_theme.dart';
+import 'core/widgets/route_aware_asset_video.dart';
 
 void main() {
   runApp(const SiteGuardianApp());
@@ -18,6 +17,7 @@ class SiteGuardianApp extends StatelessWidget {
     return MaterialApp(
       title: 'Construction Sensor Analytics',
       debugShowCheckedModeBanner: false,
+      navigatorObservers: [appRouteObserver],
       theme: OpsTheme.light(),
       home: const MainPage(),
       routes: {
@@ -45,9 +45,6 @@ class _MainPageState extends State<MainPage> {
     'contact': GlobalKey(),
   };
 
-  VideoPlayerController? _bgController;
-  Timer? _videoInitTimer;
-
   bool _isMobileMenuOpen = false;
 
   void _scrollToSection(String section) {
@@ -67,21 +64,9 @@ class _MainPageState extends State<MainPage> {
   }
 
   Widget _buildHeroMedia() {
-    if (_bgController != null && _bgController!.value.isInitialized) {
-      return FittedBox(
-        fit: BoxFit.cover,
-        clipBehavior: Clip.hardEdge,
-        child: SizedBox(
-          width: _bgController!.value.size.width,
-          height: _bgController!.value.size.height,
-          child: RepaintBoundary(child: VideoPlayer(_bgController!)),
-        ),
-      );
-    }
-
-    return Image.asset(
-      'assets/images/construction.jpg',
-      fit: BoxFit.cover,
+    return const RouteAwareAssetVideo(
+      videoAsset: 'assets/images/background.mp4',
+      fallbackAsset: 'assets/images/construction.jpg',
     );
   }
 
@@ -211,38 +196,7 @@ class _MainPageState extends State<MainPage> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _videoInitTimer = Timer(const Duration(milliseconds: 450), () {
-        if (!mounted) return;
-        final controller = VideoPlayerController.asset(
-          'assets/images/background.mp4',
-          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-        );
-        _bgController = controller;
-        controller.initialize().then((_) {
-          if (!mounted) return;
-          controller
-            ..setLooping(true)
-            ..setVolume(0)
-            ..play();
-          setState(() {});
-        }).catchError((_) {
-          controller.dispose();
-          if (identical(_bgController, controller)) {
-            _bgController = null;
-          }
-        });
-      });
-    });
-  }
-
-  @override
   void dispose() {
-    _videoInitTimer?.cancel();
-    _bgController?.dispose();
     _scrollController.dispose();
     super.dispose();
   }

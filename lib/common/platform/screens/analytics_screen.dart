@@ -16,7 +16,8 @@ class AnalyticsScreen extends StatefulWidget {
   State<AnalyticsScreen> createState() => _AnalyticsScreenState();
 }
 
-class _AnalyticsScreenState extends State<AnalyticsScreen> {
+class _AnalyticsScreenState extends State<AnalyticsScreen>
+    with WidgetsBindingObserver {
   String? _selectedDeviceId;
   String _compareMode = 'none';
   String _range = '24h';
@@ -37,18 +38,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   final List<FlSpot> _motionData = [];
   int _dataPointIndex = 0;
   StreamSubscription? _processedSubscription;
+  bool _appActive = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<SuperAdminBackendProvider>().loadThresholdValues();
     });
-    _startProcessedLiveFetch();
+    _startProcessedLiveFetchIfNeeded();
   }
 
-  Future<void> _startProcessedLiveFetch() async {
+  Future<void> _startProcessedLiveFetchIfNeeded() async {
+    if (_paused || !_appActive || _processedSubscription != null) return;
     await _processedSseService.connect();
     _processedSubscription = _processedSseService.stream.listen((payload) {
       if (!mounted || _paused) return;
@@ -71,6 +75,24 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         _trimAndReindexSeries();
       });
     });
+  }
+
+  Future<void> _stopProcessedLiveFetch() async {
+    await _processedSubscription?.cancel();
+    _processedSubscription = null;
+    _processedSseService.disconnect();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final active = state == AppLifecycleState.resumed;
+    if (_appActive == active) return;
+    _appActive = active;
+    if (_appActive) {
+      _startProcessedLiveFetchIfNeeded();
+    } else {
+      _stopProcessedLiveFetch();
+    }
   }
 
   void _trimAndReindexSeries() {
@@ -190,6 +212,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _processedSubscription?.cancel();
     _processedSseService.dispose();
     super.dispose();
@@ -360,7 +383,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       _headerButton(
                         label: _paused ? 'Resume' : 'Pause',
                         icon: _paused ? Icons.play_arrow : Icons.pause,
-                        onTap: () => setState(() => _paused = !_paused),
+                        onTap: () {
+                          final nextPaused = !_paused;
+                          setState(() => _paused = nextPaused);
+                          if (nextPaused) {
+                            _stopProcessedLiveFetch();
+                          } else {
+                            _startProcessedLiveFetchIfNeeded();
+                          }
+                        },
                       ),
                       _headerButton(
                         label: 'CSV',

@@ -21,13 +21,8 @@ class UserDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final db = ref.watch(superAdminBackendChangeNotifierProvider);
-    final dashboardStats =
-        ref.watch(superAdminDashboardStatsApiProvider).valueOrNull ?? const {};
     final dashboardOverview =
         ref.watch(superAdminDashboardOverviewApiProvider).valueOrNull ??
-            const {};
-    final analyticsOverview =
-        ref.watch(superAdminAnalyticsOverviewApiProvider).valueOrNull ??
             const {};
     final recentEvents =
         ref.watch(superAdminAnalyticsRecentEventsApiProvider).valueOrNull ??
@@ -35,9 +30,7 @@ class UserDashboardScreen extends ConsumerWidget {
 
     final dashboard = _buildDashboardModel(
       db: db,
-      dashboardStats: dashboardStats,
       dashboardOverview: dashboardOverview,
-      analyticsOverview: analyticsOverview,
       recentEvents: recentEvents,
     );
 
@@ -111,9 +104,9 @@ class UserDashboardScreen extends ConsumerWidget {
                     ? '--'
                     : _formatNumber(dashboard.avgTemperature!, decimals: 1),
                 valueSuffix: dashboard.avgTemperature == null ? null : 'C',
-                helper: analyticsOverview.isEmpty
+                helper: recentEvents.isEmpty
                     ? 'Analytics stream'
-                    : '${_asInt(analyticsOverview['eventsLast24Hours'])} events / 24h',
+                    : '${recentEvents.length} recent events',
                 icon: Icons.thermostat_rounded,
                 color: OpsColors.primaryContainer,
               ),
@@ -223,9 +216,7 @@ class UserDashboardScreen extends ConsumerWidget {
 
 _UserDashboardModel _buildDashboardModel({
   required SuperAdminBackendProvider db,
-  required Map<String, dynamic> dashboardStats,
   required Map<String, dynamic> dashboardOverview,
-  required Map<String, dynamic> analyticsOverview,
   required List<Map<String, dynamic>> recentEvents,
 }) {
   final openAlerts = db.alerts.where((alert) => !alert.isResolved).toList()
@@ -238,9 +229,7 @@ _UserDashboardModel _buildDashboardModel({
       .where((sensorId) => sensorId.isNotEmpty)
       .toSet();
 
-  final totalSensors = db.sensors.isNotEmpty
-      ? db.sensors.length
-      : _asInt(dashboardStats['activeSensors']);
+  final totalSensors = db.sensors.length;
   final healthySensorsPercent =
       _asDouble(dashboardOverview['healthySensorsPercent']);
   final fallbackOnlineSensors = math
@@ -387,21 +376,17 @@ _UserDashboardModel _buildDashboardModel({
     alertsByDay: alertsByDay,
   );
 
-  final analyticsEventsLast24Hours =
-      _asInt(analyticsOverview['eventsLast24Hours']);
   if (liveFeedEntries.isEmpty) {
     liveFeedEntries.add(
       _LiveFeedEntry(
         icon: Icons.timeline_rounded,
         iconColor: OpsColors.muted,
-        label: analyticsEventsLast24Hours > 0
+        label: recentEvents.isNotEmpty
             ? 'Waiting for sensor readings to map into the live feed'
             : 'No recent analytics events available',
-        timeLabel:
-            analyticsEventsLast24Hours > 0 ? 'Refreshing...' : 'No updates',
-        valueLabel: analyticsEventsLast24Hours > 0
-            ? '$analyticsEventsLast24Hours events'
-            : '--',
+        timeLabel: recentEvents.isNotEmpty ? 'Refreshing...' : 'No updates',
+        valueLabel:
+            recentEvents.isNotEmpty ? '${recentEvents.length} events' : '--',
         valueColor: OpsColors.muted,
       ),
     );
@@ -743,12 +728,6 @@ double? _asDouble(dynamic value) {
   if (value == null) return null;
   if (value is num) return value.toDouble();
   return double.tryParse(value.toString());
-}
-
-int _asInt(dynamic value) {
-  if (value == null) return 0;
-  if (value is num) return value.toInt();
-  return int.tryParse(value.toString()) ?? 0;
 }
 
 DateTime? _asDateTime(dynamic value) {

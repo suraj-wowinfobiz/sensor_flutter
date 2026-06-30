@@ -1,8 +1,5 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:video_player/video_player.dart';
 
 import '../../common/pages/dashboard/admin_dashboard.dart';
 import '../../common/pages/dashboard/analytics_dashboard.dart';
@@ -14,6 +11,7 @@ import '../../common/pages/dashboard/vendor_dashboard.dart';
 import '../../common/platform/api/api_client.dart';
 import '../../common/platform/core/api/auth_api.dart';
 import '../theme/ops_theme.dart';
+import '../widgets/route_aware_asset_video.dart';
 import 'app_role.dart';
 import 'app_session.dart';
 
@@ -35,7 +33,6 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   static const _rememberEmailKey = 'global_login_email';
   static const _rememberRoleKey = 'global_login_role';
   static const _rememberEnabledKey = 'global_login_remember';
-  static const _loginHeroVideoAsset = 'assets/images/login_background.mp4';
   static const _loginHeroFallbackAsset = 'assets/images/construction.jpg';
   static const _sensorLogoAsset = 'assets/icons/sensor_icon.png';
 
@@ -1149,7 +1146,7 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
             fit: StackFit.expand,
             children: [
               const _LoginHeroImage(
-                videoAsset: _loginHeroVideoAsset,
+                videoAsset: 'assets/images/login_background.mp4',
                 fallbackAsset: _loginHeroFallbackAsset,
               ),
               DecoratedBox(
@@ -1313,7 +1310,7 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   }
 }
 
-class _LoginHeroImage extends StatefulWidget {
+class _LoginHeroImage extends StatelessWidget {
   final String videoAsset;
   final String fallbackAsset;
 
@@ -1323,88 +1320,11 @@ class _LoginHeroImage extends StatefulWidget {
   });
 
   @override
-  State<_LoginHeroImage> createState() => _LoginHeroImageState();
-}
-
-class _LoginHeroImageState extends State<_LoginHeroImage> {
-  VideoPlayerController? _controller;
-  Timer? _videoInitTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _videoInitTimer = Timer(const Duration(milliseconds: 500), () {
-        if (!mounted) return;
-        final controller = VideoPlayerController.asset(
-          widget.videoAsset,
-          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-        );
-        _controller = controller;
-        controller.initialize().then((_) {
-          if (!mounted) return;
-          controller
-            ..setLooping(true)
-            ..setVolume(0)
-            ..play();
-          setState(() {});
-        }).catchError((_) {
-          controller.dispose();
-          if (!mounted) return;
-          setState(() {
-            if (identical(_controller, controller)) {
-              _controller = null;
-            }
-          });
-        });
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _videoInitTimer?.cancel();
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final controller = _controller;
-    if (controller != null && controller.value.isInitialized) {
-      return FittedBox(
-        fit: BoxFit.cover,
-        clipBehavior: Clip.hardEdge,
-        child: SizedBox(
-          width: controller.value.size.width,
-          height: controller.value.size.height,
-          child: RepaintBoundary(child: VideoPlayer(controller)),
-        ),
-      );
-    }
-
-    return _buildFallback();
-  }
-
-  Widget _buildFallback() {
-    return Image.asset(
-      widget.fallbackAsset,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                OpsColors.primaryContainer.withValues(alpha: 0.16),
-                Colors.white,
-              ],
-            ),
-          ),
-        );
-      },
+    return RouteAwareAssetVideo(
+      videoAsset: videoAsset,
+      fallbackAsset: fallbackAsset,
+      startDelay: const Duration(milliseconds: 700),
     );
   }
 }

@@ -9,6 +9,7 @@ import 'common/platform/core/providers/theme_riverpod_provider.dart';
 import 'common/platform/providers/super_admin_riverpod_provider.dart';
 import 'core/auth/app_role.dart';
 import 'core/auth/global_login_screen.dart';
+import 'core/navigation/app_route_observer.dart';
 import 'core/auth/session_check_screen.dart';
 import 'core/theme/ops_theme.dart';
 
@@ -64,6 +65,7 @@ class _AppRoot extends ConsumerWidget {
       child: MaterialApp(
         title: 'Industrial Tilt Platform',
         debugShowCheckedModeBanner: false,
+        navigatorObservers: [appRouteObserver],
         scrollBehavior: const AppScrollBehavior(),
         theme: OpsTheme.light(),
         darkTheme: OpsTheme.light(),

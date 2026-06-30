@@ -13,7 +13,8 @@ class LiveAnalyticsScreen extends StatefulWidget {
   State<LiveAnalyticsScreen> createState() => _LiveAnalyticsScreenState();
 }
 
-class _LiveAnalyticsScreenState extends State<LiveAnalyticsScreen> {
+class _LiveAnalyticsScreenState extends State<LiveAnalyticsScreen>
+    with WidgetsBindingObserver {
   final AnalyticsSseService _analyticsSseService = AnalyticsSseService();
   final List<FlSpot> _series = [];
   final List<_LiveAnalyticsRow> _rows = [];
@@ -21,15 +22,18 @@ class _LiveAnalyticsScreenState extends State<LiveAnalyticsScreen> {
   Map<String, dynamic>? _latestEvent;
   int _pointIndex = 0;
   bool _paused = false;
+  bool _appActive = true;
   bool _connected = false;
 
   @override
   void initState() {
     super.initState();
-    _connect();
+    WidgetsBinding.instance.addObserver(this);
+    _startStreamingIfNeeded();
   }
 
-  Future<void> _connect() async {
+  Future<void> _startStreamingIfNeeded() async {
+    if (_paused || !_appActive || _subscription != null) return;
     await _analyticsSseService.connect();
     if (!mounted) return;
     setState(() => _connected = _analyticsSseService.isConnected);
@@ -52,6 +56,26 @@ class _LiveAnalyticsScreenState extends State<LiveAnalyticsScreen> {
         _trimSeries(_series, 120);
       });
     });
+  }
+
+  Future<void> _stopStreaming() async {
+    await _subscription?.cancel();
+    _subscription = null;
+    _analyticsSseService.disconnect();
+    if (!mounted) return;
+    setState(() => _connected = false);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final active = state == AppLifecycleState.resumed;
+    if (_appActive == active) return;
+    _appActive = active;
+    if (_appActive) {
+      _startStreamingIfNeeded();
+    } else {
+      _stopStreaming();
+    }
   }
 
   void _trimSeries(List<FlSpot> series, int maxPoints) {
@@ -125,6 +149,7 @@ class _LiveAnalyticsScreenState extends State<LiveAnalyticsScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _subscription?.cancel();
     _analyticsSseService.dispose();
     super.dispose();
@@ -139,7 +164,15 @@ class _LiveAnalyticsScreenState extends State<LiveAnalyticsScreen> {
       subtitle: 'Streaming analytics events from live sensor processing',
       actions: [
         FilledButton.icon(
-          onPressed: () => setState(() => _paused = !_paused),
+          onPressed: () {
+            final nextPaused = !_paused;
+            setState(() => _paused = nextPaused);
+            if (nextPaused) {
+              _stopStreaming();
+            } else {
+              _startStreamingIfNeeded();
+            }
+          },
           icon: Icon(_paused ? Icons.play_arrow_rounded : Icons.pause_rounded),
           label: Text(_paused ? 'Resume' : 'Pause'),
         ),
