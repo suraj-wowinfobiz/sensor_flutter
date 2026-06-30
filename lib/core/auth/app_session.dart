@@ -86,6 +86,35 @@ class AppSession {
     }
   }
 
+  static Future<String> currentDisplayUserId() async {
+    final principalId = await currentPrincipalId();
+    return toSixDigitUserId(principalId);
+  }
+
+  static String toSixDigitUserId(String rawUserId) {
+    final normalized = rawUserId.trim();
+    if (normalized.isEmpty) return '';
+
+    final digitsOnly = normalized.replaceAll(RegExp(r'[^0-9]'), '');
+    if (RegExp(r'^\d{6}$').hasMatch(digitsOnly)) {
+      return digitsOnly;
+    }
+
+    final compact = normalized.replaceAll('-', '');
+    try {
+      final numeric = BigInt.parse(compact, radix: 16);
+      final sixDigit = (numeric % BigInt.from(900000)) + BigInt.from(100000);
+      return sixDigit.toString();
+    } catch (_) {
+      var hash = 0;
+      for (final codeUnit in normalized.codeUnits) {
+        hash = ((hash * 31) + codeUnit) & 0x7fffffff;
+      }
+      final sixDigit = (hash % 900000) + 100000;
+      return sixDigit.toString();
+    }
+  }
+
   static Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
 

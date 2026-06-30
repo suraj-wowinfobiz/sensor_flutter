@@ -8,12 +8,17 @@ class UsersApi {
 
   static Future<String> currentPrincipalId() => _currentPrincipalId();
 
+  static Future<Map<String, dynamic>> getMyProfile() async {
+    final response = await ApiClient.get('/api/v1/auth/me');
+    return _normalizeMap(response.body);
+  }
+
   static Future<Map<String, dynamic>> getUserById(String userId) async {
     final currentPrincipalId = await _currentPrincipalId();
     final response = userId.trim() == currentPrincipalId
         ? await ApiClient.get('/api/v1/auth/me')
         : await ApiClient.get('/api/v1/users/$userId');
-    return _asMap(response.body);
+    return _normalizeMap(response.body);
   }
 
   static Future<List<Map<String, dynamic>>> getUsers() async {
@@ -79,7 +84,7 @@ class UsersApi {
         'organizationId': _organizationIdValue(organizationId),
       },
     );
-    return _asMap(response.body);
+    return _normalizeMap(response.body);
   }
 
   static Future<Map<String, dynamic>> createAdminUser({
@@ -99,7 +104,7 @@ class UsersApi {
         'organizationId': _organizationIdValue(organizationId),
       },
     );
-    return _asMap(response.body);
+    return _normalizeMap(response.body);
   }
 
   static Future<Map<String, dynamic>> createVendor({
@@ -119,7 +124,7 @@ class UsersApi {
         'organizationId': _organizationIdValue(organizationId),
       },
     );
-    return _asMap(response.body);
+    return _normalizeMap(response.body);
   }
 
   static Future<Map<String, dynamic>> updateUser({
@@ -139,7 +144,7 @@ class UsersApi {
           'password': password.trim(),
       },
     );
-    return _asMap(response.body);
+    return _normalizeMap(response.body);
   }
 
   static Future<Map<String, dynamic>> updateUserProfile({
@@ -163,7 +168,7 @@ class UsersApi {
         'active': active,
       },
     );
-    return _asMap(response.body);
+    return _normalizeMap(response.body);
   }
 
   static Future<List<String>> getUserSensorAccess(String userId) async {
@@ -189,7 +194,7 @@ class UsersApi {
             .toList(),
       },
     );
-    return _asMap(response.body);
+    return _normalizeMap(response.body);
   }
 
   static Future<void> deleteUser(String id, {String? role}) async {
@@ -222,7 +227,7 @@ class UsersApi {
         ],
       },
     );
-    return _asMap(response.body);
+    return _normalizeMap(response.body);
   }
 
   static Future<List<Map<String, dynamic>>> getAccessList() async {
@@ -279,7 +284,7 @@ class UsersApi {
         'scopes': normalizedScopes,
       },
     );
-    return _asMap(response.body);
+    return _normalizeMap(response.body);
   }
 
   static Future<Map<String, dynamic>> updateAccess({
@@ -301,7 +306,7 @@ class UsersApi {
         if ((zoneId ?? '').trim().isNotEmpty) 'zoneId': zoneId!.trim(),
       },
     );
-    return _asMap(response.body);
+    return _normalizeMap(response.body);
   }
 
   static Future<Map<String, dynamic>> revokeAccess({
@@ -319,6 +324,17 @@ class UsersApi {
     if (body is Map<String, dynamic>) return body;
     if (body is Map) return body.cast<String, dynamic>();
     return const {};
+  }
+
+  static Map<String, dynamic> _normalizeMap(dynamic body) {
+    final map = _asMap(body);
+    final nestedBody = map['body'];
+    if (nestedBody is Map<String, dynamic>) return nestedBody;
+    if (nestedBody is Map) return nestedBody.cast<String, dynamic>();
+    final nestedData = map['data'];
+    if (nestedData is Map<String, dynamic>) return nestedData;
+    if (nestedData is Map) return nestedData.cast<String, dynamic>();
+    return map;
   }
 
   static List<String> _extractSensorIds(dynamic body) {

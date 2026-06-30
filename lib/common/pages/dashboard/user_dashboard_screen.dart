@@ -5,8 +5,10 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/auth/app_session.dart';
 import '../../../core/theme/ops_theme.dart';
 import '../../platform/models/sensor.dart';
+import '../../platform/models/sensor_parameter.dart';
 import '../../platform/api/users_api.dart';
 import '../../platform/providers/super_admin_backend_provider.dart';
 import '../../platform/providers/super_admin_riverpod_provider.dart';
@@ -36,6 +38,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
   final List<FlSpot> _processedAccelerationData = <FlSpot>[];
   final List<FlSpot> _analyzedVelocityData = <FlSpot>[];
   final List<FlSpot> _analyzedAccelerationData = <FlSpot>[];
+  final List<FlSpot> _configuredMetricData = <FlSpot>[];
 
   GenericSseService? _rawSseService;
   GenericSseService? _processedSseService;
@@ -60,8 +63,11 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
   String _rawEndpointPath = '/api/v1/ingestion/readings/live';
   String _processedEndpointPath = '/api/v1/processing/readings/live';
   String _analyticsEndpointPath = '/api/v1/analytics/events/live';
+  String _resolvedRawEndpoint = '';
+  String _resolvedAnalyticsEndpoint = '';
   String _sensorName = 'Workspace Sensor';
   String _primarySensorId = '';
+  SensorParameter? _configuredParameter;
   Set<String> _assignedSensorIds = <String>{};
   bool _sensorAccessLoaded = false;
   String? _sensorAccessError;
@@ -86,6 +92,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
         db.loadDevices(),
         db.loadSensors(),
         db.loadSites(),
+        db.loadSensorParameters(),
       ]);
       assignedSensorIds = await UsersApi.getMySensorAccess();
     } catch (_) {
@@ -135,6 +142,20 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     _analyticsEndpointPath = sensor.endpointKey.trim().isEmpty
         ? '/api/v1/analytics/events/live'
         : '/api/v1/analytics/events/live/${sensor.endpointKey.trim()}/{userId}';
+    final currentUserId = await AppSession.currentPrincipalId();
+    _resolvedRawEndpoint = _replaceUserIdPlaceholder(_rawEndpointPath, currentUserId);
+    _resolvedAnalyticsEndpoint =
+        _replaceUserIdPlaceholder(_analyticsEndpointPath, currentUserId);
+    final matchingParameters = db.sensorParameters
+        .where((parameter) => parameter.id.trim() == sensor.sensorParameterId.trim())
+        .toList();
+    _configuredParameter =
+        matchingParameters.isEmpty ? null : matchingParameters.first;
+  }
+
+  String _replaceUserIdPlaceholder(String value, String userId) {
+    if (userId.trim().isEmpty) return value;
+    return value.replaceAll('{userId}', userId.trim());
   }
 
   Sensor _primarySensor(List<Sensor> sensors) {
@@ -184,6 +205,10 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
         _appendPoint(_rawXData, _rawIndex, xyz.$1);
         _appendPoint(_rawYData, _rawIndex, xyz.$2);
         _appendPoint(_rawZData, _rawIndex, xyz.$3);
+        final configuredMetric = _computeConfiguredMetric(xyz.$1, xyz.$2, xyz.$3);
+        if (configuredMetric != null) {
+          _appendPoint(_configuredMetricData, _rawIndex, configuredMetric);
+        }
         _rawIndex = _rawXData.length;
       });
     });
@@ -497,8 +522,8 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
       ]);
       if (roll == null || pitch == null || tilt == null) continue;
 
-      final timestamp = _toDouble(map['timestamp']) ??
-          _toDouble(map['eventTime']) ??
+      final timestamp = _timestampToSeconds(map['timestamp']) ??
+          _timestampToSeconds(map['eventTime']) ??
           DateTime.now().millisecondsSinceEpoch / 1000.0;
 
       return _AnalyzedSnapshot(
@@ -566,6 +591,46 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     if (rawDelta <= 0) return null;
     if (rawDelta > 1000) return rawDelta / 1000.0;
     return rawDelta;
+  }
+
+  double? _computeConfiguredMetric(double x, double y, double z) {
+    final formula = (_configuredParameter?.formulaType ?? '').trim();
+    if (formula.isEmpty) return null;
+    switch (formula) {
+      case 'x':
+        return x;
+      case 'y':
+        return y;
+      case 'z':
+        return z;
+      case 'average_xyz':
+        return (x + y + z) / 3.0;
+      case 'magnitude_xyz':
+        return math.sqrt((x * x) + (y * y) + (z * z));
+      case 'tilt_angle_deg':
+        final horizontal = math.sqrt((x * x) + (y * y));
+        return math.atan2(horizontal, z) * 180 / math.pi;
+      default:
+        return null;
+    }
+  }
+
+  double? _timestampToSeconds(dynamic value) {
+    if (value == null) return null;
+    if (value is num) {
+      return value.toDouble() > 1000000000000
+          ? value.toDouble() / 1000.0
+          : value.toDouble();
+    }
+    final raw = value.toString().trim();
+    if (raw.isEmpty) return null;
+    final numeric = double.tryParse(raw);
+    if (numeric != null) {
+      return numeric > 1000000000000 ? numeric / 1000.0 : numeric;
+    }
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return null;
+    return parsed.millisecondsSinceEpoch / 1000.0;
   }
 
   @override
@@ -696,6 +761,11 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
             ],
           ),
           const SizedBox(height: 16),
+          if (_configuredParameter != null &&
+              _configuredParameter!.formulaType.trim().isNotEmpty) ...[
+            _buildConfiguredMetricCard(context),
+            const SizedBox(height: 16),
+          ],
           LayoutBuilder(
             builder: (context, constraints) {
               final stacked = constraints.maxWidth < 1180;
@@ -982,6 +1052,129 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     );
   }
 
+  Widget _buildConfiguredMetricCard(BuildContext context) {
+    final parameter = _configuredParameter!;
+    final title = parameter.calculationName.trim().isEmpty
+        ? parameter.name
+        : parameter.calculationName.trim();
+    final subtitle = parameter.formulaType.trim().isEmpty
+        ? 'Configured custom calculation'
+        : 'Formula: ${parameter.formulaType}';
+    final hasData = _configuredMetricData.isNotEmpty;
+    final graphType = parameter.graphType.trim().isEmpty
+        ? 'line'
+        : parameter.graphType.trim().toLowerCase();
+
+    return OpsPanel(
+      title: title,
+      subtitle: subtitle,
+      padding: const EdgeInsets.all(24),
+      child: SizedBox(
+        height: 300,
+        child: hasData
+            ? (graphType == 'bar'
+                ? _buildConfiguredBarChart()
+                : _buildConfiguredLineChart(
+                    label:
+                        title + (parameter.unit.trim().isEmpty ? '' : ' (${parameter.unit.trim()})'),
+                  ))
+            : _emptyState('Waiting for configured calculation samples...'),
+      ),
+    );
+  }
+
+  Widget _buildConfiguredLineChart({required String label}) {
+    final minY = _configuredMetricData.map((spot) => spot.y).reduce(math.min);
+    final maxY = _configuredMetricData.map((spot) => spot.y).reduce(math.max);
+    final span = (maxY - minY).abs();
+    final chartMinY = minY - math.max(span * 0.12, 0.5);
+    final chartMaxY = maxY + math.max(span * 0.12, 0.5);
+    final maxX = _configuredMetricData.map((spot) => spot.x).reduce(math.max);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 16,
+          children: [
+            _LegendItem(
+              color: const Color(0xFF8E44EC),
+              label: label,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Expanded(
+          child: LineChart(
+            LineChartData(
+              minX: 0,
+              maxX: maxX <= 0 ? 1 : maxX,
+              minY: chartMinY,
+              maxY: chartMaxY <= chartMinY ? chartMinY + 1 : chartMaxY,
+              gridData: FlGridData(
+                drawVerticalLine: false,
+                getDrawingHorizontalLine: (_) => const FlLine(
+                  color: OpsColors.border,
+                  strokeWidth: 1,
+                ),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: const Border(
+                  left: BorderSide(color: OpsColors.border),
+                  bottom: BorderSide(color: OpsColors.border),
+                  top: BorderSide.none,
+                  right: BorderSide.none,
+                ),
+              ),
+              titlesData: const FlTitlesData(
+                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              lineBarsData: [
+                _lineBar(_configuredMetricData, const Color(0xFF8E44EC)),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConfiguredBarChart() {
+    final latest = _configuredMetricData.last.y;
+    return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.center,
+        titlesData: const FlTitlesData(
+          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        borderData: FlBorderData(
+          show: true,
+          border: const Border(
+            left: BorderSide(color: OpsColors.border),
+            bottom: BorderSide(color: OpsColors.border),
+            top: BorderSide.none,
+            right: BorderSide.none,
+          ),
+        ),
+        barGroups: [
+          BarChartGroupData(
+            x: 0,
+            barRods: [
+              BarChartRodData(
+                toY: latest,
+                color: const Color(0xFF8E44EC),
+                width: 36,
+                borderRadius: BorderRadius.circular(6),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMetricChartCard(
     BuildContext context, {
     required String title,
@@ -1125,12 +1318,14 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
       ),
       (
         label: 'Raw SSE',
-        value: _rawEndpointPath,
+        value: _resolvedRawEndpoint.isEmpty ? _rawEndpointPath : _resolvedRawEndpoint,
         helper: 'Current raw stream endpoint',
       ),
       (
         label: 'Analytics SSE',
-        value: _analyticsEndpointPath,
+        value: _resolvedAnalyticsEndpoint.isEmpty
+            ? _analyticsEndpointPath
+            : _resolvedAnalyticsEndpoint,
         helper: 'Current analytics stream endpoint',
       ),
     ];

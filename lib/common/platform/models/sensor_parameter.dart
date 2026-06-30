@@ -7,6 +7,10 @@ class SensorParameter extends Equatable {
   final String unit;
   final double minValue;
   final double maxValue;
+  final String calculationName;
+  final String formulaType;
+  final String graphType;
+  final String useFor;
 
   const SensorParameter({
     required this.id,
@@ -15,6 +19,10 @@ class SensorParameter extends Equatable {
     required this.unit,
     required this.minValue,
     required this.maxValue,
+    this.calculationName = '',
+    this.formulaType = '',
+    this.graphType = 'line',
+    this.useFor = 'custom',
   });
 
   factory SensorParameter.fromJson(Map<String, dynamic> json) {
@@ -31,6 +39,14 @@ class SensorParameter extends Equatable {
       unit: (json['unit'] ?? '').toString(),
       minValue: asDouble(json['minValue'] ?? json['min_value']),
       maxValue: asDouble(json['maxValue'] ?? json['max_value']),
+      calculationName:
+          (json['calculationName'] ?? json['calculation_name'] ?? '')
+              .toString(),
+      formulaType:
+          (json['formulaType'] ?? json['formula_type'] ?? '').toString(),
+      graphType:
+          (json['graphType'] ?? json['graph_type'] ?? 'line').toString(),
+      useFor: (json['useFor'] ?? json['use_for'] ?? 'custom').toString(),
     );
   }
 
@@ -42,9 +58,24 @@ class SensorParameter extends Equatable {
       'unit': unit,
       'min_value': minValue,
       'max_value': maxValue,
+      'calculation_name': calculationName,
+      'formula_type': formulaType,
+      'graph_type': graphType,
+      'use_for': useFor,
     };
   }
 
   @override
-  List<Object?> get props => [id, sensorTypeId, name, unit, minValue, maxValue];
+  List<Object?> get props => [
+        id,
+        sensorTypeId,
+        name,
+        unit,
+        minValue,
+        maxValue,
+        calculationName,
+        formulaType,
+        graphType,
+        useFor,
+      ];
 }

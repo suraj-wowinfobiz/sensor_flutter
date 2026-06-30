@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/auth/app_session.dart';
 
 import '../../../core/auth/app_role.dart';
 import '../widgets/admin_account_settings_panel.dart';
@@ -13,10 +14,17 @@ class ConfigScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AdminAccountSettingsPanel(
-      roleLabel: role.label,
-      userName: 'suraj.tiwari',
-      userEmail: 'suraj.tiwari@live.com',
+    return FutureBuilder<Map<String, String?>>(
+      future: AppSession.getSessionData(),
+      builder: (context, snapshot) {
+        final session = snapshot.data ?? const <String, String?>{};
+        final username = (session['username'] ?? '').trim();
+        return AdminAccountSettingsPanel(
+          roleLabel: role.label,
+          userName: username,
+          userEmail: username,
+        );
+      },
     );
   }
 }

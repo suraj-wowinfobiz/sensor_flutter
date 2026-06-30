@@ -14,6 +14,10 @@ class SensorParameterApi {
     required String unit,
     required double minValue,
     required double maxValue,
+    String calculationName = '',
+    String formulaType = '',
+    String graphType = 'line',
+    String useFor = 'custom',
   }) async {
     final response = await ApiClient.post(
       '$_basePath/sensor-types/$sensorTypeId/parameters',
@@ -22,6 +26,10 @@ class SensorParameterApi {
         'unit': unit,
         'minValue': minValue,
         'maxValue': maxValue,
+        'calculationName': calculationName,
+        'formulaType': formulaType,
+        'graphType': graphType,
+        'useFor': useFor,
       },
     );
     return _asMap(response.body);
@@ -34,6 +42,10 @@ class SensorParameterApi {
     required String unit,
     required double minValue,
     required double maxValue,
+    String calculationName = '',
+    String formulaType = '',
+    String graphType = 'line',
+    String useFor = 'custom',
   }) async {
     final response = await ApiClient.put(
       '$_basePath/parameters/$sensorParameterId',
@@ -44,6 +56,10 @@ class SensorParameterApi {
         'unit': unit,
         'minValue': minValue,
         'maxValue': maxValue,
+        'calculationName': calculationName,
+        'formulaType': formulaType,
+        'graphType': graphType,
+        'useFor': useFor,
       },
     );
     return _asMap(response.body);

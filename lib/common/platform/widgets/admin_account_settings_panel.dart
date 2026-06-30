@@ -68,13 +68,13 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
   Future<void> _loadProfileForm() async {
     setState(() => _profileLoading = true);
     try {
-      final userId = (await AppSession.currentPrincipalId()).trim();
-      if (userId.isEmpty) {
-        throw Exception('User id not found. Please login again.');
-      }
-      final data = await UsersApi.getUserById(userId);
+      final fallbackUserId = (await AppSession.currentPrincipalId()).trim();
+      final data = await UsersApi.getMyProfile();
       if (!mounted) return;
-      _profileUserId = userId;
+      _profileUserId =
+          (data['id'] ?? data['userId'] ?? data['adminId'] ?? fallbackUserId)
+              .toString()
+              .trim();
       _nameController.text = (data['name'] ?? widget.userName).toString();
       _emailController.text = (data['email'] ?? widget.userEmail).toString();
       _organizationIdController.text =
@@ -98,16 +98,12 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
 
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
-    final currentPassword = _currentPasswordController.text.trim();
     final newPassword = _newPasswordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
     final organizationId = _organizationIdController.text.trim();
     final maxUsersAllowed =
         int.tryParse(_maxUsersAllowedController.text.trim());
-    if (name.isEmpty ||
-        email.isEmpty ||
-        organizationId.isEmpty ||
-        maxUsersAllowed == null) {
+    if (name.isEmpty || email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Fill name and email'),
@@ -115,14 +111,12 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
       );
       return false;
     }
-    if (currentPassword.isNotEmpty ||
-        newPassword.isNotEmpty ||
-        confirmPassword.isNotEmpty) {
-      if (currentPassword.isEmpty ||
-          newPassword.isEmpty ||
-          confirmPassword.isEmpty) {
+    if (newPassword.isNotEmpty || confirmPassword.isNotEmpty) {
+      if (newPassword.isEmpty || confirmPassword.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Fill all password fields')),
+          const SnackBar(
+            content: Text('Fill new password and confirm password'),
+          ),
         );
         return false;
       }
@@ -134,8 +128,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
         return false;
       }
     }
-    final resolvedPassword =
-        newPassword.isNotEmpty ? newPassword : currentPassword;
+    final resolvedPassword = newPassword;
 
     setState(() => _profileSaving = true);
     try {
@@ -145,7 +138,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
         email: email,
         password: resolvedPassword.isEmpty ? null : resolvedPassword,
         organizationId: organizationId,
-        maxUsersAllowed: maxUsersAllowed,
+        maxUsersAllowed: maxUsersAllowed ?? 0,
         active: _profileActive,
       );
       if (!mounted) return false;
@@ -186,6 +179,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
                 label: 'currentPassword',
                 controller: _currentPasswordController,
                 obscureText: true,
+                helperText: 'Optional',
               ),
               const SizedBox(height: 10),
               _editableField(
@@ -332,9 +326,14 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
     final maxUsers = _maxUsersAllowedController.text.trim().isEmpty
         ? '--'
         : _maxUsersAllowedController.text.trim();
+    final userId = (_profileUserId ?? '').trim().isEmpty
+        ? '--'
+        : AppSession.toSixDigitUserId(_profileUserId!.trim());
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _settingsInfoRow('User ID', userId),
         _settingsInfoRow('Full Name', resolvedName),
         _settingsInfoRow('Email Address', resolvedEmail),
         _settingsInfoRow('Assigned Role', widget.roleLabel),
@@ -343,6 +342,13 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
         _settingsInfoRow(
             'Account Status', _profileActive ? 'Active' : 'Inactive',
             border: false),
+        const SizedBox(height: 18),
+        const Text(
+          'Edit Profile',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+        ),
+        const SizedBox(height: 12),
+        _buildInputGrid(context),
       ],
     );
   }
@@ -1129,11 +1135,27 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
     required TextEditingController controller,
     bool obscureText = false,
     TextInputType keyboardType = TextInputType.text,
+    String? helperText,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        Row(
+          children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+            if ((helperText ?? '').trim().isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Text(
+                helperText!,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: OpsColors.outline,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
         const SizedBox(height: 6),
         Container(
           width: double.infinity,

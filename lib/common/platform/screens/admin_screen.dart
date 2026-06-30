@@ -181,20 +181,22 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
     final sessionData = await AppSession.getSessionData();
     final username = (sessionData['username'] ?? '').trim();
     final userId = (await AppSession.currentPrincipalId()).trim();
+    final displayUserId = AppSession.toSixDigitUserId(userId);
 
-    debugPrint('Loaded session userId: $userId');
+    debugPrint('Loaded session userId: $displayUserId');
+    debugPrint('Loaded session principalId: $userId');
     debugPrint('Loaded session username: $username');
 
     if (!mounted) return;
 
-    if (username.isEmpty && userId.isEmpty) {
+    if (username.isEmpty && displayUserId.isEmpty) {
       return;
     }
 
     final resolvedUsername =
         username.isNotEmpty ? username : widget.role.profileTitle;
-    final displayName = userId.isNotEmpty
-        ? '$resolvedUsername ($userId)'
+    final displayName = displayUserId.isNotEmpty
+        ? '$resolvedUsername ($displayUserId)'
         : resolvedUsername;
     final subtitle = widget.role.profileTitle;
     setState(() {

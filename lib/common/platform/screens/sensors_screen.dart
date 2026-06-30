@@ -818,7 +818,61 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
     }
     String name = editingParameter?.name ?? '';
     String unit = editingParameter?.unit ?? '';
+    String calculationName = editingParameter?.calculationName ?? '';
+    String formulaType = editingParameter?.formulaType ?? '';
+    String graphType = editingParameter?.graphType.isNotEmpty == true
+        ? editingParameter!.graphType
+        : 'line';
+    String useFor = editingParameter?.useFor.isNotEmpty == true
+        ? editingParameter!.useFor
+        : 'custom';
     String? savedId;
+
+    Map<String, String> presetForType(String typeId) {
+      final matchingTypes =
+          db.sensorTypes.where((type) => type.id == typeId).toList();
+      final matchingType = matchingTypes.isEmpty ? null : matchingTypes.first;
+      final typeName = (matchingType?.name ?? '').trim().toLowerCase();
+
+      if (typeName.contains('tilt')) {
+        return {
+          'calculationName': 'Tilt Angle',
+          'formulaType': 'tilt_angle_deg',
+          'graphType': 'line',
+          'useFor': 'custom',
+          'unit': unit.isEmpty ? 'deg' : unit,
+        };
+      }
+      if (typeName.contains('accel')) {
+        return {
+          'calculationName': 'Acceleration Magnitude',
+          'formulaType': 'magnitude_xyz',
+          'graphType': 'line',
+          'useFor': 'custom',
+          'unit': unit.isEmpty ? 'm/s²' : unit,
+        };
+      }
+      return {
+        'calculationName': calculationName,
+        'formulaType': formulaType,
+        'graphType': graphType,
+        'useFor': useFor,
+        'unit': unit,
+      };
+    }
+
+    void applyPresetForType(String typeId) {
+      final preset = presetForType(typeId);
+      calculationName = preset['calculationName'] ?? calculationName;
+      formulaType = preset['formulaType'] ?? formulaType;
+      graphType = preset['graphType'] ?? graphType;
+      useFor = preset['useFor'] ?? useFor;
+      unit = preset['unit'] ?? unit;
+    }
+
+    if (editingParameter == null && sensorTypeId.trim().isNotEmpty) {
+      applyPresetForType(sensorTypeId);
+    }
 
     await showDialog<void>(
       context: context,
@@ -845,8 +899,12 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                               child: Text(type.name),
                             ))
                         .toList(),
-                    onChanged: (value) =>
-                        setDialogState(() => sensorTypeId = value ?? ''),
+                    onChanged: (value) => setDialogState(() {
+                      sensorTypeId = value ?? '';
+                      if (editingParameter == null) {
+                        applyPresetForType(sensorTypeId);
+                      }
+                    }),
                   ),
                   const SizedBox(height: 10),
                   _dialogTextField(
@@ -859,6 +917,59 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                     label: 'Unit',
                     value: unit,
                     onChanged: (v) => setDialogState(() => unit = v),
+                  ),
+                  const SizedBox(height: 10),
+                  _dialogTextField(
+                    label: 'Calculation Name',
+                    value: calculationName,
+                    onChanged: (v) =>
+                        setDialogState(() => calculationName = v),
+                  ),
+                  const SizedBox(height: 10),
+                  _dialogDropdown(
+                    label: 'Formula',
+                    value: formulaType.isEmpty ? null : formulaType,
+                    hint: 'Select calculation formula',
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'x',
+                        child: Text('X only'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'y',
+                        child: Text('Y only'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'z',
+                        child: Text('Z only'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'average_xyz',
+                        child: Text('Average of X, Y, Z'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'magnitude_xyz',
+                        child: Text('Magnitude sqrt(x²+y²+z²)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'tilt_angle_deg',
+                        child: Text('Tilt angle from X, Y, Z'),
+                      ),
+                    ],
+                    onChanged: (value) =>
+                        setDialogState(() => formulaType = value ?? ''),
+                  ),
+                  const SizedBox(height: 10),
+                  _dialogDropdown(
+                    label: 'Graph Type',
+                    value: graphType,
+                    hint: 'Select graph type',
+                    items: const [
+                      DropdownMenuItem(value: 'line', child: Text('Line')),
+                      DropdownMenuItem(value: 'bar', child: Text('Bar')),
+                    ],
+                    onChanged: (value) =>
+                        setDialogState(() => graphType = value ?? 'line'),
                   ),
                 ],
               ),
@@ -884,6 +995,12 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                   );
                   return;
                 }
+                if (formulaType.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Calculation formula is required')),
+                  );
+                  return;
+                }
                 try {
                   Map<String, dynamic> response;
                   if (editingParameter == null) {
@@ -893,6 +1010,12 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                       unit: unit.trim(),
                       minValue: 0,
                       maxValue: 0,
+                      calculationName: calculationName.trim().isEmpty
+                          ? name.trim()
+                          : calculationName.trim(),
+                      formulaType: formulaType.trim(),
+                      graphType: graphType.trim(),
+                      useFor: useFor.trim(),
                     );
                   } else {
                     response = await SensorParameterApi.updateSensorParameter(
@@ -902,6 +1025,12 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                       unit: unit.trim(),
                       minValue: 0,
                       maxValue: 0,
+                      calculationName: calculationName.trim().isEmpty
+                          ? name.trim()
+                          : calculationName.trim(),
+                      formulaType: formulaType.trim(),
+                      graphType: graphType.trim(),
+                      useFor: useFor.trim(),
                     );
                   }
                   final responseId =
