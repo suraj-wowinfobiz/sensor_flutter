@@ -5,6 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/ops_theme.dart';
 import '../models/alert.dart';
+import '../models/device.dart';
+import '../models/sensor.dart';
+import '../models/site.dart';
+import '../providers/super_admin_api_riverpod_provider.dart';
+import '../providers/super_admin_backend_provider.dart';
 import '../providers/super_admin_riverpod_provider.dart';
 
 class UserDashboardScreen extends ConsumerWidget {
@@ -16,21 +21,25 @@ class UserDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final db = ref.watch(superAdminBackendChangeNotifierProvider);
-    final openAlerts = db.alerts.where((alert) => !alert.isResolved).toList();
-    final onlineDevices = db.devices.where((device) {
-      final status = device.status.trim().toLowerCase();
-      return status == 'active' ||
-          status == 'online' ||
-          status == 'healthy' ||
-          status == 'running';
-    }).length;
-    final warningDevices = math.max(0, db.devices.length - onlineDevices);
-    final offlineDevices = db.devices.isEmpty ? 0 : warningDevices ~/ 2;
-    final onlineSensors =
-        db.sensors.length - math.min(openAlerts.length, db.sensors.length);
-    final healthPercent = db.sensors.isEmpty
-        ? 96.2
-        : ((onlineSensors / db.sensors.length) * 100).clamp(0, 100);
+    final dashboardStats =
+        ref.watch(superAdminDashboardStatsApiProvider).valueOrNull ?? const {};
+    final dashboardOverview =
+        ref.watch(superAdminDashboardOverviewApiProvider).valueOrNull ??
+            const {};
+    final analyticsOverview =
+        ref.watch(superAdminAnalyticsOverviewApiProvider).valueOrNull ??
+            const {};
+    final recentEvents =
+        ref.watch(superAdminAnalyticsRecentEventsApiProvider).valueOrNull ??
+            const <Map<String, dynamic>>[];
+
+    final dashboard = _buildDashboardModel(
+      db: db,
+      dashboardStats: dashboardStats,
+      dashboardOverview: dashboardOverview,
+      analyticsOverview: analyticsOverview,
+      recentEvents: recentEvents,
+    );
 
     return OpsPage(
       title: 'Dashboard',
@@ -57,44 +66,54 @@ class UserDashboardScreen extends ConsumerWidget {
             cards: [
               OpsKpiCard(
                 label: 'Total Sensors',
-                value: '${db.sensors.isEmpty ? 128 : db.sensors.length}',
+                value: '${dashboard.totalSensors}',
                 helper: 'Workspace sensors',
                 icon: Icons.sensors_outlined,
               ),
               OpsKpiCard(
                 label: 'Online',
-                value: '${healthPercent.toStringAsFixed(1)}%',
+                value: dashboard.healthPercent.toStringAsFixed(1),
+                valueSuffix: '%',
                 helper: 'Sensor health',
                 icon: Icons.check_circle_outline_rounded,
                 color: OpsColors.success,
               ),
               OpsKpiCard(
                 label: 'Alerts',
-                value: '${openAlerts.isEmpty ? 12 : openAlerts.length}',
+                value: '${dashboard.openAlerts}',
                 helper: 'Action required',
                 icon: Icons.warning_amber_rounded,
                 color: OpsColors.danger,
               ),
               OpsKpiCard(
                 label: 'Active Sites',
-                value: '${db.sites.isEmpty ? 5 : db.sites.length}',
+                value: '${dashboard.activeSites}',
                 helper: 'Tracked locations',
                 icon: Icons.location_on_outlined,
                 color: OpsColors.muted,
               ),
-              const OpsKpiCard(
+              OpsKpiCard(
                 label: 'Max Vibration',
-                value: '1.24',
-                valueSuffix: 'mm/s',
+                value: dashboard.maxVibration == null
+                    ? '--'
+                    : _formatNumber(
+                        dashboard.maxVibration!,
+                        decimals: dashboard.maxVibration! >= 10 ? 1 : 2,
+                      ),
+                valueSuffix: dashboard.maxVibration == null ? null : 'mm/s',
                 helper: 'Peak',
                 icon: Icons.vibration_rounded,
                 color: OpsColors.warning,
               ),
-              const OpsKpiCard(
+              OpsKpiCard(
                 label: 'Avg Temp',
-                value: '28.4',
-                valueSuffix: 'C',
-                helper: 'Average',
+                value: dashboard.avgTemperature == null
+                    ? '--'
+                    : _formatNumber(dashboard.avgTemperature!, decimals: 1),
+                valueSuffix: dashboard.avgTemperature == null ? null : 'C',
+                helper: analyticsOverview.isEmpty
+                    ? 'Analytics stream'
+                    : '${_asInt(analyticsOverview['eventsLast24Hours'])} events / 24h',
                 icon: Icons.thermostat_rounded,
                 color: OpsColors.primaryContainer,
               ),
@@ -108,22 +127,25 @@ class UserDashboardScreen extends ConsumerWidget {
                 title: 'Sensor Status',
                 padding: const EdgeInsets.all(24),
                 child: _SensorStatusDonut(
-                  online: math.max(onlineSensors, 96).toInt(),
-                  warning: math.max(warningDevices, 20).toInt(),
-                  offline: math.max(offlineDevices, 12).toInt(),
+                  online: dashboard.onlineSensors,
+                  warning: dashboard.warningSensors,
+                  offline: dashboard.offlineSensors,
                 ),
               );
               final center = OpsPanel(
                 title: 'Alerts Summary',
                 subtitle: 'Last 7 days',
                 padding: const EdgeInsets.all(24),
-                child: _AlertSummary(openAlerts: openAlerts),
+                child: _AlertSummary(
+                  counts: dashboard.alertLevelCounts,
+                  totalAlerts: dashboard.openAlerts,
+                ),
               );
-              const right = OpsPanel(
+              final right = OpsPanel(
                 title: 'Live Feed',
-                trailing: _ActiveBadge(),
-                padding: EdgeInsets.all(24),
-                child: _LiveFeed(),
+                trailing: const _ActiveBadge(),
+                padding: const EdgeInsets.all(24),
+                child: _LiveFeed(entries: dashboard.liveFeed),
               );
 
               if (vertical) {
@@ -147,7 +169,7 @@ class UserDashboardScreen extends ConsumerWidget {
                     const SizedBox(width: 12),
                     Expanded(child: center),
                     const SizedBox(width: 12),
-                    const Expanded(child: right),
+                    Expanded(child: right),
                   ],
                 ),
               );
@@ -160,14 +182,12 @@ class UserDashboardScreen extends ConsumerWidget {
               final siteOverview = OpsPanel(
                 title: 'Site Overview',
                 padding: const EdgeInsets.all(24),
-                child: _SiteOverviewTable(
-                  sites: db.sites.map((site) => site.name).toList(),
-                ),
+                child: _SiteOverviewTable(rows: dashboard.siteRows),
               );
-              const healthTrend = OpsPanel(
+              final healthTrend = OpsPanel(
                 title: 'Sensor Health Over Time',
-                padding: EdgeInsets.all(24),
-                child: _HealthTrend(),
+                padding: const EdgeInsets.all(24),
+                child: _HealthTrend(points: dashboard.trendPoints),
               );
 
               if (stacked) {
@@ -187,7 +207,7 @@ class UserDashboardScreen extends ConsumerWidget {
                   children: [
                     Expanded(flex: 6, child: siteOverview),
                     const SizedBox(width: 16),
-                    const Expanded(flex: 4, child: healthTrend),
+                    Expanded(flex: 4, child: healthTrend),
                   ],
                 ),
               );
@@ -200,6 +220,614 @@ class UserDashboardScreen extends ConsumerWidget {
     );
   }
 }
+
+_UserDashboardModel _buildDashboardModel({
+  required SuperAdminBackendProvider db,
+  required Map<String, dynamic> dashboardStats,
+  required Map<String, dynamic> dashboardOverview,
+  required Map<String, dynamic> analyticsOverview,
+  required List<Map<String, dynamic>> recentEvents,
+}) {
+  final openAlerts = db.alerts.where((alert) => !alert.isResolved).toList()
+    ..sort((a, b) => b.triggeredAt.compareTo(a.triggeredAt));
+  final sensorById = {for (final sensor in db.sensors) sensor.id: sensor};
+  final deviceById = {for (final device in db.devices) device.id: device};
+  final siteById = {for (final site in db.sites) site.id: site};
+  final affectedSensorIds = openAlerts
+      .map((alert) => alert.sensorId.trim())
+      .where((sensorId) => sensorId.isNotEmpty)
+      .toSet();
+
+  final totalSensors = db.sensors.isNotEmpty
+      ? db.sensors.length
+      : _asInt(dashboardStats['activeSensors']);
+  final healthySensorsPercent =
+      _asDouble(dashboardOverview['healthySensorsPercent']);
+  final fallbackOnlineSensors = math
+      .max(
+        0,
+        totalSensors - math.min(totalSensors, affectedSensorIds.length),
+      )
+      .toInt();
+  final onlineSensors = totalSensors == 0
+      ? 0
+      : healthySensorsPercent != null
+          ? ((totalSensors * healthySensorsPercent / 100).round())
+              .clamp(0, totalSensors)
+              .toInt()
+          : fallbackOnlineSensors;
+  final warningSensors = totalSensors == 0
+      ? 0
+      : math
+          .min(
+            affectedSensorIds.length,
+            math.max(totalSensors - onlineSensors, 0),
+          )
+          .toInt();
+  final offlineSensors = math
+      .max(
+        0,
+        totalSensors - onlineSensors - warningSensors,
+      )
+      .toInt();
+  final healthPercent = totalSensors == 0
+      ? (healthySensorsPercent ?? 0).clamp(0, 100).toDouble()
+      : ((onlineSensors / totalSensors) * 100).clamp(0, 100).toDouble();
+  final activeSites = db.sites.isNotEmpty
+      ? db.sites.length
+      : db.devices
+          .map((device) => device.siteId)
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .length;
+
+  final alertLevelCounts = <String, int>{
+    'critical': 0,
+    'high': 0,
+    'medium': 0,
+    'low': 0,
+  };
+  for (final alert in openAlerts) {
+    alertLevelCounts[_normalizeAlertLevel(alert.alertLevel)] =
+        (alertLevelCounts[_normalizeAlertLevel(alert.alertLevel)] ?? 0) + 1;
+  }
+
+  final vibrationReadings = <double>[];
+  final temperatureReadings = <double>[];
+  final liveFeedEntries = <_LiveFeedEntry>[];
+  final recentSiteMoments = <String, DateTime>{};
+  final activeSensorsLast24hBySite = <String, Set<String>>{};
+  final activeSensorsByDay = <String, Set<String>>{};
+  final alertsByDay = <String, Set<String>>{};
+  final now = DateTime.now();
+
+  for (final event in recentEvents) {
+    final sensorId = _extractSensorId(event);
+    final sensor = sensorId == null ? null : sensorById[sensorId];
+    final device = sensor == null ? null : deviceById[sensor.deviceId];
+    final siteId = device?.siteId ?? '';
+    final receivedAt = _extractEventDateTime(event);
+    if (siteId.isNotEmpty && receivedAt != null) {
+      final existing = recentSiteMoments[siteId];
+      if (existing == null || receivedAt.isAfter(existing)) {
+        recentSiteMoments[siteId] = receivedAt;
+      }
+      if (sensorId != null &&
+          now.difference(receivedAt).inHours <= 24 &&
+          sensorId.isNotEmpty) {
+        activeSensorsLast24hBySite
+            .putIfAbsent(siteId, () => <String>{})
+            .add(sensorId);
+      }
+      final dayKey = _dayKey(receivedAt);
+      if (sensorId != null && sensorId.isNotEmpty) {
+        activeSensorsByDay.putIfAbsent(dayKey, () => <String>{}).add(sensorId);
+      }
+      if (_extractEventAlertCount(event) > 0 &&
+          sensorId != null &&
+          sensorId.isNotEmpty) {
+        alertsByDay.putIfAbsent(dayKey, () => <String>{}).add(sensorId);
+      }
+    }
+
+    final vibration = _extractMetricValue(event, _vibrationMetricAliases);
+    if (vibration != null) {
+      vibrationReadings.add(vibration);
+    }
+    final temperature = _extractMetricValue(event, _temperatureMetricAliases);
+    if (temperature != null) {
+      temperatureReadings.add(temperature);
+    }
+
+    if (liveFeedEntries.length < 4) {
+      final metric = _extractPreferredMetric(event);
+      if (metric != null) {
+        final label = _feedTitle(
+          metric: metric.label,
+          siteName: siteId.isEmpty ? '' : siteById[siteId]?.name ?? '',
+          sensor: sensor,
+        );
+        liveFeedEntries.add(
+          _LiveFeedEntry(
+            icon: metric.icon,
+            iconColor: metric.color,
+            label: label,
+            timeLabel: _agoLabel(receivedAt),
+            valueLabel: _formatMetricValue(metric),
+            valueColor: metric.color,
+          ),
+        );
+      }
+    }
+  }
+
+  for (final alert in openAlerts) {
+    final sensor = sensorById[alert.sensorId];
+    final device = sensor == null ? null : deviceById[sensor.deviceId];
+    final siteId = device?.siteId ?? '';
+    if (siteId.isEmpty) continue;
+    final dayKey = _dayKey(alert.triggeredAt);
+    alertsByDay.putIfAbsent(dayKey, () => <String>{}).add(alert.sensorId);
+  }
+
+  final siteRows = _buildSiteRows(
+    sites: db.sites,
+    devices: db.devices,
+    sensors: db.sensors,
+    openAlerts: openAlerts,
+    activeSensorsLast24hBySite: activeSensorsLast24hBySite,
+    recentSiteMoments: recentSiteMoments,
+  );
+
+  final trendPoints = _buildTrendPoints(
+    totalSensors: totalSensors,
+    healthPercent: healthPercent,
+    openAlertSensorCount: affectedSensorIds.length,
+    activeSensorsByDay: activeSensorsByDay,
+    alertsByDay: alertsByDay,
+  );
+
+  final analyticsEventsLast24Hours =
+      _asInt(analyticsOverview['eventsLast24Hours']);
+  if (liveFeedEntries.isEmpty) {
+    liveFeedEntries.add(
+      _LiveFeedEntry(
+        icon: Icons.timeline_rounded,
+        iconColor: OpsColors.muted,
+        label: analyticsEventsLast24Hours > 0
+            ? 'Waiting for sensor readings to map into the live feed'
+            : 'No recent analytics events available',
+        timeLabel:
+            analyticsEventsLast24Hours > 0 ? 'Refreshing...' : 'No updates',
+        valueLabel: analyticsEventsLast24Hours > 0
+            ? '$analyticsEventsLast24Hours events'
+            : '--',
+        valueColor: OpsColors.muted,
+      ),
+    );
+  }
+
+  return _UserDashboardModel(
+    totalSensors: totalSensors,
+    onlineSensors: onlineSensors,
+    warningSensors: warningSensors,
+    offlineSensors: offlineSensors,
+    healthPercent: healthPercent,
+    openAlerts: openAlerts.length,
+    activeSites: activeSites,
+    maxVibration:
+        vibrationReadings.isEmpty ? null : vibrationReadings.reduce(math.max),
+    avgTemperature: temperatureReadings.isEmpty
+        ? null
+        : temperatureReadings.reduce((a, b) => a + b) /
+            temperatureReadings.length,
+    alertLevelCounts: alertLevelCounts,
+    liveFeed: liveFeedEntries,
+    siteRows: siteRows,
+    trendPoints: trendPoints,
+  );
+}
+
+List<_SiteOverviewRowData> _buildSiteRows({
+  required List<Site> sites,
+  required List<Device> devices,
+  required List<Sensor> sensors,
+  required List<Alert> openAlerts,
+  required Map<String, Set<String>> activeSensorsLast24hBySite,
+  required Map<String, DateTime> recentSiteMoments,
+}) {
+  final deviceSiteById = {
+    for (final device in devices) device.id: device.siteId
+  };
+  final sensorsBySite = <String, List<Sensor>>{};
+  for (final sensor in sensors) {
+    final siteId = deviceSiteById[sensor.deviceId] ?? '';
+    if (siteId.isEmpty) continue;
+    sensorsBySite.putIfAbsent(siteId, () => <Sensor>[]).add(sensor);
+  }
+
+  final sensorById = {for (final sensor in sensors) sensor.id: sensor};
+  final alertsBySite = <String, int>{};
+  for (final alert in openAlerts) {
+    final sensor = sensorById[alert.sensorId];
+    if (sensor == null) continue;
+    final siteId = deviceSiteById[sensor.deviceId] ?? '';
+    if (siteId.isEmpty) continue;
+    alertsBySite[siteId] = (alertsBySite[siteId] ?? 0) + 1;
+  }
+
+  final rows = <_SiteOverviewRowData>[];
+  for (final site in sites) {
+    final siteSensors = sensorsBySite[site.id] ?? const <Sensor>[];
+    final totalSensors = siteSensors.length;
+    final activeSensors = activeSensorsLast24hBySite[site.id]?.length ?? 0;
+    final alerts = alertsBySite[site.id] ?? 0;
+    final status = totalSensors == 0
+        ? 'Offline'
+        : alerts > 0
+            ? 'Warning'
+            : activeSensors > 0 || recentSiteMoments.containsKey(site.id)
+                ? 'Online'
+                : 'Offline';
+    final onlineCount = totalSensors == 0
+        ? 0
+        : activeSensors > 0
+            ? math.min(activeSensors, totalSensors).toInt()
+            : math.max(totalSensors - alerts, 0).toInt();
+    rows.add(
+      _SiteOverviewRowData(
+        site: site.name,
+        status: status,
+        sensors: '$onlineCount / $totalSensors',
+        alerts: '$alerts',
+        last: _agoLabel(recentSiteMoments[site.id]),
+      ),
+    );
+  }
+
+  rows.sort((a, b) {
+    final statusPriority =
+        _siteStatusPriority(a.status) - _siteStatusPriority(b.status);
+    if (statusPriority != 0) return statusPriority;
+    return a.site.compareTo(b.site);
+  });
+
+  return rows.take(5).toList();
+}
+
+List<_TrendPoint> _buildTrendPoints({
+  required int totalSensors,
+  required double healthPercent,
+  required int openAlertSensorCount,
+  required Map<String, Set<String>> activeSensorsByDay,
+  required Map<String, Set<String>> alertsByDay,
+}) {
+  final now = DateTime.now();
+  final currentAlertPercent = totalSensors == 0
+      ? 0.0
+      : ((openAlertSensorCount / totalSensors) * 100).clamp(0, 100).toDouble();
+  final points = <_TrendPoint>[];
+
+  for (var offset = 6; offset >= 0; offset--) {
+    final day = DateTime(now.year, now.month, now.day).subtract(
+      Duration(days: offset),
+    );
+    final key = _dayKey(day);
+    final activeForDay = activeSensorsByDay[key]?.length ?? 0;
+    final alertsForDay = alertsByDay[key]?.length ?? 0;
+    final onlinePercent = totalSensors == 0
+        ? 0.0
+        : activeForDay > 0
+            ? ((activeForDay / totalSensors) * 100).clamp(0, 100).toDouble()
+            : healthPercent;
+    final warningPercent = totalSensors == 0
+        ? 0.0
+        : alertsForDay > 0
+            ? ((alertsForDay / totalSensors) * 100).clamp(0, 100).toDouble()
+            : currentAlertPercent;
+
+    points.add(
+      _TrendPoint(
+        label: 'Day ${7 - offset}',
+        onlinePercent: onlinePercent,
+        warningPercent: warningPercent,
+      ),
+    );
+  }
+
+  return points;
+}
+
+String _feedTitle({
+  required String metric,
+  required String siteName,
+  required Sensor? sensor,
+}) {
+  if (siteName.isNotEmpty) {
+    return '$metric - $siteName';
+  }
+  if (sensor != null && sensor.serialNumber.trim().isNotEmpty) {
+    return '$metric - ${sensor.serialNumber.trim()}';
+  }
+  return metric;
+}
+
+String _formatMetricValue(_MetricMetric metric) {
+  final decimals = metric.unit == '%'
+      ? 0
+      : metric.unit == 'C'
+          ? 1
+          : 2;
+  return '${_formatNumber(metric.value, decimals: decimals)} ${metric.unit}'
+      .trim();
+}
+
+String _formatNumber(double value, {int decimals = 1}) {
+  return value.toStringAsFixed(decimals);
+}
+
+int _siteStatusPriority(String status) {
+  switch (status.toLowerCase()) {
+    case 'warning':
+      return 0;
+    case 'offline':
+      return 1;
+    default:
+      return 2;
+  }
+}
+
+String _normalizeAlertLevel(String value) {
+  final normalized = value.trim().toLowerCase();
+  if (normalized.contains('critical')) return 'critical';
+  if (normalized.contains('high')) return 'high';
+  if (normalized.contains('medium')) return 'medium';
+  return 'low';
+}
+
+String _dayKey(DateTime value) {
+  final local = value.toLocal();
+  return '${local.year.toString().padLeft(4, '0')}-'
+      '${local.month.toString().padLeft(2, '0')}-'
+      '${local.day.toString().padLeft(2, '0')}';
+}
+
+DateTime? _extractEventDateTime(Map<String, dynamic> event) {
+  for (final candidate in _candidateMaps(event)) {
+    for (final key in const [
+      'receivedAt',
+      'timestamp',
+      'createdAt',
+      'updatedAt',
+      'eventTime',
+      'time',
+    ]) {
+      final parsed = _asDateTime(candidate[key]);
+      if (parsed != null) return parsed;
+    }
+  }
+  return null;
+}
+
+String? _extractSensorId(Map<String, dynamic> event) {
+  for (final candidate in _candidateMaps(event)) {
+    final sensorId = (candidate['sensorId'] ?? candidate['sensor_id'] ?? '')
+        .toString()
+        .trim();
+    if (sensorId.isNotEmpty) return sensorId;
+  }
+  return null;
+}
+
+int _extractEventAlertCount(Map<String, dynamic> event) {
+  for (final candidate in _candidateMaps(event)) {
+    final raw = candidate['alertCount'] ?? candidate['alertsCount'];
+    if (raw is num) return raw.toInt();
+    final parsed = int.tryParse(raw?.toString() ?? '');
+    if (parsed != null) return parsed;
+  }
+  return 0;
+}
+
+_MetricMetric? _extractPreferredMetric(Map<String, dynamic> event) {
+  for (final definition in _metricDefinitions) {
+    final value = _extractMetricValue(event, definition.aliases);
+    if (value == null) continue;
+    return _MetricMetric(
+      label: definition.label,
+      unit: definition.unit,
+      value: value,
+      icon: definition.icon,
+      color: definition.color,
+    );
+  }
+  return null;
+}
+
+double? _extractMetricValue(
+  Map<String, dynamic> event,
+  List<String> aliases,
+) {
+  final normalizedAliases =
+      aliases.map(_normalizeMetricKey).where((key) => key.isNotEmpty).toSet();
+
+  for (final candidate in _candidateMaps(event)) {
+    for (final entry in candidate.entries) {
+      if (normalizedAliases
+          .contains(_normalizeMetricKey(entry.key.toString()))) {
+        final parsed = _asDouble(entry.value);
+        if (parsed != null) return parsed;
+      }
+    }
+
+    final parameters = candidate['parameters'];
+    if (parameters is Map) {
+      for (final entry in parameters.entries) {
+        if (normalizedAliases
+            .contains(_normalizeMetricKey(entry.key.toString()))) {
+          final parsed = _asDouble(entry.value);
+          if (parsed != null) return parsed;
+        }
+      }
+    }
+
+    final series = candidate['series'];
+    if (series is List) {
+      for (final item in series) {
+        if (item is! Map) continue;
+        final name = item['name']?.toString() ?? '';
+        if (!normalizedAliases.contains(_normalizeMetricKey(name))) continue;
+        final parsed = _asDouble(item['value']);
+        if (parsed != null) return parsed;
+      }
+    }
+
+    final evaluations = candidate['evaluations'];
+    if (evaluations is List) {
+      for (final item in evaluations) {
+        if (item is! Map) continue;
+        final name =
+            item['parameterName']?.toString() ?? item['name']?.toString() ?? '';
+        if (!normalizedAliases.contains(_normalizeMetricKey(name))) continue;
+        final parsed = _asDouble(item['value']);
+        if (parsed != null) return parsed;
+      }
+    }
+  }
+
+  return null;
+}
+
+Iterable<Map<String, dynamic>> _candidateMaps(
+  dynamic payload, {
+  int depth = 0,
+}) sync* {
+  if (payload == null || depth > 6) return;
+
+  if (payload is Map<String, dynamic>) {
+    yield payload;
+    for (final key in const [
+      'body',
+      'data',
+      'payload',
+      'event',
+      'rawPayload',
+      'processedPayload',
+      'parameters',
+    ]) {
+      final next = payload[key];
+      if (next != null) {
+        yield* _candidateMaps(next, depth: depth + 1);
+      }
+    }
+    return;
+  }
+
+  if (payload is Map) {
+    yield* _candidateMaps(payload.cast<String, dynamic>(), depth: depth);
+    return;
+  }
+
+  if (payload is List) {
+    for (final item in payload) {
+      yield* _candidateMaps(item, depth: depth + 1);
+    }
+  }
+}
+
+String _normalizeMetricKey(String value) {
+  return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '');
+}
+
+double? _asDouble(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  return double.tryParse(value.toString());
+}
+
+int _asInt(dynamic value) {
+  if (value == null) return 0;
+  if (value is num) return value.toInt();
+  return int.tryParse(value.toString()) ?? 0;
+}
+
+DateTime? _asDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  if (value is num) {
+    final raw = value.toDouble();
+    final milliseconds =
+        raw > 1000000000000 ? raw.round() : (raw * 1000).round();
+    return DateTime.fromMillisecondsSinceEpoch(milliseconds);
+  }
+
+  final text = value.toString().trim();
+  if (text.isEmpty) return null;
+  final direct = DateTime.tryParse(text);
+  if (direct != null) return direct;
+
+  final number = double.tryParse(text);
+  if (number == null) return null;
+  final milliseconds =
+      number > 1000000000000 ? number.round() : (number * 1000).round();
+  return DateTime.fromMillisecondsSinceEpoch(milliseconds);
+}
+
+String _agoLabel(DateTime? when) {
+  if (when == null) return 'No updates';
+  final delta = DateTime.now().difference(when.toLocal());
+  if (delta.inSeconds < 10) return 'Just now';
+  if (delta.inMinutes < 1) return '${delta.inSeconds}s ago';
+  if (delta.inHours < 1) return '${delta.inMinutes} mins ago';
+  if (delta.inDays < 1) return '${delta.inHours} hrs ago';
+  return '${delta.inDays} days ago';
+}
+
+const List<String> _vibrationMetricAliases = [
+  'vibRMS',
+  'vibrationRms',
+  'vibration.vibrationRms',
+  'horizontalMagnitude',
+  'accelerationMagnitude',
+];
+
+const List<String> _temperatureMetricAliases = [
+  'temperature',
+  'temperatureC',
+  'temp',
+  'tempC',
+];
+
+const List<_MetricDefinition> _metricDefinitions = [
+  _MetricDefinition(
+    label: 'Temperature',
+    unit: 'C',
+    icon: Icons.device_thermostat_rounded,
+    color: OpsColors.primary,
+    aliases: _temperatureMetricAliases,
+  ),
+  _MetricDefinition(
+    label: 'Humidity',
+    unit: '%',
+    icon: Icons.water_drop_outlined,
+    color: Color(0xFF3B82F6),
+    aliases: ['humidity', 'humidityPercent', 'rh'],
+  ),
+  _MetricDefinition(
+    label: 'Vibration',
+    unit: 'mm/s',
+    icon: Icons.vibration_rounded,
+    color: OpsColors.danger,
+    aliases: _vibrationMetricAliases,
+  ),
+  _MetricDefinition(
+    label: 'Tilt',
+    unit: 'deg',
+    icon: Icons.architecture_rounded,
+    color: OpsColors.amber,
+    aliases: ['tiltFromVerticalDegrees', 'inclinationDegrees', 'tilt'],
+  ),
+];
 
 class _SensorStatusDonut extends StatelessWidget {
   const _SensorStatusDonut({
@@ -233,7 +861,7 @@ class _SensorStatusDonut extends StatelessWidget {
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('$total',
+                  Text('${online + warning + offline}',
                       style: Theme.of(context).textTheme.headlineMedium),
                   Text('TOTAL', style: Theme.of(context).textTheme.labelSmall),
                 ],
@@ -311,22 +939,28 @@ class _DonutPainter extends CustomPainter {
 }
 
 class _AlertSummary extends StatelessWidget {
-  const _AlertSummary({required this.openAlerts});
+  const _AlertSummary({
+    required this.counts,
+    required this.totalAlerts,
+  });
 
-  final List<Alert> openAlerts;
+  final Map<String, int> counts;
+  final int totalAlerts;
 
   @override
   Widget build(BuildContext context) {
-    final critical = openAlerts
-        .where((alert) => alert.alertLevel.toLowerCase().contains('critical'))
-        .length;
+    final total = math.max(totalAlerts, 1);
+    final critical = counts['critical'] ?? 0;
+    final high = counts['high'] ?? 0;
+    final medium = counts['medium'] ?? 0;
+    final low = counts['low'] ?? 0;
+
     return Column(
       children: [
-        _CategoryRow(
-            'Critical', critical == 0 ? 3 : critical, .25, OpsColors.danger),
-        const _CategoryRow('High', 5, .42, Color(0xFFF97316)),
-        const _CategoryRow('Medium', 8, .66, OpsColors.amber),
-        const _CategoryRow('Low', 12, 1, OpsColors.primary),
+        _CategoryRow('Critical', critical, critical / total, OpsColors.danger),
+        _CategoryRow('High', high, high / total, const Color(0xFFF97316)),
+        _CategoryRow('Medium', medium, medium / total, OpsColors.amber),
+        _CategoryRow('Low', low, low / total, OpsColors.primary),
       ],
     );
   }
@@ -358,7 +992,7 @@ class _CategoryRow extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
-              value: factor,
+              value: factor.isFinite ? factor.clamp(0, 1) : 0,
               minHeight: 8,
               color: color,
               backgroundColor: const Color(0xFFECEEF0),
@@ -394,53 +1028,20 @@ class _ActiveBadge extends StatelessWidget {
 }
 
 class _LiveFeed extends StatelessWidget {
-  const _LiveFeed();
+  const _LiveFeed({required this.entries});
+
+  final List<_LiveFeedEntry> entries;
 
   @override
   Widget build(BuildContext context) {
-    const display = [
-      (
-        Icons.device_thermostat_rounded,
-        OpsColors.primary,
-        'Temp - Zone A',
-        '2 mins ago',
-        '28.4 C',
-        OpsColors.primary
-      ),
-      (
-        Icons.water_drop_outlined,
-        Color(0xFF3B82F6),
-        'Humidity - Zone A',
-        '5 mins ago',
-        '62 %',
-        Color(0xFF3B82F6)
-      ),
-      (
-        Icons.vibration_rounded,
-        OpsColors.danger,
-        'Vibration - Pile 7',
-        'Just now',
-        '1.24 mm/s',
-        OpsColors.danger
-      ),
-      (
-        Icons.architecture_rounded,
-        OpsColors.amber,
-        'Tilt - Tower Crane',
-        '10 mins ago',
-        '0.32 deg',
-        OpsColors.text
-      ),
-    ];
-
     return Column(
-      children: display.indexed.map((entry) {
+      children: entries.indexed.map((entry) {
         final index = entry.$1;
         final row = entry.$2;
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            border: index == display.length - 1
+            border: index == entries.length - 1
                 ? null
                 : const Border(bottom: BorderSide(color: Color(0xFFECEEF0))),
           ),
@@ -451,28 +1052,33 @@ class _LiveFeed extends StatelessWidget {
                 height: 32,
                 margin: const EdgeInsets.only(right: 12),
                 decoration: BoxDecoration(
-                  color: row.$2.withValues(alpha: .10),
+                  color: row.iconColor.withValues(alpha: .10),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: Icon(row.$1, color: row.$2, size: 18),
+                child: Icon(row.icon, color: row.iconColor, size: 18),
               ),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      row.$3,
+                      row.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                    Text(row.$4, style: Theme.of(context).textTheme.labelSmall),
+                    Text(row.timeLabel,
+                        style: Theme.of(context).textTheme.labelSmall),
                   ],
                 ),
               ),
               Text(
-                row.$5,
+                row.valueLabel,
                 style: TextStyle(
-                  color: row.$6,
+                  color: row.valueColor,
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
                 ),
@@ -486,21 +1092,24 @@ class _LiveFeed extends StatelessWidget {
 }
 
 class _SiteOverviewTable extends StatelessWidget {
-  const _SiteOverviewTable({required this.sites});
+  const _SiteOverviewTable({required this.rows});
 
-  final List<String> sites;
+  final List<_SiteOverviewRowData> rows;
 
   @override
   Widget build(BuildContext context) {
-    final names = sites.isEmpty
+    final displayRows = rows.isEmpty
         ? const [
-            'Project Alpha',
-            'Project Beta',
-            'Project Gamma',
-            'Project Delta',
-            'Project Epsilon'
+            _SiteOverviewRowData(
+              site: 'No sites found',
+              status: 'Offline',
+              sensors: '0 / 0',
+              alerts: '0',
+              last: 'No updates',
+            ),
           ]
-        : sites.take(5).toList();
+        : rows;
+
     return Column(
       children: [
         const _SiteRow(
@@ -512,22 +1121,15 @@ class _SiteOverviewTable extends StatelessWidget {
           header: true,
         ),
         const Divider(height: 16),
-        ...names.indexed.map((entry) {
-          final index = entry.$1;
-          final site = entry.$2;
-          final status = index == 2
-              ? 'Warning'
-              : index == 3
-                  ? 'Offline'
-                  : 'Online';
-          return _SiteRow(
-            site: site,
-            status: status,
-            sensors: '${42 - (index * 4)} / ${45 - (index * 3)}',
-            alerts: '${index == 0 ? 2 : index == 4 ? 0 : index + 1}',
-            last: index == 0 ? '2 mins ago' : '${index * 4 + 1} mins ago',
-          );
-        }),
+        ...displayRows.map(
+          (row) => _SiteRow(
+            site: row.site,
+            status: row.status,
+            sensors: row.sensors,
+            alerts: row.alerts,
+            last: row.last,
+          ),
+        ),
       ],
     );
   }
@@ -573,24 +1175,34 @@ class _SiteRow extends StatelessWidget {
                 ? Text(status, style: textStyle)
                 : Align(
                     alignment: Alignment.centerLeft,
-                    child: OpsStatusBadge(status)),
+                    child: OpsStatusBadge(status),
+                  ),
           ),
           Expanded(
-              child:
-                  Text(sensors, textAlign: TextAlign.center, style: textStyle)),
+            child: Text(
+              sensors,
+              textAlign: TextAlign.center,
+              style: textStyle,
+            ),
+          ),
           Expanded(
             child: Text(
               alerts,
               textAlign: TextAlign.center,
               style: textStyle.copyWith(
-                  color: header ? OpsColors.outline : alertColor),
+                color: header ? OpsColors.outline : alertColor,
+              ),
             ),
           ),
           Expanded(
-              flex: 2,
-              child: Text(last,
-                  style: textStyle.copyWith(
-                      color: header ? OpsColors.outline : OpsColors.muted))),
+            flex: 2,
+            child: Text(
+              last,
+              style: textStyle.copyWith(
+                color: header ? OpsColors.outline : OpsColors.muted,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -598,15 +1210,17 @@ class _SiteRow extends StatelessWidget {
 }
 
 class _HealthTrend extends StatelessWidget {
-  const _HealthTrend();
+  const _HealthTrend({required this.points});
+
+  final List<_TrendPoint> points;
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
+    return SizedBox(
       height: 286,
       child: Stack(
         children: [
-          Positioned(
+          const Positioned(
             top: 0,
             right: 0,
             child: Row(
@@ -617,7 +1231,7 @@ class _HealthTrend extends StatelessWidget {
               ],
             ),
           ),
-          Positioned(
+          const Positioned(
             top: 26,
             bottom: 32,
             left: 0,
@@ -640,8 +1254,8 @@ class _HealthTrend extends StatelessWidget {
             left: 38,
             right: 0,
             child: CustomPaint(
-              painter: _TrendPainter(),
-              child: SizedBox.expand(),
+              painter: _TrendPainter(points: points),
+              child: const SizedBox.expand(),
             ),
           ),
           Positioned(
@@ -650,15 +1264,9 @@ class _HealthTrend extends StatelessWidget {
             right: 0,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Day 1'),
-                Text('Day 2'),
-                Text('Day 3'),
-                Text('Day 4'),
-                Text('Day 5'),
-                Text('Day 6'),
-                Text('Day 7'),
-              ],
+              children: points
+                  .map((point) => Text(point.label))
+                  .toList(growable: false),
             ),
           ),
         ],
@@ -691,7 +1299,9 @@ class _LegendDot extends StatelessWidget {
 }
 
 class _TrendPainter extends CustomPainter {
-  const _TrendPainter();
+  const _TrendPainter({required this.points});
+
+  final List<_TrendPoint> points;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -702,13 +1312,23 @@ class _TrendPainter extends CustomPainter {
       final y = size.height * i / 4;
       _drawDashedLine(canvas, Offset(0, y), Offset(size.width, y), gridPaint);
     }
+
     _drawLine(
-        canvas, size, const [78, 88, 74, 84, 94, 79, 88], OpsColors.success);
+      canvas,
+      size,
+      points.map((point) => point.onlinePercent).toList(growable: false),
+      OpsColors.success,
+    );
     _drawLine(
-        canvas, size, const [25, 31, 19, 22, 28, 31, 25], OpsColors.amber);
+      canvas,
+      size,
+      points.map((point) => point.warningPercent).toList(growable: false),
+      OpsColors.amber,
+    );
   }
 
   void _drawLine(Canvas canvas, Size size, List<double> values, Color color) {
+    if (values.isEmpty) return;
     final path = Path();
     final pointPaint = Paint()..color = color;
     final linePaint = Paint()
@@ -718,9 +1338,10 @@ class _TrendPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
+    final denominator = math.max(values.length - 1, 1);
     for (var i = 0; i < values.length; i++) {
-      final x = size.width * i / (values.length - 1);
-      final y = size.height - (values[i] / 100 * size.height);
+      final x = size.width * i / denominator;
+      final y = size.height - (values[i].clamp(0, 100) / 100 * size.height);
       if (i == 0) {
         path.moveTo(x, y);
       } else {
@@ -746,7 +1367,13 @@ class _TrendPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _TrendPainter oldDelegate) {
+    if (oldDelegate.points.length != points.length) return true;
+    for (var i = 0; i < points.length; i++) {
+      if (oldDelegate.points[i] != points[i]) return true;
+    }
+    return false;
+  }
 }
 
 class _DashboardFooter extends StatelessWidget {
@@ -774,4 +1401,125 @@ class _DashboardFooter extends StatelessWidget {
       ),
     );
   }
+}
+
+class _UserDashboardModel {
+  const _UserDashboardModel({
+    required this.totalSensors,
+    required this.onlineSensors,
+    required this.warningSensors,
+    required this.offlineSensors,
+    required this.healthPercent,
+    required this.openAlerts,
+    required this.activeSites,
+    required this.maxVibration,
+    required this.avgTemperature,
+    required this.alertLevelCounts,
+    required this.liveFeed,
+    required this.siteRows,
+    required this.trendPoints,
+  });
+
+  final int totalSensors;
+  final int onlineSensors;
+  final int warningSensors;
+  final int offlineSensors;
+  final double healthPercent;
+  final int openAlerts;
+  final int activeSites;
+  final double? maxVibration;
+  final double? avgTemperature;
+  final Map<String, int> alertLevelCounts;
+  final List<_LiveFeedEntry> liveFeed;
+  final List<_SiteOverviewRowData> siteRows;
+  final List<_TrendPoint> trendPoints;
+}
+
+class _LiveFeedEntry {
+  const _LiveFeedEntry({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.timeLabel,
+    required this.valueLabel,
+    required this.valueColor,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String timeLabel;
+  final String valueLabel;
+  final Color valueColor;
+}
+
+class _SiteOverviewRowData {
+  const _SiteOverviewRowData({
+    required this.site,
+    required this.status,
+    required this.sensors,
+    required this.alerts,
+    required this.last,
+  });
+
+  final String site;
+  final String status;
+  final String sensors;
+  final String alerts;
+  final String last;
+}
+
+class _TrendPoint {
+  const _TrendPoint({
+    required this.label,
+    required this.onlinePercent,
+    required this.warningPercent,
+  });
+
+  final String label;
+  final double onlinePercent;
+  final double warningPercent;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _TrendPoint &&
+        other.label == label &&
+        other.onlinePercent == onlinePercent &&
+        other.warningPercent == warningPercent;
+  }
+
+  @override
+  int get hashCode => Object.hash(label, onlinePercent, warningPercent);
+}
+
+class _MetricDefinition {
+  const _MetricDefinition({
+    required this.label,
+    required this.unit,
+    required this.icon,
+    required this.color,
+    required this.aliases,
+  });
+
+  final String label;
+  final String unit;
+  final IconData icon;
+  final Color color;
+  final List<String> aliases;
+}
+
+class _MetricMetric {
+  const _MetricMetric({
+    required this.label,
+    required this.unit,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final String unit;
+  final double value;
+  final IconData icon;
+  final Color color;
 }
