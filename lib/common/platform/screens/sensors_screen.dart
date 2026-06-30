@@ -170,6 +170,7 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
     final draftSensorId = sensor?.id ?? _generateClientSensorId();
     final transientCreatedParameterIds = <String>{};
     var sensorSaved = false;
+    String parameterSectionTab = 'api';
     String sensorParameterId = '';
     List<Map<String, dynamic>> sensorParametersForType = [];
     bool sensorParametersLoading = false;
@@ -220,6 +221,10 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                     'unit': param.unit,
                     'minValue': param.minValue,
                     'maxValue': param.maxValue,
+                    'calculationName': param.calculationName,
+                    'formulaType': param.formulaType,
+                    'graphType': param.graphType,
+                    'useFor': param.useFor,
                   })
               .toList();
         }
@@ -261,10 +266,11 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
 
     if (sensor != null) {
       _editingId = sensor.id;
-      _sensorName = sensor.serialNumber;
+      _sensorName = sensor.name;
       _serialNumber = sensor.serialNumber;
       _deviceId = sensor.deviceId;
       _sensorTypeId = sensor.sensorTypeId;
+      sensorParameterId = sensor.sensorParameterId;
     } else {
       _editingId = null;
       _sensorName = 'Sensor ${DateTime.now().millisecondsSinceEpoch % 10000}';
@@ -273,7 +279,10 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
       _deviceId = defaultDeviceId;
       _sensorTypeId = defaultTypeId;
     }
-    await fetchParametersForType(_sensorTypeId);
+    await fetchParametersForType(
+      _sensorTypeId,
+      preferredParameterId: sensorParameterId,
+    );
     if (!mounted) return;
 
     await showGeneralDialog(
@@ -414,8 +423,14 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                       const SizedBox(height: 12),
                       _parameterSection(
                         context,
+                        tab: parameterSectionTab,
+                        selectedParameterId: sensorParameterId,
                         sensorParametersLoading: sensorParametersLoading,
                         sensorParametersForType: sensorParametersForType,
+                        onTabChanged: (value) =>
+                            setState(() => parameterSectionTab = value),
+                        onSelect: (parameterId) =>
+                            setState(() => sensorParameterId = parameterId),
                         onCreate: () async {
                           final createdParameterId =
                               await _showCreateOrEditSensorParameterDialog(
@@ -1267,8 +1282,12 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
 
   Widget _parameterSection(
     BuildContext context, {
+    required String tab,
+    required String selectedParameterId,
     required bool sensorParametersLoading,
     required List<Map<String, dynamic>> sensorParametersForType,
+    required ValueChanged<String> onTabChanged,
+    required ValueChanged<String> onSelect,
     required Future<void> Function() onCreate,
     required Future<void> Function(String parameterId) onEdit,
   }) {
@@ -1293,7 +1312,7 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'API Parameters',
+                  'Sensor Parameters',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
@@ -1304,23 +1323,59 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
               IconButton(
                 onPressed: onCreate,
                 icon: const Icon(Icons.add),
-                tooltip: 'Add parameter',
+                tooltip: tab == 'api'
+                    ? 'Add API parameter'
+                    : 'Add calculation',
               ),
             ],
           ),
           Text(
-            'Add payload fields like x, y, z. These fields will appear in the ingestion request body.',
+            tab == 'api'
+                ? 'Add payload fields like x, y, z. These fields will appear in the ingestion request body.'
+                : 'Choose how this sensor should calculate and display derived values.',
             style: TextStyle(fontSize: 12.5, color: mutedColor),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: isLight ? Colors.white : const Color(0xFF132A3B),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Theme.of(context).dividerColor),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _parameterTabButton(
+                    context,
+                    label: 'API Parameters',
+                    selected: tab == 'api',
+                    onTap: () => onTabChanged('api'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _parameterTabButton(
+                    context,
+                    label: 'Calculations',
+                    selected: tab == 'calculation',
+                    onTap: () => onTabChanged('calculation'),
+                  ),
+                ),
+              ],
+            ),
           ),
           if (sensorParametersLoading)
             const Padding(
-              padding: EdgeInsets.only(top: 8),
+              padding: EdgeInsets.only(top: 12),
               child: LinearProgressIndicator(minHeight: 2),
             ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           if (sensorParametersForType.isEmpty)
             Text(
-              'No parameters added yet.',
+              tab == 'api'
+                  ? 'No API parameters added yet.'
+                  : 'No calculations configured yet.',
               style: TextStyle(fontSize: 12.5, color: mutedColor),
             )
           else
@@ -1329,50 +1384,226 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                   (parameter['sensorParameterId'] ?? parameter['id'] ?? '')
                       .toString()
                       .trim();
+              final isSelected = parameterId.isNotEmpty &&
+                  parameterId == selectedParameterId.trim();
               final name = (parameter['name'] ?? '').toString().trim();
               final unit = (parameter['unit'] ?? '').toString().trim();
+              final calculationName =
+                  (parameter['calculationName'] ?? parameter['calculation_name'] ?? '')
+                      .toString()
+                      .trim();
+              final formulaType =
+                  (parameter['formulaType'] ?? parameter['formula_type'] ?? '')
+                      .toString()
+                      .trim();
+              final graphType =
+                  (parameter['graphType'] ?? parameter['graph_type'] ?? 'line')
+                      .toString()
+                      .trim();
+              final useFor =
+                  (parameter['useFor'] ?? parameter['use_for'] ?? 'custom')
+                      .toString()
+                      .trim();
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              isLight ? Colors.white : const Color(0xFF132A3B),
-                          borderRadius: BorderRadius.circular(12),
-                          border:
-                              Border.all(color: Theme.of(context).dividerColor),
-                        ),
-                        child: Text(
-                          unit.isEmpty ? name : '$name ($unit)',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: textColor,
-                          ),
-                        ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: parameterId.isEmpty ? null : () => onSelect(parameterId),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isLight ? Colors.white : const Color(0xFF132A3B),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).dividerColor,
+                        width: isSelected ? 1.6 : 1,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: parameterId.isEmpty
-                          ? null
-                          : () => onEdit(parameterId),
-                      icon: const Icon(Icons.edit_outlined),
-                      tooltip: 'Edit parameter',
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Icon(
+                            isSelected
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_off,
+                            size: 18,
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : mutedColor,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: tab == 'api'
+                              ? Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      unit.isEmpty ? name : '$name ($unit)',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      calculationName.isEmpty
+                                          ? 'No calculation linked yet'
+                                          : 'Calculation: $calculationName',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: mutedColor,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      calculationName.isEmpty
+                                          ? (name.isEmpty ? 'Calculation' : name)
+                                          : calculationName,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'API parameter: ${unit.isEmpty ? name : '$name ($unit)'}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: mutedColor,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 6,
+                                      children: [
+                                        _parameterInfoChip(
+                                          context,
+                                          label: 'Formula',
+                                          value: _formulaTypeLabel(formulaType),
+                                        ),
+                                        _parameterInfoChip(
+                                          context,
+                                          label: 'Graph',
+                                          value: graphType.isEmpty ? 'line' : graphType,
+                                        ),
+                                        _parameterInfoChip(
+                                          context,
+                                          label: 'Use',
+                                          value: useFor.isEmpty ? 'custom' : useFor,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: parameterId.isEmpty
+                              ? null
+                              : () => onEdit(parameterId),
+                          icon: const Icon(Icons.edit_outlined),
+                          tooltip: tab == 'api'
+                              ? 'Edit API parameter'
+                              : 'Edit calculation',
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               );
             }),
         ],
       ),
     );
+  }
+
+  Widget _parameterTabButton(
+    BuildContext context, {
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? Theme.of(context).colorScheme.primary
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+            color: selected
+                ? Colors.white
+                : Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _parameterInfoChip(
+    BuildContext context, {
+    required String label,
+    required String value,
+  }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: isLight ? const Color(0xFFF2F5F8) : const Color(0xFF0F2230),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Text(
+        '$label: $value',
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+          color: isLight ? const Color(0xFF425C6B) : const Color(0xFFC8D9E6),
+        ),
+      ),
+    );
+  }
+
+  String _formulaTypeLabel(String formulaType) {
+    switch (formulaType.trim()) {
+      case 'x':
+        return 'X only';
+      case 'y':
+        return 'Y only';
+      case 'z':
+        return 'Z only';
+      case 'average_xyz':
+        return 'Average of X, Y, Z';
+      case 'magnitude_xyz':
+        return 'Magnitude √(x²+y²+z²)';
+      case 'tilt_angle_deg':
+        return 'Tilt angle from X, Y, Z';
+      case '':
+        return 'Not set';
+      default:
+        return formulaType;
+    }
   }
 
   String _dropdownItemLabel(DropdownMenuItem<String> item) {
