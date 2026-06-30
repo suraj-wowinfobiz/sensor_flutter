@@ -64,8 +64,9 @@ class _RoleProfileSettingsPanelState extends State<RoleProfileSettingsPanel> {
     setState(() => _loading = true);
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userId = (await AppSession.currentPrincipalId()).trim().isNotEmpty
-          ? (await AppSession.currentPrincipalId()).trim()
+      final resolvedUserId = (await AppSession.currentPrincipalId()).trim();
+      final userId = resolvedUserId.isNotEmpty
+          ? resolvedUserId
           : (prefs.getString(widget.principalIdPreferenceKey)?.trim() ?? '');
       if (userId.isEmpty) {
         throw Exception('User id not found. Please login again.');

@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/auth/app_session.dart';
 import 'api_client.dart';
 
 class UsersApi {
@@ -378,28 +379,7 @@ class UsersApi {
   }
 
   static Future<String> _currentPrincipalId() async {
-    final prefs = await SharedPreferences.getInstance();
-    final backendRole = await _currentBackendRole();
-    switch (backendRole) {
-      case 'super_admin':
-        return (prefs.getString('admin_principal_id') ??
-                prefs.getString('super_admin_principal_id') ??
-                '')
-            .trim();
-      case 'admin':
-        return (prefs.getString('user_admin_principal_id') ??
-                prefs.getString('admin_principal_id') ??
-                '')
-            .trim();
-      case 'vendor':
-        return (prefs.getString('vendor_principal_id') ?? '').trim();
-      case 'vendor_engineer':
-        return (prefs.getString('engineer_principal_id') ?? '').trim();
-      case 'user':
-        return (prefs.getString('user_principal_id') ?? '').trim();
-      default:
-        return '';
-    }
+    return AppSession.currentPrincipalId();
   }
 
   static dynamic _organizationIdValue(String organizationId) {
