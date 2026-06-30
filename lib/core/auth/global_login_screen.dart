@@ -1,13 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../common/pages/dashboard/admin_dashboard.dart';
-import '../../common/pages/dashboard/analytics_dashboard.dart';
-import '../../common/pages/dashboard/analytics_role_dashboard.dart';
-import '../../common/pages/dashboard/engineer_dashboard.dart';
-import '../../common/pages/dashboard/user_admin_dashboard.dart';
-import '../../common/pages/dashboard/user_dashboard.dart';
-import '../../common/pages/dashboard/vendor_dashboard.dart';
+import '../../common/pages/platform_shell_page.dart';
 import '../../common/platform/api/api_client.dart';
 import '../../common/platform/core/api/auth_api.dart';
 import '../theme/ops_theme.dart';
@@ -164,19 +158,19 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
   Widget _homePageForRole(AppLoginRole role) {
     switch (role) {
       case AppLoginRole.user:
-        return const UserDashboardPage();
+        return const PlatformShellPage(role: AppLoginRole.user);
       case AppLoginRole.userAdmin:
-        return const UserAdminDashboardPage();
+        return const PlatformShellPage(role: AppLoginRole.userAdmin);
       case AppLoginRole.engineer:
-        return const EngineerDashboardPage();
+        return const PlatformShellPage(role: AppLoginRole.engineer);
       case AppLoginRole.vendor:
-        return const VendorDashboardPage();
+        return const PlatformShellPage(role: AppLoginRole.vendor);
       case AppLoginRole.analytics:
-        return const AnalyticsDashboardPage();
+        return const PlatformShellPage(role: AppLoginRole.analytics);
       case AppLoginRole.analyticsRole:
-        return const AnalyticsRoleDashboardPage();
+        return const PlatformShellPage(role: AppLoginRole.analyticsRole);
       case AppLoginRole.admin:
-        return const AdminDashboardPage();
+        return const PlatformShellPage(role: AppLoginRole.admin);
     }
   }
 

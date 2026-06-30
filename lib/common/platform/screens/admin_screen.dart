@@ -21,9 +21,9 @@ import 'live_analytics_screen.dart';
 import 'map_screen.dart';
 import 'organizations_screen.dart';
 import 'reports_screen.dart';
-import 'role_dashboard_screen.dart';
 import 'sensors_screen.dart';
 import 'users_screen.dart';
+import '../../pages/dashboard/role_dashboard_screen.dart';
 
 class AdminScreen extends ConsumerStatefulWidget {
   const AdminScreen({

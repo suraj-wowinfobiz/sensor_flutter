@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/auth/app_role.dart';
 import '../../../core/theme/ops_theme.dart';
-import '../providers/super_admin_riverpod_provider.dart';
+import '../../platform/providers/super_admin_riverpod_provider.dart';
 
 class RoleDashboardContent extends ConsumerWidget {
   const RoleDashboardContent({

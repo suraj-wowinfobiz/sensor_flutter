@@ -5,15 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/ops_theme.dart';
-import '../models/alert.dart';
-import '../models/device.dart';
-import '../models/sensor.dart';
-import '../models/site.dart';
-import '../providers/super_admin_api_riverpod_provider.dart';
-import '../providers/super_admin_backend_provider.dart';
-import '../providers/super_admin_riverpod_provider.dart';
-import '../services/analytics_sse_service.dart';
-import '../services/generic_sse_service.dart';
+import '../../platform/models/alert.dart';
+import '../../platform/models/device.dart';
+import '../../platform/models/sensor.dart';
+import '../../platform/models/site.dart';
+import '../../platform/providers/super_admin_api_riverpod_provider.dart';
+import '../../platform/providers/super_admin_backend_provider.dart';
+import '../../platform/providers/super_admin_riverpod_provider.dart';
+import '../../platform/services/generic_sse_service.dart';
 
 class UserDashboardScreen extends ConsumerWidget {
   const UserDashboardScreen({super.key});
@@ -183,7 +182,12 @@ class UserDashboardScreen extends ConsumerWidget {
               final healthTrend = OpsPanel(
                 title: 'Sensor Health Over Time',
                 padding: const EdgeInsets.all(24),
-                child: _HealthTrend(points: dashboard.trendPoints),
+                child: _HealthTrend(
+                  points: dashboard.trendPoints,
+                  historicalSeries: dashboard.historicalSeries,
+                  processingLivePath: dashboard.processingLivePath,
+                  analyticsLivePath: dashboard.analyticsLivePath,
+                ),
               );
 
               if (stacked) {
@@ -227,6 +231,21 @@ _UserDashboardModel _buildDashboardModel({
   final sensorById = {for (final sensor in db.sensors) sensor.id: sensor};
   final deviceById = {for (final device in db.devices) device.id: device};
   final siteById = {for (final site in db.sites) site.id: site};
+  final primarySensor = db.sensors.firstWhere(
+    (sensor) =>
+        sensor.processingLiveEndpoint.trim().isNotEmpty ||
+        sensor.analyticsLiveEndpoint.trim().isNotEmpty ||
+        sensor.endpointKey.trim().isNotEmpty,
+    orElse: () => Sensor(
+      id: '',
+      deviceId: '',
+      sensorTypeId: '',
+      name: '',
+      serialNumber: '',
+      installedAt: DateTime.fromMillisecondsSinceEpoch(0),
+      lastReading: 0,
+    ),
+  );
   final affectedSensorIds = openAlerts
       .map((alert) => alert.sensorId.trim())
       .where((sensorId) => sensorId.isNotEmpty)
@@ -286,6 +305,8 @@ _UserDashboardModel _buildDashboardModel({
 
   final vibrationReadings = <double>[];
   final temperatureReadings = <double>[];
+  final tiltTrendSource = <({DateTime at, double value})>[];
+  final vibrationTrendSource = <({DateTime at, double value})>[];
   final liveFeedEntries = <_LiveFeedEntry>[];
   final recentSiteMoments = <String, DateTime>{};
   final activeSensorsLast24hBySite = <String, Set<String>>{};
@@ -328,6 +349,13 @@ _UserDashboardModel _buildDashboardModel({
     final vibration = _extractMetricValue(event, _vibrationMetricAliases);
     if (vibration != null) {
       vibrationReadings.add(vibration);
+      if (receivedAt != null) {
+        vibrationTrendSource.add((at: receivedAt, value: vibration));
+      }
+    }
+    final tilt = _extractMetricValue(event, _tiltMetricAliases);
+    if (tilt != null && receivedAt != null) {
+      tiltTrendSource.add((at: receivedAt, value: tilt));
     }
     final temperature = _extractMetricValue(event, _temperatureMetricAliases);
     if (temperature != null) {
@@ -381,6 +409,10 @@ _UserDashboardModel _buildDashboardModel({
     activeSensorsByDay: activeSensorsByDay,
     alertsByDay: alertsByDay,
   );
+  final historicalSeries = _buildHistoricalSeries(
+    tiltSource: tiltTrendSource,
+    vibrationSource: vibrationTrendSource,
+  );
 
   if (liveFeedEntries.isEmpty) {
     liveFeedEntries.add(
@@ -416,6 +448,19 @@ _UserDashboardModel _buildDashboardModel({
     liveFeed: liveFeedEntries,
     siteRows: siteRows,
     trendPoints: trendPoints,
+    historicalSeries: historicalSeries,
+    processingLivePath: _resolveLivePath(
+      explicitPath: primarySensor.processingLiveEndpoint,
+      fallbackPath: primarySensor.endpointKey.trim().isEmpty
+          ? ''
+          : '/api/v1/processing/readings/live/${primarySensor.endpointKey.trim()}',
+    ),
+    analyticsLivePath: _resolveLivePath(
+      explicitPath: primarySensor.analyticsLiveEndpoint,
+      fallbackPath: primarySensor.endpointKey.trim().isEmpty
+          ? ''
+          : '/api/v1/analytics/events/live/${primarySensor.endpointKey.trim()}',
+    ),
   );
 }
 
@@ -527,6 +572,67 @@ List<_TrendPoint> _buildTrendPoints({
   }
 
   return points;
+}
+
+List<_HistoricalTrendSeries> _buildHistoricalSeries({
+  required List<({DateTime at, double value})> tiltSource,
+  required List<({DateTime at, double value})> vibrationSource,
+}) {
+  List<_HistoricalTrendPoint> buildPoints(
+    List<({DateTime at, double value})> source,
+  ) {
+    if (source.isEmpty) return const <_HistoricalTrendPoint>[];
+    final sorted = [...source]..sort((a, b) => a.at.compareTo(b.at));
+    final window =
+        sorted.length > 12 ? sorted.sublist(sorted.length - 12) : sorted;
+    return [
+      for (var i = 0; i < window.length; i++)
+        _HistoricalTrendPoint(
+          x: i.toDouble(),
+          label:
+              '${window[i].at.hour.toString().padLeft(2, '0')}:${window[i].at.minute.toString().padLeft(2, '0')}',
+          value: window[i].value,
+        ),
+    ];
+  }
+
+  final series = <_HistoricalTrendSeries>[];
+  final tiltPoints = buildPoints(tiltSource);
+  final vibrationPoints = buildPoints(vibrationSource);
+  if (tiltPoints.isNotEmpty) {
+    series.add(
+      _HistoricalTrendSeries(
+        label: 'Tilt',
+        unit: 'deg',
+        color: OpsColors.success,
+        points: tiltPoints,
+      ),
+    );
+  }
+  if (vibrationPoints.isNotEmpty) {
+    series.add(
+      _HistoricalTrendSeries(
+        label: 'Vibration',
+        unit: 'mm/s',
+        color: OpsColors.primary,
+        points: vibrationPoints,
+      ),
+    );
+  }
+  return series;
+}
+
+String _resolveLivePath({
+  required String explicitPath,
+  required String fallbackPath,
+}) {
+  final trimmed = explicitPath.trim();
+  if (trimmed.isEmpty) return fallbackPath;
+  final uri = Uri.tryParse(trimmed);
+  if (uri != null && uri.hasScheme) {
+    return uri.path.isEmpty ? fallbackPath : uri.path;
+  }
+  return trimmed;
 }
 
 String _feedTitle({
@@ -774,6 +880,14 @@ const List<String> _vibrationMetricAliases = [
   'vibration.vibrationRms',
   'horizontalMagnitude',
   'accelerationMagnitude',
+];
+
+const List<String> _tiltMetricAliases = [
+  'tiltFromVerticalDegrees',
+  'inclinationDegrees',
+  'tilt',
+  'rollDegrees',
+  'pitchDegrees',
 ];
 
 const List<String> _temperatureMetricAliases = [
@@ -1195,9 +1309,17 @@ class _SiteRow extends StatelessWidget {
 }
 
 class _HealthTrend extends StatefulWidget {
-  const _HealthTrend({required this.points});
+  const _HealthTrend({
+    required this.points,
+    required this.historicalSeries,
+    required this.processingLivePath,
+    required this.analyticsLivePath,
+  });
 
   final List<_TrendPoint> points;
+  final List<_HistoricalTrendSeries> historicalSeries;
+  final String processingLivePath;
+  final String analyticsLivePath;
 
   @override
   State<_HealthTrend> createState() => _HealthTrendState();
@@ -1206,9 +1328,8 @@ class _HealthTrend extends StatefulWidget {
 class _HealthTrendState extends State<_HealthTrend> {
   static const int _maxPoints = 65;
 
-  final AnalyticsSseService _analyticsSseService = AnalyticsSseService();
-  final GenericSseService _processedSseService =
-      GenericSseService('/api/v1/processing/readings/live');
+  GenericSseService? _analyticsSseService;
+  GenericSseService? _processedSseService;
   final List<FlSpot> _processedTiltData = <FlSpot>[];
   final List<FlSpot> _analyzedTiltData = <FlSpot>[];
 
@@ -1222,8 +1343,18 @@ class _HealthTrendState extends State<_HealthTrend> {
   }
 
   Future<void> _connectStreams() async {
-    await _analyticsSseService.connect();
-    _analyticsSseService.stream.listen((data) {
+    final analyticsPath = widget.analyticsLivePath.trim().isEmpty
+        ? '/api/v1/analytics/events/live'
+        : widget.analyticsLivePath.trim();
+    final processedPath = widget.processingLivePath.trim().isEmpty
+        ? '/api/v1/processing/readings/live'
+        : widget.processingLivePath.trim();
+
+    _analyticsSseService = GenericSseService(analyticsPath);
+    _processedSseService = GenericSseService(processedPath);
+
+    await _analyticsSseService!.connect();
+    _analyticsSseService!.stream.listen((data) {
       if (!mounted) return;
       final tilt = _extractAnalyzedTilt(data);
       if (tilt == null) return;
@@ -1232,8 +1363,8 @@ class _HealthTrendState extends State<_HealthTrend> {
       });
     });
 
-    await _processedSseService.connect();
-    _processedSseService.stream.listen((data) {
+    await _processedSseService!.connect();
+    _processedSseService!.stream.listen((data) {
       if (!mounted) return;
       final tilt = _extractProcessedTilt(data);
       if (tilt == null) return;
@@ -1374,8 +1505,8 @@ class _HealthTrendState extends State<_HealthTrend> {
 
   @override
   void dispose() {
-    _analyticsSseService.dispose();
-    _processedSseService.dispose();
+    _analyticsSseService?.dispose();
+    _processedSseService?.dispose();
     super.dispose();
   }
 
@@ -1383,12 +1514,15 @@ class _HealthTrendState extends State<_HealthTrend> {
   Widget build(BuildContext context) {
     final hasLiveData =
         _processedTiltData.isNotEmpty || _analyzedTiltData.isNotEmpty;
+    final hasHistoricalSeries = widget.historicalSeries.isNotEmpty;
 
     return SizedBox(
       height: 286,
       child: hasLiveData
           ? _buildLiveChart(context)
-          : _buildFallbackTrend(),
+          : hasHistoricalSeries
+              ? _buildHistoricalChart(context)
+              : _buildFallbackTrend(),
     );
   }
 
@@ -1497,6 +1631,127 @@ class _HealthTrendState extends State<_HealthTrend> {
                     spots: _analyzedTiltData,
                     isCurved: true,
                     color: OpsColors.success,
+                    barWidth: 2.4,
+                    dotData: const FlDotData(show: false),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHistoricalChart(BuildContext context) {
+    final series = widget.historicalSeries;
+    final allPoints = [
+      for (final item in series) ...item.points,
+    ];
+    final minY = allPoints.map((point) => point.value).reduce(math.min);
+    final maxY = allPoints.map((point) => point.value).reduce(math.max);
+    final span = (maxY - minY).abs();
+    final chartMinY = minY - math.max(span * 0.12, 0.5);
+    final chartMaxY = maxY + math.max(span * 0.12, 0.5);
+    final maxX = allPoints.map((point) => point.x).reduce(math.max);
+    final bottomLabels = series.first.points;
+    final unit = series.length == 1 ? series.first.unit : 'mixed';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 14,
+          runSpacing: 8,
+          children: [
+            for (final item in series) _LegendDot(item.label, item.color),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Expanded(
+          child: LineChart(
+            LineChartData(
+              minX: 0,
+              maxX: maxX <= 0 ? 1 : maxX,
+              minY: chartMinY,
+              maxY: chartMaxY <= chartMinY ? chartMinY + 1 : chartMaxY,
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval:
+                    (((chartMaxY - chartMinY).abs()) / 4).clamp(0.5, 9999),
+                getDrawingHorizontalLine: (_) => const FlLine(
+                  color: OpsColors.border,
+                  strokeWidth: 1,
+                ),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: const Border(
+                  left: BorderSide(color: OpsColors.border),
+                  bottom: BorderSide(color: OpsColors.border),
+                  top: BorderSide.none,
+                  right: BorderSide.none,
+                ),
+              ),
+              titlesData: FlTitlesData(
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                leftTitles: AxisTitles(
+                  axisNameWidget: Text(
+                    unit,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: OpsColors.muted,
+                    ),
+                  ),
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 38,
+                    getTitlesWidget: (value, _) => Text(
+                      value.toStringAsFixed(1),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: OpsColors.muted,
+                      ),
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 28,
+                    interval: 1,
+                    getTitlesWidget: (value, _) {
+                      final index = value.toInt();
+                      if (index < 0 || index >= bottomLabels.length) {
+                        return const SizedBox.shrink();
+                      }
+                      return Text(
+                        bottomLabels[index].label,
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: OpsColors.muted,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              lineBarsData: [
+                for (final item in series)
+                  LineChartBarData(
+                    spots: [
+                      for (final point in item.points)
+                        FlSpot(point.x, point.value),
+                    ],
+                    isCurved: true,
+                    color: item.color,
                     barWidth: 2.4,
                     dotData: const FlDotData(show: false),
                   ),
@@ -1708,6 +1963,9 @@ class _UserDashboardModel {
     required this.liveFeed,
     required this.siteRows,
     required this.trendPoints,
+    required this.historicalSeries,
+    required this.processingLivePath,
+    required this.analyticsLivePath,
   });
 
   final int totalSensors;
@@ -1723,6 +1981,9 @@ class _UserDashboardModel {
   final List<_LiveFeedEntry> liveFeed;
   final List<_SiteOverviewRowData> siteRows;
   final List<_TrendPoint> trendPoints;
+  final List<_HistoricalTrendSeries> historicalSeries;
+  final String processingLivePath;
+  final String analyticsLivePath;
 }
 
 class _LiveFeedEntry {
@@ -1780,6 +2041,32 @@ class _TrendPoint {
 
   @override
   int get hashCode => Object.hash(label, onlinePercent, warningPercent);
+}
+
+class _HistoricalTrendSeries {
+  const _HistoricalTrendSeries({
+    required this.label,
+    required this.unit,
+    required this.color,
+    required this.points,
+  });
+
+  final String label;
+  final String unit;
+  final Color color;
+  final List<_HistoricalTrendPoint> points;
+}
+
+class _HistoricalTrendPoint {
+  const _HistoricalTrendPoint({
+    required this.x,
+    required this.label,
+    required this.value,
+  });
+
+  final double x;
+  final String label;
+  final double value;
 }
 
 class _MetricDefinition {

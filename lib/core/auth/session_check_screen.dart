@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../common/pages/dashboard/admin_dashboard.dart';
-import '../../common/pages/dashboard/analytics_dashboard.dart';
-import '../../common/pages/dashboard/analytics_role_dashboard.dart';
-import '../../common/pages/dashboard/engineer_dashboard.dart';
-import '../../common/pages/dashboard/user_admin_dashboard.dart';
-import '../../common/pages/dashboard/user_dashboard.dart';
-import '../../common/pages/dashboard/vendor_dashboard.dart';
+import '../../common/pages/platform_shell_page.dart';
 import '../../common/platform/api/api_client.dart';
 import '../../main_page.dart';
+import 'app_role.dart';
 import 'app_session.dart';
 
 class SessionCheckScreen extends StatefulWidget {
@@ -54,26 +49,27 @@ class _SessionCheckScreenState extends State<SessionCheckScreen> {
       Widget? targetPage;
       switch (role) {
         case 'user':
-          targetPage = const UserDashboardPage();
+          targetPage = const PlatformShellPage(role: AppLoginRole.user);
           break;
         case 'user_admin':
-          targetPage = const UserAdminDashboardPage();
+          targetPage = const PlatformShellPage(role: AppLoginRole.userAdmin);
           break;
         case 'engineer':
-          targetPage = const EngineerDashboardPage();
+          targetPage = const PlatformShellPage(role: AppLoginRole.engineer);
           break;
         case 'vendor':
-          targetPage = const VendorDashboardPage();
+          targetPage = const PlatformShellPage(role: AppLoginRole.vendor);
           break;
         case 'analytics':
-          targetPage = const AnalyticsDashboardPage();
+          targetPage = const PlatformShellPage(role: AppLoginRole.analytics);
           break;
         case 'analytics_role':
-          targetPage = const AnalyticsRoleDashboardPage();
+          targetPage =
+              const PlatformShellPage(role: AppLoginRole.analyticsRole);
           break;
         case 'admin':
         case 'super_admin':
-          targetPage = const AdminDashboardPage();
+          targetPage = const PlatformShellPage(role: AppLoginRole.admin);
           break;
       }
 
