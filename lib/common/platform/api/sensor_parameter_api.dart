@@ -36,9 +36,10 @@ class SensorParameterApi {
     required double maxValue,
   }) async {
     final response = await ApiClient.put(
-      '$_basePath/sensor-types/$sensorTypeId/parameters',
+      '$_basePath/parameters/$sensorParameterId',
       data: {
         'sensorParameterId': sensorParameterId,
+        'sensorTypeId': sensorTypeId,
         'name': name,
         'unit': unit,
         'minValue': minValue,
@@ -56,6 +57,10 @@ class SensorParameterApi {
     final response =
         await ApiClient.get('$_basePath/sensor-types/$normalized/parameters');
     return _asListMap(response.body);
+  }
+
+  static Future<void> deleteSensorParameter(String sensorParameterId) async {
+    await ApiClient.delete('$_basePath/parameters/${sensorParameterId.trim()}');
   }
 
   static List<Map<String, dynamic>> _asListMap(dynamic body) {

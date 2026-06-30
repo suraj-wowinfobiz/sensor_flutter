@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -55,16 +56,6 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
     return hash;
   }
 
-  String _slugify(String value) {
-    final trimmed = value.trim().toLowerCase();
-    final normalized = trimmed
-        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
-        .replaceAll(RegExp(r'^-+'), '')
-        .replaceAll(RegExp(r'-+$'), '')
-        .replaceAll(RegExp(r'-{2,}'), '-');
-    return normalized.isEmpty ? 'item' : normalized;
-  }
-
   String _buildAbsoluteUrl(String path) {
     final base = AdminApiConfig.baseUrl.replaceAll(RegExp(r'/$'), '');
     final normalizedPath = path.startsWith('/') ? path : '/$path';
@@ -74,20 +65,18 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
   Map<String, String> _endpointPreview({
     required String sensorId,
     required String sensorName,
-    required String serialNumber,
-    required String deviceId,
-    required SuperAdminBackendProvider db,
   }) {
-    final device = db.devices.where((item) => item.id == deviceId).firstOrNull;
-    final deviceLabel = (device?.serialNumber.trim().isNotEmpty ?? false)
-        ? device!.serialNumber.trim()
-        : (device?.deviceCode ?? 'device');
-    final sensorLabel = sensorName.trim().isNotEmpty
-        ? sensorName.trim()
-        : (serialNumber.trim().isNotEmpty ? serialNumber.trim() : 'Sensor');
-    final uid = (_javaStringHash(sensorId) % 100000).toString().padLeft(5, '0');
+    final uid =
+        (_javaStringHash(sensorId) % 1000000).toString().padLeft(6, '0');
+    final normalizedSensorName = sensorName
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+'), '')
+        .replaceAll(RegExp(r'-+$'), '')
+        .replaceAll(RegExp(r'-{2,}'), '-');
     final endpointKey =
-        '$uid-${_slugify(sensorLabel)}-${_slugify(deviceLabel)}';
+        normalizedSensorName.isEmpty ? uid : '$uid-$normalizedSensorName';
     final ingestion = _buildAbsoluteUrl('/api/v1/ingestion/$endpointKey');
     final ingestionLive =
         _buildAbsoluteUrl('/api/v1/ingestion/readings/live/$endpointKey');
@@ -104,9 +93,23 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
     };
   }
 
+  String _requestBodyExample(List<Map<String, dynamic>> sensorParameters) {
+    final payload = <String, String>{};
+    for (final parameter in sensorParameters) {
+      final name = (parameter['name'] ?? '').toString().trim();
+      if (name.isEmpty) continue;
+      payload[name] = '';
+    }
+    if (payload.isEmpty) {
+      payload['value'] = '';
+    }
+    return const JsonEncoder.withIndent('  ').convert(payload);
+  }
+
   Future<void> _showSensorEndpointsDialog(
     BuildContext context,
     Sensor sensor,
+    List<Map<String, dynamic>> sensorParameters,
   ) async {
     await showDialog<void>(
       context: context,
@@ -122,6 +125,7 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
               ingestionLiveEndpoint: sensor.ingestionLiveEndpoint,
               processingLiveEndpoint: sensor.processingLiveEndpoint,
               analyticsLiveEndpoint: sensor.analyticsLiveEndpoint,
+              requestBodyExample: _requestBodyExample(sensorParameters),
             ),
           ),
         ),
@@ -155,6 +159,8 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
     final defaultTypeId =
         db.sensorTypes.isNotEmpty ? db.sensorTypes.first.id : '';
     final draftSensorId = sensor?.id ?? _generateClientSensorId();
+    final transientCreatedParameterIds = <String>{};
+    var sensorSaved = false;
     String sensorParameterId = '';
     List<Map<String, dynamic>> sensorParametersForType = [];
     bool sensorParametersLoading = false;
@@ -261,7 +267,7 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
     await fetchParametersForType(_sensorTypeId);
     if (!mounted) return;
 
-    showGeneralDialog(
+    await showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Sensor Form',
@@ -274,9 +280,6 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
           final preview = _endpointPreview(
             sensorId: draftSensorId,
             sensorName: _sensorName,
-            serialNumber: _serialNumber,
-            deviceId: _deviceId,
-            db: db,
           );
           return Dialog(
             backgroundColor: Colors.transparent,
@@ -400,66 +403,45 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _dialogDropdown(
-                        label: 'Sensor Parameter',
-                        value: sensorParameterId.isEmpty
-                            ? null
-                            : sensorParameterId,
-                        hint: 'Select sensor parameter',
-                        items: parameterItems(),
-                        onChanged: (value) =>
-                            setState(() => sensorParameterId = value ?? ''),
-                      ),
-                      if (sensorParametersLoading)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 6),
-                          child: LinearProgressIndicator(minHeight: 2),
-                        ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: () async {
-                              final createdParameterId =
-                                  await _showCreateOrEditSensorParameterDialog(
-                                initialSensorTypeId: _sensorTypeId,
-                              );
-                              if (!mounted) return;
-                              await db.loadSensorParameters();
-                              if (!context.mounted) return;
-                              await fetchParametersForType(
-                                _sensorTypeId,
-                                setDialogState: setState,
-                                preferredParameterId: createdParameterId,
-                              );
-                            },
-                            icon: const Icon(Icons.add, size: 16),
-                            label: const Text('Create Sensor Parameter'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: sensorParameterId.trim().isEmpty
-                                ? null
-                                : () async {
-                                    final updatedParameterId =
-                                        await _showCreateOrEditSensorParameterDialog(
-                                      initialSensorTypeId: _sensorTypeId,
-                                      editingParameterId: sensorParameterId,
-                                    );
-                                    if (!mounted) return;
-                                    await db.loadSensorParameters();
-                                    if (!context.mounted) return;
-                                    await fetchParametersForType(
-                                      _sensorTypeId,
-                                      setDialogState: setState,
-                                      preferredParameterId: updatedParameterId,
-                                    );
-                                  },
-                            icon: const Icon(Icons.edit_outlined, size: 16),
-                            label: const Text('Edit Selected Parameter'),
-                          ),
-                        ],
+                      _parameterSection(
+                        context,
+                        sensorParametersLoading: sensorParametersLoading,
+                        sensorParametersForType: sensorParametersForType,
+                        onCreate: () async {
+                          final createdParameterId =
+                              await _showCreateOrEditSensorParameterDialog(
+                            initialSensorTypeId: _sensorTypeId,
+                          );
+                          if (createdParameterId != null &&
+                              createdParameterId.trim().isNotEmpty) {
+                            transientCreatedParameterIds.add(
+                              createdParameterId.trim(),
+                            );
+                          }
+                          if (!mounted) return;
+                          await db.loadSensorParameters();
+                          if (!context.mounted) return;
+                          await fetchParametersForType(
+                            _sensorTypeId,
+                            setDialogState: setState,
+                            preferredParameterId: createdParameterId,
+                          );
+                        },
+                        onEdit: (parameterId) async {
+                          final updatedParameterId =
+                              await _showCreateOrEditSensorParameterDialog(
+                            initialSensorTypeId: _sensorTypeId,
+                            editingParameterId: parameterId,
+                          );
+                          if (!mounted) return;
+                          await db.loadSensorParameters();
+                          if (!context.mounted) return;
+                          await fetchParametersForType(
+                            _sensorTypeId,
+                            setDialogState: setState,
+                            preferredParameterId: updatedParameterId,
+                          );
+                        },
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -489,6 +471,8 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                         ingestionLiveEndpoint: preview['ingestionLive'] ?? '',
                         processingLiveEndpoint: preview['processingLive'] ?? '',
                         analyticsLiveEndpoint: preview['analyticsLive'] ?? '',
+                        requestBodyExample:
+                            _requestBodyExample(sensorParametersForType),
                         helperText: _deviceId.trim().isEmpty
                             ? 'Select a device to generate the exact sensor URLs.'
                             : (_editingId == null
@@ -583,12 +567,6 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                                       'Please select sensor type or create one.',
                                     );
                                   }
-                                  if (sensorParameterId.trim().isEmpty) {
-                                    throw Exception(
-                                      'Please select sensor parameter.',
-                                    );
-                                  }
-
                                   if (_editingId == null) {
                                     await backend.create('sensors', {
                                       'sensor_id': draftSensorId,
@@ -597,8 +575,11 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                                       'serial_number': _serialNumber.trim(),
                                       'device_id': _deviceId,
                                       'sensor_type_id': _sensorTypeId,
-                                      'sensor_parameter_id': sensorParameterId,
-                                      'sensorParameterId': sensorParameterId,
+                                      if (sensorParameterId.trim().isNotEmpty)
+                                        'sensor_parameter_id':
+                                            sensorParameterId,
+                                      if (sensorParameterId.trim().isNotEmpty)
+                                        'sensorParameterId': sensorParameterId,
                                       'lat': _latitude.trim(),
                                       'log': _longitude.trim(),
                                       'status': 'ACTIVE',
@@ -613,8 +594,11 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                                       'serial_number': _serialNumber.trim(),
                                       'device_id': _deviceId,
                                       'sensor_type_id': _sensorTypeId,
-                                      'sensor_parameter_id': sensorParameterId,
-                                      'sensorParameterId': sensorParameterId,
+                                      if (sensorParameterId.trim().isNotEmpty)
+                                        'sensor_parameter_id':
+                                            sensorParameterId,
+                                      if (sensorParameterId.trim().isNotEmpty)
+                                        'sensorParameterId': sensorParameterId,
                                       'lat': _latitude.trim(),
                                       'log': _longitude.trim(),
                                       'status': 'ACTIVE',
@@ -629,11 +613,26 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                                       .where((item) => item.id == savedSensorId)
                                       .firstOrNull;
                                   if (savedSensor != null && context.mounted) {
+                                    final savedSensorParameters = db
+                                        .sensorParameters
+                                        .where((param) =>
+                                            param.sensorTypeId ==
+                                            savedSensor.sensorTypeId)
+                                        .map(
+                                          (param) => {
+                                            'sensorParameterId': param.id,
+                                            'name': param.name,
+                                            'unit': param.unit,
+                                          },
+                                        )
+                                        .toList();
                                     await _showSensorEndpointsDialog(
                                       context,
                                       savedSensor,
+                                      savedSensorParameters,
                                     );
                                   }
+                                  sensorSaved = true;
                                   if (context.mounted) Navigator.pop(context);
                                   this.setState(() => _refreshKey++);
                                 } catch (e) {
@@ -696,6 +695,19 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
         );
       },
     );
+
+    if (!sensorSaved && transientCreatedParameterIds.isNotEmpty) {
+      for (final parameterId in transientCreatedParameterIds) {
+        try {
+          await SensorParameterApi.deleteSensorParameter(parameterId);
+        } catch (_) {
+          // Best-effort cleanup for parameters created during abandoned sensor creation.
+        }
+      }
+      if (mounted) {
+        await db.loadSensorParameters();
+      }
+    }
   }
 
   Future<void> _showCreateSensorTypeDialog() async {
@@ -797,10 +809,6 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
     }
     String name = editingParameter?.name ?? '';
     String unit = editingParameter?.unit ?? '';
-    String minValue =
-        editingParameter == null ? '0' : editingParameter.minValue.toString();
-    String maxValue =
-        editingParameter == null ? '0' : editingParameter.maxValue.toString();
     String? savedId;
 
     await showDialog<void>(
@@ -843,18 +851,6 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                     value: unit,
                     onChanged: (v) => setDialogState(() => unit = v),
                   ),
-                  const SizedBox(height: 10),
-                  _dialogTextField(
-                    label: 'Min Value',
-                    value: minValue,
-                    onChanged: (v) => setDialogState(() => minValue = v),
-                  ),
-                  const SizedBox(height: 10),
-                  _dialogTextField(
-                    label: 'Max Value',
-                    value: maxValue,
-                    onChanged: (v) => setDialogState(() => maxValue = v),
-                  ),
                 ],
               ),
             ),
@@ -879,15 +875,6 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                   );
                   return;
                 }
-                final min = double.tryParse(minValue.trim());
-                final max = double.tryParse(maxValue.trim());
-                if (min == null || max == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Min and max values must be numeric')),
-                  );
-                  return;
-                }
                 try {
                   Map<String, dynamic> response;
                   if (editingParameter == null) {
@@ -895,8 +882,8 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                       sensorTypeId: sensorTypeId,
                       name: name.trim(),
                       unit: unit.trim(),
-                      minValue: min,
-                      maxValue: max,
+                      minValue: 0,
+                      maxValue: 0,
                     );
                   } else {
                     response = await SensorParameterApi.updateSensorParameter(
@@ -904,8 +891,8 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                       sensorParameterId: editingParameter.id,
                       name: name.trim(),
                       unit: unit.trim(),
-                      minValue: min,
-                      maxValue: max,
+                      minValue: 0,
+                      maxValue: 0,
                     );
                   }
                   final responseId =
@@ -1058,6 +1045,7 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
     required String ingestionLiveEndpoint,
     required String processingLiveEndpoint,
     required String analyticsLiveEndpoint,
+    required String requestBodyExample,
     String? helperText,
   }) {
     final isLight = Theme.of(context).brightness == Brightness.light;
@@ -1127,6 +1115,118 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
           endpointRow('Live Processing SSE', processingLiveEndpoint),
           const SizedBox(height: 10),
           endpointRow('Live Analytics SSE', analyticsLiveEndpoint),
+          const SizedBox(height: 10),
+          endpointRow('Request Body Example', requestBodyExample),
+        ],
+      ),
+    );
+  }
+
+  Widget _parameterSection(
+    BuildContext context, {
+    required bool sensorParametersLoading,
+    required List<Map<String, dynamic>> sensorParametersForType,
+    required Future<void> Function() onCreate,
+    required Future<void> Function(String parameterId) onEdit,
+  }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final textColor =
+        isLight ? const Color(0xFF1B313D) : const Color(0xFFE2EDF8);
+    final mutedColor =
+        isLight ? const Color(0xFF5A6F7D) : const Color(0xFFAEC4D7);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isLight ? const Color(0xFFF7FAFC) : const Color(0xFF1A3347),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'API Parameters',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: textColor,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: onCreate,
+                icon: const Icon(Icons.add),
+                tooltip: 'Add parameter',
+              ),
+            ],
+          ),
+          Text(
+            'Add payload fields like x, y, z. These fields will appear in the ingestion request body.',
+            style: TextStyle(fontSize: 12.5, color: mutedColor),
+          ),
+          if (sensorParametersLoading)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: LinearProgressIndicator(minHeight: 2),
+            ),
+          const SizedBox(height: 8),
+          if (sensorParametersForType.isEmpty)
+            Text(
+              'No parameters added yet.',
+              style: TextStyle(fontSize: 12.5, color: mutedColor),
+            )
+          else
+            ...sensorParametersForType.map((parameter) {
+              final parameterId =
+                  (parameter['sensorParameterId'] ?? parameter['id'] ?? '')
+                      .toString()
+                      .trim();
+              final name = (parameter['name'] ?? '').toString().trim();
+              final unit = (parameter['unit'] ?? '').toString().trim();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              isLight ? Colors.white : const Color(0xFF132A3B),
+                          borderRadius: BorderRadius.circular(12),
+                          border:
+                              Border.all(color: Theme.of(context).dividerColor),
+                        ),
+                        child: Text(
+                          unit.isEmpty ? name : '$name ($unit)',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: textColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: parameterId.isEmpty
+                          ? null
+                          : () => onEdit(parameterId),
+                      icon: const Icon(Icons.edit_outlined),
+                      tooltip: 'Edit parameter',
+                    ),
+                  ],
+                ),
+              );
+            }),
         ],
       ),
     );
