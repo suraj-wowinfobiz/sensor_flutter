@@ -241,7 +241,8 @@ class SuperAdminBackendProvider extends ChangeNotifier {
 
         for (final org in organizations) {
           try {
-            final orgSitesRes = await org_api.OrgServiceApi.getOrganizationSites(
+            final orgSitesRes =
+                await org_api.OrgServiceApi.getOrganizationSites(
               org.id,
             );
             final body = _asMap(orgSitesRes.body);
@@ -567,6 +568,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         if (createdSite != null) {
           _upsertSite(createdSite);
         }
+        notifyListeners();
         _refreshSitesSoon();
         break;
       case 'zones':
@@ -694,8 +696,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         } else if (role == 'engineer' ||
             role == 'user' ||
             role == 'vendor_engineer') {
-          final createRole =
-              role == 'user' ? 'user' : 'vendor_engineer';
+          final createRole = role == 'user' ? 'user' : 'vendor_engineer';
           await UsersApi.createUser(
             name: name,
             email: email,
@@ -726,9 +727,9 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           timestamp: DateTime.now(),
           ip: data['ip'] as String,
         ));
+        notifyListeners();
         break;
     }
-    notifyListeners();
   }
 
   Future<void> update(String view, String id, Map<String, dynamic> data) async {
@@ -773,6 +774,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
             ),
           );
         }
+        notifyListeners();
         _refreshSitesSoon();
         break;
       case 'zones':
@@ -867,7 +869,6 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         await loadUsers();
         break;
     }
-    notifyListeners();
   }
 
   Future<void> delete(String view, String id) async {
@@ -881,11 +882,13 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         await org_api.OrgServiceApi.deleteSite(id);
         sites.removeWhere((item) => item.id == id);
         zones.removeWhere((z) => z.siteId == id);
+        notifyListeners();
         _refreshSitesSoon();
         break;
       case 'zones':
         await org_api.OrgServiceApi.deleteZone(id);
         zones.removeWhere((item) => item.id == id);
+        notifyListeners();
         break;
       case 'devices':
         await DeviceApi.deleteDevice(id);
@@ -897,6 +900,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         break;
       case 'alerts':
         alerts.removeWhere((item) => item.id == id);
+        notifyListeners();
         break;
       case 'thresholds':
         await ThresholdsApi.deleteProfile(id);
@@ -916,9 +920,9 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         break;
       case 'audit':
         auditLogs.removeWhere((item) => item.id == id);
+        notifyListeners();
         break;
     }
-    notifyListeners();
   }
 
   void resolveAlert(String id) {

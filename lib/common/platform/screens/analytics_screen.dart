@@ -74,20 +74,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   void _trimAndReindexSeries() {
-    while (_gravityMagnitudeData.length > 220) {
-      _gravityMagnitudeData.removeAt(0);
+    _trimSeries(_gravityMagnitudeData, 220);
+    _trimSeries(_motionData, 220);
+  }
+
+  void _trimSeries(List<FlSpot> series, int maxPoints) {
+    final overflow = series.length - maxPoints;
+    if (overflow > 0) {
+      series.removeRange(0, overflow);
     }
-    while (_motionData.length > 220) {
-      _motionData.removeAt(0);
-    }
-    for (int i = 0; i < _gravityMagnitudeData.length; i++) {
-      _gravityMagnitudeData[i] =
-          FlSpot(i.toDouble(), _gravityMagnitudeData[i].y);
-    }
-    for (int i = 0; i < _motionData.length; i++) {
-      _motionData[i] = FlSpot(i.toDouble(), _motionData[i].y);
-    }
-    _dataPointIndex = _gravityMagnitudeData.length;
   }
 
   Iterable<Map<dynamic, dynamic>> _candidateMaps(

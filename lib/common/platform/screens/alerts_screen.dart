@@ -451,6 +451,27 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
     String warningLevel = '0';
     String criticalLevel = '0';
 
+    void applyParameterDefaults(String parameterId) {
+      var parameter = db.sensorParameters.first;
+      var found = false;
+      for (final item in db.sensorParameters) {
+        if (item.id == parameterId) {
+          parameter = item;
+          found = true;
+          break;
+        }
+      }
+      if (!found) return;
+      final minValue = parameter.minValue;
+      final maxValue = parameter.maxValue;
+      minThresholdValue = minValue.toStringAsFixed(2);
+      maxThresholdValue = maxValue.toStringAsFixed(2);
+      warningLevel =
+          (minValue + ((maxValue - minValue) * 0.75)).toStringAsFixed(2);
+      criticalLevel =
+          (minValue + ((maxValue - minValue) * 0.9)).toStringAsFixed(2);
+    }
+
     if (db.sensorTypes.isNotEmpty) {
       sensorTypeId = db.sensorTypes.first.id;
     } else if (db.sensorParameters.isNotEmpty) {
@@ -486,6 +507,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
     var sensorParameterOptions = parameterOptionsForType(sensorTypeId);
     if (sensorParameterOptions.isNotEmpty) {
       sensorParameterId = sensorParameterOptions.first['value']!;
+      applyParameterDefaults(sensorParameterId);
     }
 
     await showDialog<void>(
@@ -517,6 +539,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                       } else {
                         sensorParameterId =
                             sensorParameterOptions.first['value']!;
+                        applyParameterDefaults(sensorParameterId);
                       }
                     }),
               },
@@ -527,6 +550,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                 'options': sensorParameterOptions,
                 'onChanged': (String? value) => setDialogState(() {
                       sensorParameterId = value ?? '';
+                      applyParameterDefaults(sensorParameterId);
                     }),
               },
               {

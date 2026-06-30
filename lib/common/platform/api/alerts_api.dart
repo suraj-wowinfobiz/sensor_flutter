@@ -14,7 +14,7 @@ class AlertsApi {
       '/api/v1/alerts',
       queryParameters: {
         if (status != null && status.isNotEmpty) 'status': status,
-        if (level != null && level.isNotEmpty) 'level': level,
+        if (level != null && level.isNotEmpty) 'alertLevel': level,
         if (sensorId != null && sensorId.isNotEmpty) 'sensorId': sensorId,
         if (assignedTo != null && assignedTo.isNotEmpty)
           'assignedTo': assignedTo,

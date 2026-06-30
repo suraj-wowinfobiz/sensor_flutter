@@ -46,18 +46,19 @@ class _LiveAnalyticsScreenState extends State<LiveAnalyticsScreen> {
           _series.add(FlSpot(_pointIndex.toDouble(), row.value));
           _pointIndex++;
         }
-        while (_rows.length > 12) {
-          _rows.removeLast();
+        if (_rows.length > 12) {
+          _rows.removeRange(12, _rows.length);
         }
-        while (_series.length > 120) {
-          _series.removeAt(0);
-        }
-        for (var i = 0; i < _series.length; i++) {
-          _series[i] = FlSpot(i.toDouble(), _series[i].y);
-        }
-        _pointIndex = _series.length;
+        _trimSeries(_series, 120);
       });
     });
+  }
+
+  void _trimSeries(List<FlSpot> series, int maxPoints) {
+    final overflow = series.length - maxPoints;
+    if (overflow > 0) {
+      series.removeRange(0, overflow);
+    }
   }
 
   Map<String, dynamic>? _asMap(dynamic payload) {

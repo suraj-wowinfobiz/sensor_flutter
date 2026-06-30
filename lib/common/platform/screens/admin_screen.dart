@@ -41,7 +41,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
   String _currentView = 'dashboard';
   bool _showTopNav = true;
   bool _showBottomNav = true;
-  final List<String> _openedViews = ['dashboard'];
+  final PageStorageBucket _pageStorageBucket = PageStorageBucket();
   late AnimationController _menuController;
   String _profileName = '';
   String _profileInitial = '';
@@ -462,19 +462,12 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
     final normalized = _normalizeView(view);
     final resolved =
         _allowedViews.contains(normalized) ? normalized : 'dashboard';
-    if (!_openedViews.contains(resolved)) {
-      _openedViews.add(resolved);
-    }
-    return IndexedStack(
-      index: _openedViews.indexOf(resolved),
-      children: _openedViews
-          .map(
-            (openedView) => KeyedSubtree(
-              key: PageStorageKey<String>('admin_$openedView'),
-              child: _buildView(openedView),
-            ),
-          )
-          .toList(),
+    return PageStorage(
+      bucket: _pageStorageBucket,
+      child: KeyedSubtree(
+        key: PageStorageKey<String>('admin_$resolved'),
+        child: _buildView(resolved),
+      ),
     );
   }
 

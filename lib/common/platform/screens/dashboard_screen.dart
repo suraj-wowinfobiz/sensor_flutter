@@ -202,141 +202,46 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   void _trimAndReindexAnalyzedSeries() {
-    while (_analyzedXData.length > 65) {
-      _analyzedXData.removeAt(0);
-    }
-    while (_analyzedYData.length > 65) {
-      _analyzedYData.removeAt(0);
-    }
-    while (_analyzedZData.length > 65) {
-      _analyzedZData.removeAt(0);
-    }
-    while (_analyzedRollData.length > 65) {
-      _analyzedRollData.removeAt(0);
-    }
-    while (_analyzedPitchData.length > 65) {
-      _analyzedPitchData.removeAt(0);
-    }
-    while (_analyzedTiltData.length > 65) {
-      _analyzedTiltData.removeAt(0);
-    }
-    while (_analyzedAngularVelocityData.length > 65) {
-      _analyzedAngularVelocityData.removeAt(0);
-    }
-    while (_analyzedAccelerationData.length > 65) {
-      _analyzedAccelerationData.removeAt(0);
-    }
-
-    for (int i = 0; i < _analyzedXData.length; i++) {
-      _analyzedXData[i] = FlSpot(i.toDouble(), _analyzedXData[i].y);
-    }
-    for (int i = 0; i < _analyzedYData.length; i++) {
-      _analyzedYData[i] = FlSpot(i.toDouble(), _analyzedYData[i].y);
-    }
-    for (int i = 0; i < _analyzedZData.length; i++) {
-      _analyzedZData[i] = FlSpot(i.toDouble(), _analyzedZData[i].y);
-    }
-    for (int i = 0; i < _analyzedRollData.length; i++) {
-      _analyzedRollData[i] = FlSpot(i.toDouble(), _analyzedRollData[i].y);
-    }
-    for (int i = 0; i < _analyzedPitchData.length; i++) {
-      _analyzedPitchData[i] = FlSpot(i.toDouble(), _analyzedPitchData[i].y);
-    }
-    for (int i = 0; i < _analyzedTiltData.length; i++) {
-      _analyzedTiltData[i] = FlSpot(i.toDouble(), _analyzedTiltData[i].y);
-    }
-    for (int i = 0; i < _analyzedAngularVelocityData.length; i++) {
-      _analyzedAngularVelocityData[i] =
-          FlSpot(i.toDouble(), _analyzedAngularVelocityData[i].y);
-    }
-    for (int i = 0; i < _analyzedAccelerationData.length; i++) {
-      _analyzedAccelerationData[i] =
-          FlSpot(i.toDouble(), _analyzedAccelerationData[i].y);
-    }
-    _analyzedIndex = _analyzedXData.length;
+    _trimSeries(_analyzedXData, 65);
+    _trimSeries(_analyzedYData, 65);
+    _trimSeries(_analyzedZData, 65);
+    _trimSeries(_analyzedRollData, 65);
+    _trimSeries(_analyzedPitchData, 65);
+    _trimSeries(_analyzedTiltData, 65);
+    _trimSeries(_analyzedAngularVelocityData, 65);
+    _trimSeries(_analyzedAccelerationData, 65);
   }
 
   void _trimAndReindexRawSeries() {
-    while (_rawXData.length > 65) {
-      _rawXData.removeAt(0);
-    }
-    while (_rawYData.length > 65) {
-      _rawYData.removeAt(0);
-    }
-    while (_rawZData.length > 65) {
-      _rawZData.removeAt(0);
-    }
-
-    for (int i = 0; i < _rawXData.length; i++) {
-      _rawXData[i] = FlSpot(i.toDouble(), _rawXData[i].y);
-    }
-    for (int i = 0; i < _rawYData.length; i++) {
-      _rawYData[i] = FlSpot(i.toDouble(), _rawYData[i].y);
-    }
-    for (int i = 0; i < _rawZData.length; i++) {
-      _rawZData[i] = FlSpot(i.toDouble(), _rawZData[i].y);
-    }
-    _rawIndex = _rawXData.length;
+    _trimSeries(_rawXData, 65);
+    _trimSeries(_rawYData, 65);
+    _trimSeries(_rawZData, 65);
   }
 
   void _trimAndReindexProcessedSeries() {
-    while (_processedXData.length > 65) {
-      _processedXData.removeAt(0);
-    }
-    while (_processedYData.length > 65) {
-      _processedYData.removeAt(0);
-    }
-    while (_processedZData.length > 65) {
-      _processedZData.removeAt(0);
-    }
-    while (_processedMagnitudeData.length > 65) {
-      _processedMagnitudeData.removeAt(0);
-    }
-    while (_processedAngularVelocityData.length > 65) {
-      _processedAngularVelocityData.removeAt(0);
-    }
-    while (_processedAccelerationData.length > 65) {
-      _processedAccelerationData.removeAt(0);
-    }
-    while (_processedVibrationData.length > 65) {
-      _processedVibrationData.removeAt(0);
-    }
-    while (_processedMotionData.length > 65) {
-      _processedMotionData.removeAt(0);
-    }
-    while (_processedSnapshots.length > 120) {
-      _processedSnapshots.removeAt(0);
-    }
+    _trimSeries(_processedXData, 65);
+    _trimSeries(_processedYData, 65);
+    _trimSeries(_processedZData, 65);
+    _trimSeries(_processedMagnitudeData, 65);
+    _trimSeries(_processedAngularVelocityData, 65);
+    _trimSeries(_processedAccelerationData, 65);
+    _trimSeries(_processedVibrationData, 65);
+    _trimSeries(_processedMotionData, 65);
+    _trimList(_processedSnapshots, 120);
+  }
 
-    for (int i = 0; i < _processedXData.length; i++) {
-      _processedXData[i] = FlSpot(i.toDouble(), _processedXData[i].y);
+  void _trimSeries(List<FlSpot> series, int maxPoints) {
+    final overflow = series.length - maxPoints;
+    if (overflow > 0) {
+      series.removeRange(0, overflow);
     }
-    for (int i = 0; i < _processedYData.length; i++) {
-      _processedYData[i] = FlSpot(i.toDouble(), _processedYData[i].y);
+  }
+
+  void _trimList<T>(List<T> values, int maxItems) {
+    final overflow = values.length - maxItems;
+    if (overflow > 0) {
+      values.removeRange(0, overflow);
     }
-    for (int i = 0; i < _processedZData.length; i++) {
-      _processedZData[i] = FlSpot(i.toDouble(), _processedZData[i].y);
-    }
-    for (int i = 0; i < _processedMagnitudeData.length; i++) {
-      _processedMagnitudeData[i] =
-          FlSpot(i.toDouble(), _processedMagnitudeData[i].y);
-    }
-    for (int i = 0; i < _processedAngularVelocityData.length; i++) {
-      _processedAngularVelocityData[i] =
-          FlSpot(i.toDouble(), _processedAngularVelocityData[i].y);
-    }
-    for (int i = 0; i < _processedAccelerationData.length; i++) {
-      _processedAccelerationData[i] =
-          FlSpot(i.toDouble(), _processedAccelerationData[i].y);
-    }
-    for (int i = 0; i < _processedVibrationData.length; i++) {
-      _processedVibrationData[i] =
-          FlSpot(i.toDouble(), _processedVibrationData[i].y);
-    }
-    for (int i = 0; i < _processedMotionData.length; i++) {
-      _processedMotionData[i] = FlSpot(i.toDouble(), _processedMotionData[i].y);
-    }
-    _processedIndex = _processedXData.length;
   }
 
   (double, double, double)? _extractXyzValues(dynamic payload) {

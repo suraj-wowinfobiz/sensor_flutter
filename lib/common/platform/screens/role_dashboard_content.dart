@@ -15,15 +15,50 @@ class RoleDashboardContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final db = ref.watch(superAdminBackendChangeNotifierProvider);
-    final activeAlerts = db.alerts.where((alert) => !alert.isResolved).length;
-    final activeDevices = db.devices.where((device) {
-      final status = device.status.trim().toLowerCase();
-      return status == 'active' ||
-          status == 'online' ||
-          status == 'healthy' ||
-          status == 'running';
-    }).length;
+    final activeAlerts =
+        ref.watch(superAdminBackendChangeNotifierProvider.select((db) {
+      return db.alerts.where((alert) => !alert.isResolved).length;
+    }));
+    final activeDevices =
+        ref.watch(superAdminBackendChangeNotifierProvider.select((db) {
+      return db.devices.where((device) {
+        final status = device.status.trim().toLowerCase();
+        return status == 'active' ||
+            status == 'online' ||
+            status == 'healthy' ||
+            status == 'running';
+      }).length;
+    }));
+    final organizationsCount =
+        ref.watch(superAdminBackendChangeNotifierProvider.select((db) {
+      return db.organizations.length;
+    }));
+    final sitesCount =
+        ref.watch(superAdminBackendChangeNotifierProvider.select((db) {
+      return db.sites.length;
+    }));
+    final zonesCount =
+        ref.watch(superAdminBackendChangeNotifierProvider.select((db) {
+      return db.zones.length;
+    }));
+    final usersCount =
+        ref.watch(superAdminBackendChangeNotifierProvider.select((db) {
+      return db.users.length;
+    }));
+    final sensorsCount =
+        ref.watch(superAdminBackendChangeNotifierProvider.select((db) {
+      return db.sensors.length;
+    }));
+    final devicesCount =
+        ref.watch(superAdminBackendChangeNotifierProvider.select((db) {
+      return db.devices.length;
+    }));
+    final hasPlatformRecords =
+        ref.watch(superAdminBackendChangeNotifierProvider.select((db) {
+      return db.organizations.isNotEmpty ||
+          db.devices.isNotEmpty ||
+          db.sensors.isNotEmpty;
+    }));
 
     return OpsPage(
       title: '${role.label} Dashboard',
@@ -41,11 +76,11 @@ class RoleDashboardContent extends ConsumerWidget {
                 role: role,
                 activeAlerts: activeAlerts,
                 activeDevices: activeDevices,
-                organizations: db.organizations.length,
-                sites: db.sites.length,
-                users: db.users.length,
-                sensors: db.sensors.length,
-                devices: db.devices.length,
+                organizations: organizationsCount,
+                sites: sitesCount,
+                users: usersCount,
+                sensors: sensorsCount,
+                devices: devicesCount,
               );
 
               return Wrap(
@@ -97,11 +132,10 @@ class RoleDashboardContent extends ConsumerWidget {
                 child: _SnapshotList(
                   items: [
                     _SnapshotItem('Active alerts', '$activeAlerts'),
-                    _SnapshotItem(
-                        'Organizations', '${db.organizations.length}'),
-                    _SnapshotItem('Sites', '${db.sites.length}'),
-                    _SnapshotItem('Zones', '${db.zones.length}'),
-                    _SnapshotItem('Users', '${db.users.length}'),
+                    _SnapshotItem('Organizations', '$organizationsCount'),
+                    _SnapshotItem('Sites', '$sitesCount'),
+                    _SnapshotItem('Zones', '$zonesCount'),
+                    _SnapshotItem('Users', '$usersCount'),
                   ],
                 ),
               );
@@ -137,9 +171,7 @@ class RoleDashboardContent extends ConsumerWidget {
           OpsPanel(
             title: 'Recommended Next Steps',
             subtitle: 'Start here after login',
-            child: db.organizations.isEmpty &&
-                    db.devices.isEmpty &&
-                    db.sensors.isEmpty
+            child: !hasPlatformRecords
                 ? const OpsEmptyState(
                     title: 'No platform records loaded yet',
                     message:

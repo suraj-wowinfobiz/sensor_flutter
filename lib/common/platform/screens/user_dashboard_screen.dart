@@ -10,6 +10,7 @@ import '../providers/super_admin_riverpod_provider.dart';
 class UserDashboardScreen extends ConsumerWidget {
   const UserDashboardScreen({super.key});
 
+  static const double _statusRowHeight = 344;
   static const double _overviewRowHeight = 396;
 
   @override
@@ -137,7 +138,8 @@ class UserDashboardScreen extends ConsumerWidget {
                 );
               }
 
-              return IntrinsicHeight(
+              return SizedBox(
+                height: _statusRowHeight,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
