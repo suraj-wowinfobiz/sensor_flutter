@@ -61,6 +61,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
   String _processedEndpointPath = '/api/v1/processing/readings/live';
   String _analyticsEndpointPath = '/api/v1/analytics/events/live';
   String _sensorName = 'Workspace Sensor';
+  String _primarySensorId = '';
   Set<String> _assignedSensorIds = <String>{};
   bool _sensorAccessLoaded = false;
   String? _sensorAccessError;
@@ -110,9 +111,10 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     }
 
     if (scopedSensors.isEmpty) {
-      _sensorName = sensorAccessError == null
-          ? 'No assigned sensors'
-          : 'Sensor access unavailable';
+    _sensorName = sensorAccessError == null
+        ? 'No assigned sensors'
+        : 'Sensor access unavailable';
+      _primarySensorId = '';
       _rawEndpointPath = '';
       _processedEndpointPath = '';
       _analyticsEndpointPath = '';
@@ -120,24 +122,19 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     }
 
     _sensorName = _sensorLabel(sensor);
+    _primarySensorId = sensor.id.trim();
     _rawEndpointPath = _resolveLivePath(
       explicitPath: sensor.ingestionLiveEndpoint,
       fallbackPath: sensor.endpointKey.trim().isEmpty
           ? '/api/v1/ingestion/readings/live'
           : '/api/v1/ingestion/readings/live/${sensor.endpointKey.trim()}',
     );
-    _processedEndpointPath = _resolveLivePath(
-      explicitPath: sensor.processingLiveEndpoint,
-      fallbackPath: sensor.endpointKey.trim().isEmpty
-          ? '/api/v1/processing/readings/live'
-          : '/api/v1/processing/readings/live/${sensor.endpointKey.trim()}',
-    );
-    _analyticsEndpointPath = _resolveLivePath(
-      explicitPath: sensor.analyticsLiveEndpoint,
-      fallbackPath: sensor.endpointKey.trim().isEmpty
-          ? '/api/v1/analytics/events/live'
-          : '/api/v1/analytics/events/live/${sensor.endpointKey.trim()}',
-    );
+    // These exact live endpoints are permit-all in backend security config.
+    // The sensor-scoped /{endpointKey} variants require auth/role checks and
+    // can reject normal user tokens, so we subscribe to the public feeds and
+    // filter events locally to the assigned primary sensor.
+    _processedEndpointPath = '/api/v1/processing/readings/live';
+    _analyticsEndpointPath = '/api/v1/analytics/events/live';
   }
 
   Sensor _primarySensor(List<Sensor> sensors) {
@@ -180,6 +177,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     await _rawSseService!.connect();
     _rawSubscription = _rawSseService!.stream.listen((data) {
       if (!mounted) return;
+      if (!_matchesPrimarySensor(data)) return;
       final xyz = _extractRawXyz(data);
       if (xyz == null) return;
       setState(() {
@@ -193,6 +191,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     await _processedSseService!.connect();
     _processedSubscription = _processedSseService!.stream.listen((data) {
       if (!mounted) return;
+      if (!_matchesPrimarySensor(data)) return;
       final snapshot = _extractProcessedSnapshot(data);
       if (snapshot == null) return;
       final nowSec = DateTime.now().millisecondsSinceEpoch / 1000.0;
@@ -225,6 +224,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     await _analyticsSseService!.connect();
     _analyticsSubscription = _analyticsSseService!.stream.listen((data) {
       if (!mounted) return;
+      if (!_matchesPrimarySensor(data)) return;
       final snapshot = _extractAnalyzedSnapshot(data);
       if (snapshot == null) return;
       final dt = (_previousAnalyzedTimestamp == null)
@@ -318,18 +318,93 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     return null;
   }
 
+  bool _matchesPrimarySensor(dynamic payload) {
+    final expectedSensorId = _primarySensorId.trim();
+    if (expectedSensorId.isEmpty) return true;
+    for (final map in _candidateMaps(payload)) {
+      final sensorId = _sensorIdFromMap(map);
+      if (sensorId == expectedSensorId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  String? _sensorIdFromMap(Map<String, dynamic> map) {
+    final direct = (map['sensorId'] ?? map['sensor_id'])?.toString().trim();
+    if (direct != null && direct.isNotEmpty) return direct;
+
+    final rawPayload = map['rawPayload'];
+    if (rawPayload is Map) {
+      final rawSensorId =
+          (rawPayload['sensorId'] ?? rawPayload['sensor_id'])?.toString().trim();
+      if (rawSensorId != null && rawSensorId.isNotEmpty) return rawSensorId;
+    }
+
+    final processedPayload = map['processedPayload'];
+    if (processedPayload is Map) {
+      final processedSensorId =
+          (processedPayload['sensorId'] ?? processedPayload['sensor_id'])
+              ?.toString()
+              .trim();
+      if (processedSensorId != null && processedSensorId.isNotEmpty) {
+        return processedSensorId;
+      }
+    }
+
+    final nestedEvent = map['event'];
+    if (nestedEvent is Map) {
+      final nestedSensorId =
+          (nestedEvent['sensorId'] ?? nestedEvent['sensor_id'])
+              ?.toString()
+              .trim();
+      if (nestedSensorId != null && nestedSensorId.isNotEmpty) {
+        return nestedSensorId;
+      }
+    }
+
+    return null;
+  }
+
   _ProcessedSnapshot? _extractProcessedSnapshot(dynamic payload) {
     for (final map in _candidateMaps(payload)) {
       final processed = map['processedPayload'];
       if (processed is! Map) continue;
 
-      final roll = _toDouble(processed['rollDegrees'] ?? processed['x']);
-      final pitch = _toDouble(processed['pitchDegrees'] ?? processed['y']);
-      final tilt = _toDouble(
-        processed['tiltFromVerticalDegrees'] ??
-            processed['inclinationDegrees'] ??
-            processed['z'],
-      );
+      final tiltPayload =
+          processed['tilt'] is Map ? processed['tilt'] as Map : null;
+      final inclinoPayload = processed['inclinometer'] is Map
+          ? processed['inclinometer'] as Map
+          : null;
+
+      final roll = _firstDouble([
+        processed['rollDegrees'],
+        tiltPayload?['rollDegrees'],
+        processed['roll'],
+        tiltPayload?['roll'],
+        processed['x'],
+        tiltPayload?['x'],
+      ]);
+      final pitch = _firstDouble([
+        processed['pitchDegrees'],
+        tiltPayload?['pitchDegrees'],
+        processed['pitch'],
+        tiltPayload?['pitch'],
+        processed['y'],
+        tiltPayload?['y'],
+      ]);
+      final tilt = _firstDouble([
+        processed['tiltFromVerticalDegrees'],
+        tiltPayload?['tiltFromVerticalDegrees'],
+        processed['inclinationDegrees'],
+        inclinoPayload?['inclinationDegrees'],
+        processed['tiltDegrees'],
+        tiltPayload?['tiltDegrees'],
+        processed['tilt'],
+        processed['z'],
+        tiltPayload?['z'],
+        inclinoPayload?['z'],
+      ]);
       if (roll == null || pitch == null || tilt == null) continue;
 
       return _ProcessedSnapshot(
@@ -369,11 +444,57 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
         }
       }
 
-      final roll = values['rollDegrees'] ?? values['roll'];
-      final pitch = values['pitchDegrees'] ?? values['pitch'];
-      final tilt = values['tiltFromVerticalDegrees'] ??
-          values['inclinationDegrees'] ??
-          values['tilt'];
+      final processedPayload = map['processedPayload'] is Map
+          ? map['processedPayload'] as Map<dynamic, dynamic>
+          : null;
+      final tiltPayload = processedPayload != null &&
+              processedPayload['tilt'] is Map
+          ? processedPayload['tilt'] as Map<dynamic, dynamic>
+          : null;
+      final inclinoPayload = processedPayload != null &&
+              processedPayload['inclinometer'] is Map
+          ? processedPayload['inclinometer'] as Map<dynamic, dynamic>
+          : null;
+
+      final roll = _firstDouble([
+        values['rollDegrees'],
+        values['roll'],
+        values['tilt.rollDegrees'],
+        values['processedPayload.rollDegrees'],
+        values['processedPayload.tilt.rollDegrees'],
+        processedPayload?['rollDegrees'],
+        tiltPayload?['rollDegrees'],
+        processedPayload?['x'],
+        tiltPayload?['x'],
+      ]);
+      final pitch = _firstDouble([
+        values['pitchDegrees'],
+        values['pitch'],
+        values['tilt.pitchDegrees'],
+        values['processedPayload.pitchDegrees'],
+        values['processedPayload.tilt.pitchDegrees'],
+        processedPayload?['pitchDegrees'],
+        tiltPayload?['pitchDegrees'],
+        processedPayload?['y'],
+        tiltPayload?['y'],
+      ]);
+      final tilt = _firstDouble([
+        values['tiltFromVerticalDegrees'],
+        values['inclinationDegrees'],
+        values['tilt'],
+        values['tilt.tiltFromVerticalDegrees'],
+        values['inclinometer.inclinationDegrees'],
+        values['processedPayload.tiltFromVerticalDegrees'],
+        values['processedPayload.inclinationDegrees'],
+        values['processedPayload.tilt.tiltFromVerticalDegrees'],
+        values['processedPayload.inclinometer.inclinationDegrees'],
+        processedPayload?['tiltFromVerticalDegrees'],
+        tiltPayload?['tiltFromVerticalDegrees'],
+        processedPayload?['inclinationDegrees'],
+        inclinoPayload?['inclinationDegrees'],
+        processedPayload?['z'],
+        tiltPayload?['z'],
+      ]);
       if (roll == null || pitch == null || tilt == null) continue;
 
       final timestamp = _toDouble(map['timestamp']) ??
@@ -386,6 +507,14 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
         tilt: tilt,
         timestamp: timestamp,
       );
+    }
+    return null;
+  }
+
+  double? _firstDouble(List<dynamic> values) {
+    for (final value in values) {
+      final parsed = _toDouble(value);
+      if (parsed != null) return parsed;
     }
     return null;
   }
