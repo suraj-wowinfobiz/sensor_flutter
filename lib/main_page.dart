@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -44,6 +46,7 @@ class _MainPageState extends State<MainPage> {
   };
 
   VideoPlayerController? _bgController;
+  Timer? _videoInitTimer;
 
   bool _isMobileMenuOpen = false;
 
@@ -71,7 +74,7 @@ class _MainPageState extends State<MainPage> {
         child: SizedBox(
           width: _bgController!.value.size.width,
           height: _bgController!.value.size.height,
-          child: VideoPlayer(_bgController!),
+          child: RepaintBoundary(child: VideoPlayer(_bgController!)),
         ),
       );
     }
@@ -210,19 +213,35 @@ class _MainPageState extends State<MainPage> {
   @override
   void initState() {
     super.initState();
-    _bgController = VideoPlayerController.asset('assets/images/background.mp4');
-    _bgController!.initialize().then((_) {
-      _bgController!.setLooping(true);
-      _bgController!.setVolume(0);
-      _bgController!.play();
-      setState(() {});
-    }).catchError((_) {
-      // If video fails to initialize, we silently fall back to the image.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _videoInitTimer = Timer(const Duration(milliseconds: 450), () {
+        if (!mounted) return;
+        final controller = VideoPlayerController.asset(
+          'assets/images/background.mp4',
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        );
+        _bgController = controller;
+        controller.initialize().then((_) {
+          if (!mounted) return;
+          controller
+            ..setLooping(true)
+            ..setVolume(0)
+            ..play();
+          setState(() {});
+        }).catchError((_) {
+          controller.dispose();
+          if (identical(_bgController, controller)) {
+            _bgController = null;
+          }
+        });
+      });
     });
   }
 
   @override
   void dispose() {
+    _videoInitTimer?.cancel();
     _bgController?.dispose();
     _scrollController.dispose();
     super.dispose();

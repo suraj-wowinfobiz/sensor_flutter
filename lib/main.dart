@@ -54,7 +54,7 @@ class _AppRoot extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeProvider = ref.watch(themeChangeNotifierProvider);
     final superAdminDatabase =
-        ref.watch(superAdminBackendChangeNotifierProvider);
+        ref.read(superAdminBackendChangeNotifierProvider);
 
     return MultiProvider(
       providers: [

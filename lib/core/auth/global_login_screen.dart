@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
@@ -1326,28 +1328,43 @@ class _LoginHeroImage extends StatefulWidget {
 
 class _LoginHeroImageState extends State<_LoginHeroImage> {
   VideoPlayerController? _controller;
+  Timer? _videoInitTimer;
 
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.asset(widget.videoAsset)
-      ..initialize().then((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _videoInitTimer = Timer(const Duration(milliseconds: 500), () {
         if (!mounted) return;
-        _controller!
-          ..setLooping(true)
-          ..setVolume(0)
-          ..play();
-        setState(() {});
-      }).catchError((_) {
-        if (!mounted) return;
-        setState(() {
-          _controller = null;
+        final controller = VideoPlayerController.asset(
+          widget.videoAsset,
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        );
+        _controller = controller;
+        controller.initialize().then((_) {
+          if (!mounted) return;
+          controller
+            ..setLooping(true)
+            ..setVolume(0)
+            ..play();
+          setState(() {});
+        }).catchError((_) {
+          controller.dispose();
+          if (!mounted) return;
+          setState(() {
+            if (identical(_controller, controller)) {
+              _controller = null;
+            }
+          });
         });
       });
+    });
   }
 
   @override
   void dispose() {
+    _videoInitTimer?.cancel();
     _controller?.dispose();
     super.dispose();
   }
@@ -1362,7 +1379,7 @@ class _LoginHeroImageState extends State<_LoginHeroImage> {
         child: SizedBox(
           width: controller.value.size.width,
           height: controller.value.size.height,
-          child: VideoPlayer(controller),
+          child: RepaintBoundary(child: VideoPlayer(controller)),
         ),
       );
     }

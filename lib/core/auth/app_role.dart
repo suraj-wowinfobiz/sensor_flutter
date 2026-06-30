@@ -207,11 +207,6 @@ extension AppLoginRoleX on AppLoginRole {
             view: 'dashboard',
           ),
           RoleNavigationItem(
-            label: 'Sensors',
-            icon: Icons.sensors_outlined,
-            view: 'sensors',
-          ),
-          RoleNavigationItem(
             label: 'Alerts',
             icon: Icons.notifications_none_rounded,
             view: 'alerts',
