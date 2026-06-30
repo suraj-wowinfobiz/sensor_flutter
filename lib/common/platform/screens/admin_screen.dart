@@ -47,6 +47,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
   late AnimationController _menuController;
   String _profileName = '';
   String _profileInitial = '';
+  String _profileSubtitle = '';
 
   List<RoleNavigationItem> get _navigationItems => widget.role.navigationItems;
   Set<String> get _allowedViews =>
@@ -179,18 +180,28 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
   Future<void> _loadSessionProfile() async {
     final sessionData = await AppSession.getSessionData();
     final username = (sessionData['username'] ?? '').trim();
-    if (!mounted || username.isEmpty) return;
+    final userId = (await AppSession.currentPrincipalId()).trim();
 
-    final displayName = _displayNameFromUsername(username);
+    debugPrint('Loaded session userId: $userId');
+    debugPrint('Loaded session username: $username');
+
+    if (!mounted) return;
+
+    if (username.isEmpty && userId.isEmpty) {
+      return;
+    }
+
+    final resolvedUsername =
+        username.isNotEmpty ? username : widget.role.profileTitle;
+    final displayName = userId.isNotEmpty
+        ? '$resolvedUsername ($userId)'
+        : resolvedUsername;
+    final subtitle = widget.role.profileTitle;
     setState(() {
       _profileName = displayName;
+      _profileSubtitle = subtitle;
       _profileInitial = _initialsFromName(displayName);
     });
-  }
-
-  String _displayNameFromUsername(String username) {
-    final localPart = username.split('@').first.trim();
-    return localPart.isEmpty ? username : localPart;
   }
 
   String _initialsFromName(String value) {
@@ -307,7 +318,8 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
       workspaceIcon: widget.role.icon,
       profileName:
           _profileName.isNotEmpty ? _profileName : widget.role.profileTitle,
-      profileRole: widget.role.profileTitle,
+      profileRole:
+          _profileSubtitle.isNotEmpty ? _profileSubtitle : widget.role.profileTitle,
       profileInitial: _profileInitial.isNotEmpty
           ? _profileInitial
           : widget.role.profileInitial,
@@ -365,7 +377,9 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
                                   profileName: _profileName.isNotEmpty
                                       ? _profileName
                                       : widget.role.profileTitle,
-                                  profileRole: widget.role.profileTitle,
+                                  profileRole: _profileSubtitle.isNotEmpty
+                                      ? _profileSubtitle
+                                      : widget.role.profileTitle,
                                   profileInitial: _profileInitial.isNotEmpty
                                       ? _profileInitial
                                       : widget.role.profileInitial,

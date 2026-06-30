@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../../../core/auth/app_session.dart';
 import '../core/api/admin_api_config.dart';
 
 class LiveReading {
@@ -43,7 +44,11 @@ class LiveReadingsService {
   Future<List<LiveReading>> fetchLiveReadings() async {
     try {
       debugPrint('🔵 Fetching live readings from API...');
-      final response = await _dio.get('/api/v1/ingestion/readings/live');
+      final userId = await AppSession.currentPrincipalId();
+      final response = await _dio.get(
+        '/api/v1/ingestion/readings/live',
+        queryParameters: userId.isEmpty ? null : {'userId': userId},
+      );
       debugPrint('🟢 Response received: ${response.data}');
       final List<dynamic> data = response.data as List<dynamic>;
       final readings = data.map((json) => LiveReading.fromJson(json)).toList();

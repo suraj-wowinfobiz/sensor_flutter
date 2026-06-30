@@ -52,6 +52,40 @@ class AppSession {
     };
   }
 
+  static Future<String> currentPrincipalId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final sessionRole = (prefs.getString(_sessionRoleKey) ?? '').trim();
+
+    switch (sessionRole) {
+      case 'admin':
+        return (prefs.getString('admin_principal_id') ??
+                prefs.getString('super_admin_principal_id') ??
+                '')
+            .trim();
+      case 'user_admin':
+        return (prefs.getString('user_admin_principal_id') ??
+                prefs.getString('admin_principal_id') ??
+                '')
+            .trim();
+      case 'engineer':
+        return (prefs.getString('engineer_principal_id') ?? '').trim();
+      case 'vendor':
+        return (prefs.getString('vendor_principal_id') ?? '').trim();
+      case 'analytics':
+        return (prefs.getString('analytics_principal_id') ?? '').trim();
+      case 'analytics_role':
+        return (prefs.getString('analytics_role_principal_id') ?? '').trim();
+      case 'user':
+        return (prefs.getString('user_principal_id') ?? '').trim();
+      default:
+        for (final key in _principalKeys) {
+          final value = (prefs.getString(key) ?? '').trim();
+          if (value.isNotEmpty) return value;
+        }
+        return '';
+    }
+  }
+
   static Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
 

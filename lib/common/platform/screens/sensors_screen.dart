@@ -62,6 +62,11 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
     return '$base$normalizedPath';
   }
 
+  String _withUserIdPlaceholder(String url) {
+    final normalized = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+    return '$normalized/{userId}';
+  }
+
   Map<String, String> _endpointPreview({
     required String sensorId,
     required String sensorName,
@@ -77,13 +82,17 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
         .replaceAll(RegExp(r'-{2,}'), '-');
     final endpointKey =
         normalizedSensorName.isEmpty ? uid : '$uid-$normalizedSensorName';
-    final ingestion = _buildAbsoluteUrl('/api/v1/ingestion/$endpointKey');
-    final ingestionLive =
-        _buildAbsoluteUrl('/api/v1/ingestion/readings/live/$endpointKey');
-    final processingLive =
-        _buildAbsoluteUrl('/api/v1/processing/readings/live/$endpointKey');
-    final analyticsLive =
-        _buildAbsoluteUrl('/api/v1/analytics/events/live/$endpointKey');
+    final ingestion =
+        _withUserIdPlaceholder(_buildAbsoluteUrl('/api/v1/ingestion/$endpointKey'));
+    final ingestionLive = _withUserIdPlaceholder(
+      _buildAbsoluteUrl('/api/v1/ingestion/readings/live/$endpointKey'),
+    );
+    final processingLive = _withUserIdPlaceholder(
+      _buildAbsoluteUrl('/api/v1/processing/readings/live/$endpointKey'),
+    );
+    final analyticsLive = _withUserIdPlaceholder(
+      _buildAbsoluteUrl('/api/v1/analytics/events/live/$endpointKey'),
+    );
     return {
       'endpointKey': endpointKey,
       'ingestion': ingestion,
@@ -1105,6 +1114,11 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
               style: TextStyle(fontSize: 12.5, color: mutedColor),
             ),
           ],
+          const SizedBox(height: 4),
+          Text(
+            'Use a valid userId as the final path segment. These endpoints now verify that user before returning data.',
+            style: TextStyle(fontSize: 12.5, color: mutedColor),
+          ),
           const SizedBox(height: 10),
           endpointRow('Endpoint Key', endpointKey),
           const SizedBox(height: 10),

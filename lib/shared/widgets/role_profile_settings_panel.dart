@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/auth/app_session.dart';
 
 typedef LoadUserById = Future<Map<String, dynamic>> Function(String userId);
 typedef UpdateUserById = Future<Map<String, dynamic>> Function({
@@ -63,8 +64,9 @@ class _RoleProfileSettingsPanelState extends State<RoleProfileSettingsPanel> {
     setState(() => _loading = true);
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userId =
-          prefs.getString(widget.principalIdPreferenceKey)?.trim() ?? '';
+      final userId = (await AppSession.currentPrincipalId()).trim().isNotEmpty
+          ? (await AppSession.currentPrincipalId()).trim()
+          : (prefs.getString(widget.principalIdPreferenceKey)?.trim() ?? '');
       if (userId.isEmpty) {
         throw Exception('User id not found. Please login again.');
       }

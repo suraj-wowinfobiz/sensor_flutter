@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/auth/app_session.dart';
 import '../../../core/theme/ops_theme.dart';
@@ -69,12 +68,7 @@ class _AdminAccountSettingsPanelState extends State<AdminAccountSettingsPanel> {
   Future<void> _loadProfileForm() async {
     setState(() => _profileLoading = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final userId = (prefs.getString('user_admin_principal_id') ??
-                  prefs.getString('admin_principal_id') ??
-                  prefs.getString('super_admin_principal_id'))
-              ?.trim() ??
-          '';
+      final userId = (await AppSession.currentPrincipalId()).trim();
       if (userId.isEmpty) {
         throw Exception('User id not found. Please login again.');
       }

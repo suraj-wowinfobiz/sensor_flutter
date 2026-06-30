@@ -127,14 +127,14 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
       explicitPath: sensor.ingestionLiveEndpoint,
       fallbackPath: sensor.endpointKey.trim().isEmpty
           ? '/api/v1/ingestion/readings/live'
-          : '/api/v1/ingestion/readings/live/${sensor.endpointKey.trim()}',
+          : '/api/v1/ingestion/readings/live/${sensor.endpointKey.trim()}/{userId}',
     );
-    // These exact live endpoints are permit-all in backend security config.
-    // The sensor-scoped /{endpointKey} variants require auth/role checks and
-    // can reject normal user tokens, so we subscribe to the public feeds and
-    // filter events locally to the assigned primary sensor.
-    _processedEndpointPath = '/api/v1/processing/readings/live';
-    _analyticsEndpointPath = '/api/v1/analytics/events/live';
+    _processedEndpointPath = sensor.endpointKey.trim().isEmpty
+        ? '/api/v1/processing/readings/live'
+        : '/api/v1/processing/readings/live/${sensor.endpointKey.trim()}/{userId}';
+    _analyticsEndpointPath = sensor.endpointKey.trim().isEmpty
+        ? '/api/v1/analytics/events/live'
+        : '/api/v1/analytics/events/live/${sensor.endpointKey.trim()}/{userId}';
   }
 
   Sensor _primarySensor(List<Sensor> sensors) {

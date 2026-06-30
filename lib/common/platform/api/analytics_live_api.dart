@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../../core/auth/app_session.dart';
 import '../core/api/admin_api_config.dart';
 
 class AnalyticsLiveEvent {
@@ -100,7 +101,7 @@ class AnalyticsLiveApi {
     try {
       final request = http.Request(
         'GET',
-        Uri.parse('${AdminApiConfig.baseUrl}$endpoint'),
+        await _buildEndpointUri(),
       );
       request.headers['Accept'] = 'text/event-stream';
       request.headers['Cache-Control'] = 'no-cache';
@@ -128,5 +129,28 @@ class AnalyticsLiveApi {
     } finally {
       client.close();
     }
+  }
+
+  static Future<Uri> _buildEndpointUri() async {
+    final uri = Uri.parse('${AdminApiConfig.baseUrl}$endpoint');
+    if (uri.queryParameters.containsKey('userId')) {
+      return uri;
+    }
+
+    final userId = await AppSession.currentPrincipalId();
+    if (userId.isEmpty) {
+      return uri;
+    }
+
+    if (uri.path.contains('{userId}')) {
+      return uri.replace(path: uri.path.replaceAll('{userId}', userId));
+    }
+
+    return uri.replace(
+      queryParameters: <String, String>{
+        ...uri.queryParameters,
+        'userId': userId,
+      },
+    );
   }
 }

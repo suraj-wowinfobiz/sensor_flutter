@@ -2,13 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/auth/app_session.dart';
 import '../core/api/admin_api_config.dart';
 
 class AnalyticsSseService {
-  static const String _tokenStorageKey = 'platform_auth_token';
-  static const String _sessionTokenStorageKey = 'app_session_token';
-
   final StreamController<dynamic> _controller =
       StreamController<dynamic>.broadcast();
   http.Client? _client;
@@ -56,17 +53,10 @@ class AnalyticsSseService {
     try {
       final request = http.Request(
         'GET',
-        Uri.parse('${AdminApiConfig.apiV1Base}/analytics/events/live'),
+        await _buildEndpointUri(),
       );
       request.headers['Accept'] = 'text/event-stream';
       request.headers['Cache-Control'] = 'no-cache';
-      final prefs = await SharedPreferences.getInstance();
-      final token = (prefs.getString(_tokenStorageKey) ??
-              prefs.getString(_sessionTokenStorageKey))
-          ?.trim();
-      if (token != null && token.isNotEmpty) {
-        request.headers['Authorization'] = 'Bearer $token';
-      }
 
       final response = await _client!.send(request);
 
@@ -126,5 +116,28 @@ class AnalyticsSseService {
   void dispose() {
     disconnect();
     _controller.close();
+  }
+
+  Future<Uri> _buildEndpointUri() async {
+    final uri = Uri.parse('${AdminApiConfig.apiV1Base}/analytics/events/live');
+    if (uri.queryParameters.containsKey('userId')) {
+      return uri;
+    }
+
+    final userId = await AppSession.currentPrincipalId();
+    if (userId.isEmpty) {
+      return uri;
+    }
+
+    if (uri.path.contains('{userId}')) {
+      return uri.replace(path: uri.path.replaceAll('{userId}', userId));
+    }
+
+    return uri.replace(
+      queryParameters: <String, String>{
+        ...uri.queryParameters,
+        'userId': userId,
+      },
+    );
   }
 }

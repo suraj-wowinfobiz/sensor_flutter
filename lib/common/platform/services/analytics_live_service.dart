@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../../../core/auth/app_session.dart';
 import '../core/api/admin_api_config.dart';
 
 class AnalyticsEvent {
@@ -42,7 +43,11 @@ class AnalyticsLiveService {
   Future<List<AnalyticsEvent>> fetchLiveAnalytics() async {
     try {
       debugPrint('🔵 Fetching live analytics from API...');
-      final response = await _dio.get('/api/v1/analytics/events/live');
+      final userId = await AppSession.currentPrincipalId();
+      final response = await _dio.get(
+        '/api/v1/analytics/events/live',
+        queryParameters: userId.isEmpty ? null : {'userId': userId},
+      );
       debugPrint('🟢 Response received: ${response.data}');
 
       if (response.data is List) {
