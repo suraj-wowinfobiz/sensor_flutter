@@ -14,7 +14,6 @@ import 'alerts_screen.dart';
 import 'analytics_screen.dart';
 import 'audit_screen.dart';
 import 'config_screen.dart';
-import 'dashboard_screen.dart';
 import 'devices_screen.dart';
 import 'live_analytics_screen.dart';
 import 'map_screen.dart';
@@ -61,19 +60,56 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       await _loadSessionProfile();
-      final db = ref.read(superAdminBackendChangeNotifierProvider);
-      try {
-        await Future.wait([
+      await _preloadDashboardData();
+    });
+  }
+
+  Future<void> _preloadDashboardData() async {
+    final db = ref.read(superAdminBackendChangeNotifierProvider);
+    final tasks = <Future<void>>[];
+
+    switch (widget.role) {
+      case AppLoginRole.admin:
+        tasks.addAll([
+          db.loadOrganizations(),
+          db.loadUsers(),
           db.loadDevices(),
-          db.loadSensors(),
+        ]);
+      case AppLoginRole.userAdmin:
+        tasks.addAll([
           db.loadUsers(),
           db.loadOrganizations(),
-          _refreshAlerts(),
         ]);
-      } catch (_) {
-        // Keep the shell responsive even if one preload request fails.
-      }
-    });
+      case AppLoginRole.user:
+        tasks.addAll([
+          db.loadSensors(),
+          db.loadDevices(),
+        ]);
+      case AppLoginRole.engineer:
+        tasks.addAll([
+          db.loadDevices(),
+          db.loadSensors(),
+        ]);
+      case AppLoginRole.vendor:
+        tasks.addAll([
+          db.loadOrganizations(),
+          db.loadUsers(),
+        ]);
+      case AppLoginRole.analytics:
+      case AppLoginRole.analyticsRole:
+        tasks.addAll([
+          db.loadSensors(),
+          db.loadDevices(),
+        ]);
+    }
+
+    tasks.add(_refreshAlerts());
+
+    try {
+      await Future.wait(tasks);
+    } catch (_) {
+      // Keep the shell responsive even if one preload request fails.
+    }
   }
 
   Future<void> _loadSessionProfile() async {
@@ -418,7 +454,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
       case 'config':
         return ConfigScreen(role: widget.role);
       default:
-        return const DashboardScreen();
+        return RoleDashboardScreen(role: widget.role);
     }
   }
 
