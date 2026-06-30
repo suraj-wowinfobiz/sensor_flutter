@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'
     show ConsumerWidget, ProviderScope, WidgetRef;
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 
 import 'common/platform/core/providers/theme_riverpod_provider.dart';
@@ -15,7 +14,6 @@ import 'core/theme/ops_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter();
   runApp(const MyApp());
 }
 

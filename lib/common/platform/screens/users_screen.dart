@@ -42,14 +42,13 @@ class _UsersScreenState extends State<UsersScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final db = context.read<SuperAdminBackendProvider>();
-      await db.loadOrganizations();
-      await db.loadSites();
-      await db.loadDevices();
-      await db.loadSensors();
-      for (final site in db.sites) {
-        await db.loadZones(site.id);
-      }
-      await db.loadUsers();
+      await Future.wait([
+        db.loadOrganizations(),
+        db.loadOrganizations().then((_) => db.loadSites()),
+        db.loadDevices(),
+        db.loadSensors(),
+        db.loadUsers(),
+      ]);
     });
   }
 

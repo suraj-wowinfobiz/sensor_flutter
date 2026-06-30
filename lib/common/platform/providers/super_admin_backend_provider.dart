@@ -46,6 +46,16 @@ class SuperAdminBackendProvider extends ChangeNotifier {
   Future<void>? _loadSitesTask;
   Future<void>? _loadDevicesTask;
   Future<void>? _loadSensorsTask;
+  bool _organizationsLoaded = false;
+  bool _sitesLoaded = false;
+  bool _usersLoaded = false;
+  bool _devicesLoaded = false;
+  bool _sensorsLoaded = false;
+  bool _sensorTypesLoaded = false;
+  bool _sensorParametersLoaded = false;
+  bool _thresholdProfilesLoaded = false;
+  bool _thresholdValuesLoaded = false;
+  final Set<String> _loadedZoneSiteIds = <String>{};
   int _thresholdRuleSeed = 4;
   final List<ThresholdRule> _thresholdRules = [];
 
@@ -182,7 +192,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
   void _refreshSitesSoon() {
     unawaited(() async {
       try {
-        await loadSites();
+        await loadSites(force: true);
       } catch (e) {
         print('Error refreshing sites: $e');
       }
@@ -227,13 +237,15 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     );
   }
 
-  Future<void> loadOrganizations() async {
+  Future<void> loadOrganizations({bool force = false}) async {
+    if (!force && _organizationsLoaded) return;
     if (_loadOrganizationsTask != null) return _loadOrganizationsTask!;
     final task = () async {
       try {
         final res = await org_api.OrgServiceApi.getAllOrganizations();
         if (res.body == null) {
           organizations = [];
+          _organizationsLoaded = true;
           return;
         }
         organizations = (res.body as List)
@@ -246,9 +258,11 @@ class SuperAdminBackendProvider extends ChangeNotifier {
                   createdAt: DateTime.parse(json['createdAt']),
                 ))
             .toList();
+        _organizationsLoaded = true;
       } catch (e) {
         print('Error loading organizations: $e');
         organizations = [];
+        _organizationsLoaded = false;
       }
     }();
     _loadOrganizationsTask = task;
@@ -260,12 +274,14 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadSites() async {
+  Future<void> loadSites({bool force = false}) async {
+    if (!force && _sitesLoaded) return;
     if (_loadSitesTask != null) return _loadSitesTask!;
     final task = () async {
       try {
         if (organizations.isEmpty) {
           sites = [];
+          _sitesLoaded = _organizationsLoaded;
           return;
         }
 
@@ -295,9 +311,11 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         }
 
         sites = mappedSites.values.toList();
+        _sitesLoaded = true;
       } catch (e) {
         print('Error loading sites: $e');
         sites = [];
+        _sitesLoaded = false;
       }
     }();
     _loadSitesTask = task;
@@ -309,11 +327,15 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadZones(String siteId) async {
+  Future<void> loadZones(String siteId, {bool force = false}) async {
+    final normalizedSiteId = siteId.trim();
+    if (normalizedSiteId.isEmpty) return;
+    if (!force && _loadedZoneSiteIds.contains(normalizedSiteId)) return;
     try {
-      final res = await org_api.OrgServiceApi.getZonesBySite(siteId);
+      final res = await org_api.OrgServiceApi.getZonesBySite(normalizedSiteId);
       if (res.body == null) {
-        zones.removeWhere((z) => z.siteId == siteId);
+        zones.removeWhere((z) => z.siteId == normalizedSiteId);
+        _loadedZoneSiteIds.add(normalizedSiteId);
         notifyListeners();
         return;
       }
@@ -321,19 +343,23 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         final site = json['site'];
         return Zone(
           id: json['zoneId'],
-          siteId: site != null && site is Map ? site['sitesID'] : siteId,
+          siteId:
+              site != null && site is Map ? site['sitesID'] : normalizedSiteId,
           name: json['name'],
         );
       }).toList();
-      zones.removeWhere((z) => z.siteId == siteId);
+      zones.removeWhere((z) => z.siteId == normalizedSiteId);
       zones.addAll(newZones);
+      _loadedZoneSiteIds.add(normalizedSiteId);
     } catch (e) {
       print('Error loading zones: $e');
+      _loadedZoneSiteIds.remove(normalizedSiteId);
     }
     notifyListeners();
   }
 
-  Future<void> loadUsers() async {
+  Future<void> loadUsers({bool force = false}) async {
+    if (!force && _usersLoaded) return;
     try {
       final body = await UsersApi.getUsers();
       users = body.map((json) {
@@ -346,14 +372,17 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           updatedAt: _asDate(json['updatedAt'] ?? json['updated_at']),
         );
       }).toList();
+      _usersLoaded = true;
     } catch (e) {
       print('Error loading users: $e');
       users = [];
+      _usersLoaded = false;
     }
     notifyListeners();
   }
 
-  Future<void> loadDevices() async {
+  Future<void> loadDevices({bool force = false}) async {
+    if (!force && _devicesLoaded) return;
     if (_loadDevicesTask != null) return _loadDevicesTask!;
     final task = () async {
       try {
@@ -410,9 +439,11 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           deduped[device.id] = device;
         }
         devices = deduped.values.toList();
+        _devicesLoaded = true;
       } catch (e) {
         print('Error loading devices: $e');
         devices = [];
+        _devicesLoaded = false;
       }
     }();
     _loadDevicesTask = task;
@@ -424,7 +455,8 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadSensors() async {
+  Future<void> loadSensors({bool force = false}) async {
+    if (!force && _sensorsLoaded) return;
     if (_loadSensorsTask != null) return _loadSensorsTask!;
     final task = () async {
       try {
@@ -495,9 +527,11 @@ class SuperAdminBackendProvider extends ChangeNotifier {
               .where((sensor) => allowedSensorIds.contains(sensor.id))
               .toList();
         }
+        _sensorsLoaded = true;
       } catch (e) {
         print('Error loading sensors: $e');
         sensors = [];
+        _sensorsLoaded = false;
       }
     }();
     _loadSensorsTask = task;
@@ -509,7 +543,8 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadSensorTypes() async {
+  Future<void> loadSensorTypes({bool force = false}) async {
+    if (!force && _sensorTypesLoaded) return;
     try {
       final body = await SensorTypeApi.getAllSensorTypes();
       final loaded = body.map((json) {
@@ -528,14 +563,17 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         deduped[item.id] = item;
       }
       sensorTypes = deduped.values.toList();
+      _sensorTypesLoaded = true;
     } catch (e) {
       print('Error loading sensor types: $e');
       sensorTypes = [];
+      _sensorTypesLoaded = false;
     }
     notifyListeners();
   }
 
-  Future<void> loadSensorParameters() async {
+  Future<void> loadSensorParameters({bool force = false}) async {
+    if (!force && _sensorParametersLoaded) return;
     try {
       final body = await SensorParameterApi.getAllSensorParameters();
       final loaded = body
@@ -547,14 +585,17 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         deduped[item.id] = item;
       }
       sensorParameters = deduped.values.toList();
+      _sensorParametersLoaded = true;
     } catch (e) {
       print('Error loading sensor parameters: $e');
       sensorParameters = [];
+      _sensorParametersLoaded = false;
     }
     notifyListeners();
   }
 
-  Future<void> loadThresholdProfiles() async {
+  Future<void> loadThresholdProfiles({bool force = false}) async {
+    if (!force && _thresholdProfilesLoaded) return;
     try {
       final body = await ThresholdsApi.getProfiles().timeout(
         const Duration(seconds: 6),
@@ -570,14 +611,17 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           description: _asString(json['description']),
         );
       }).toList();
+      _thresholdProfilesLoaded = true;
     } catch (e) {
       print('Error loading threshold profiles: $e');
       thresholdProfiles = [];
+      _thresholdProfilesLoaded = false;
     }
     notifyListeners();
   }
 
-  Future<void> loadThresholdValues() async {
+  Future<void> loadThresholdValues({bool force = false}) async {
+    if (!force && _thresholdValuesLoaded) return;
     try {
       final body = await ThresholdsApi.getThresholds().timeout(
         const Duration(seconds: 6),
@@ -613,9 +657,11 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           ),
         );
       }).toList();
+      _thresholdValuesLoaded = true;
     } catch (e) {
       print('Error loading threshold values: $e');
       thresholdValues = [];
+      _thresholdValuesLoaded = false;
     }
     notifyListeners();
   }
@@ -627,7 +673,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           data['name'] as String,
           data['email'] as String,
         );
-        await loadOrganizations();
+        await loadOrganizations(force: true);
         break;
       case 'sites':
         final organizationId = data['organization_id'] as String;
@@ -652,7 +698,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           siteId,
           data['name'] as String,
         );
-        await loadZones(siteId);
+        await loadZones(siteId, force: true);
         break;
       case 'devices':
         final siteId = data['site_id'] as String;
@@ -675,7 +721,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           lastHeartBeat: _asString(data['last_heart_beat']),
           status: _asString(data['status'], 'active'),
         );
-        await loadDevices();
+        await loadDevices(force: true);
         break;
       case 'sensors':
         final sensorId = _asString(data['sensor_id'] ?? data['sensorId']);
@@ -696,7 +742,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           status: _asString(data['status'], 'ACTIVE'),
           unit: _asString(data['unit'], ''),
         );
-        await loadSensors();
+        await loadSensors(force: true);
         break;
       case 'sensor_types':
         await SensorTypeApi.createSensorType(
@@ -704,7 +750,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           category: _asString(data['category'], 'general'),
           description: _asString(data['description']),
         );
-        await loadSensorTypes();
+        await loadSensorTypes(force: true);
         break;
       case 'sensor_parameters':
         final typeId =
@@ -719,14 +765,14 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           minValue: _asDouble(data['minValue'] ?? data['min_value']),
           maxValue: _asDouble(data['maxValue'] ?? data['max_value']),
         );
-        await loadSensorParameters();
+        await loadSensorParameters(force: true);
         break;
       case 'thresholds':
         await ThresholdsApi.createProfile(
           name: data['name'] as String,
           description: data['description'] as String,
         );
-        await loadThresholdProfiles();
+        await loadThresholdProfiles(force: true);
         break;
       case 'threshold_values':
         await ThresholdsApi.createThreshold(
@@ -742,7 +788,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           warrningLevel: _asDouble(data['warrningLevel']),
           sensorParamterId: _asString(data['sensorParamterId']),
         );
-        await loadThresholdValues();
+        await loadThresholdValues(force: true);
         break;
       case 'users':
         final rawRole = _asString(data['role'], 'admin');
@@ -806,7 +852,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         } else {
           throw ArgumentError('Unsupported user role: $role');
         }
-        await loadUsers();
+        await loadUsers(force: true);
         break;
       case 'audit':
         auditLogs.add(AuditLog(
@@ -845,7 +891,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           data['name'] as String,
           data['email'] as String,
         );
-        await loadOrganizations();
+        await loadOrganizations(force: true);
         break;
       case 'sites':
         await org_api.OrgServiceApi.updateSite(
@@ -873,7 +919,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           data['name'] as String,
           siteId: data['site_id'] as String,
         );
-        await loadZones(data['site_id'] as String);
+        await loadZones(data['site_id'] as String, force: true);
         break;
       case 'devices':
         final siteId = data['site_id'] as String;
@@ -897,7 +943,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
               data['last_heart_beat'], DateTime.now().toIso8601String()),
           status: _asString(data['status'], 'active'),
         );
-        await loadDevices();
+        await loadDevices(force: true);
         break;
       case 'sensors':
         final sensorParameterId =
@@ -917,7 +963,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           status: _asString(data['status'], 'ACTIVE'),
           unit: _asString(data['unit'], ''),
         );
-        await loadSensors();
+        await loadSensors(force: true);
         break;
       case 'thresholds':
         await ThresholdsApi.updateProfile(
@@ -925,7 +971,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           name: data['name'] as String,
           description: data['description'] as String,
         );
-        await loadThresholdProfiles();
+        await loadThresholdProfiles(force: true);
         break;
       case 'sensor_parameters':
         final typeId =
@@ -942,7 +988,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
           minValue: _asDouble(data['minValue'] ?? data['min_value']),
           maxValue: _asDouble(data['maxValue'] ?? data['max_value']),
         );
-        await loadSensorParameters();
+        await loadSensorParameters(force: true);
         break;
       case 'users':
         final existingRole = users
@@ -969,7 +1015,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
             sensorIds: sensorIds,
           );
         }
-        await loadUsers();
+        await loadUsers(force: true);
         break;
     }
   }
@@ -978,13 +1024,14 @@ class SuperAdminBackendProvider extends ChangeNotifier {
     switch (view) {
       case 'organizations':
         await org_api.OrgServiceApi.deleteOrganization(id);
-        await loadOrganizations();
-        await loadSites();
+        await loadOrganizations(force: true);
+        await loadSites(force: true);
         break;
       case 'sites':
         await org_api.OrgServiceApi.deleteSite(id);
         sites.removeWhere((item) => item.id == id);
         zones.removeWhere((z) => z.siteId == id);
+        _loadedZoneSiteIds.remove(id);
         notifyListeners();
         _refreshSitesSoon();
         break;
@@ -995,11 +1042,11 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         break;
       case 'devices':
         await DeviceApi.deleteDevice(id);
-        await loadDevices();
+        await loadDevices(force: true);
         break;
       case 'sensors':
         await SensorApi.deleteSensor(id);
-        await loadSensors();
+        await loadSensors(force: true);
         break;
       case 'alerts':
         alerts.removeWhere((item) => item.id == id);
@@ -1007,11 +1054,11 @@ class SuperAdminBackendProvider extends ChangeNotifier {
         break;
       case 'thresholds':
         await ThresholdsApi.deleteProfile(id);
-        await loadThresholdProfiles();
+        await loadThresholdProfiles(force: true);
         break;
       case 'threshold_values':
         await ThresholdsApi.deleteThresholdValue(id);
-        await loadThresholdValues();
+        await loadThresholdValues(force: true);
         break;
       case 'users':
         final existingRole = users
@@ -1019,7 +1066,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
             .map((item) => item.role)
             .firstOrNull;
         await UsersApi.deleteUser(id, role: existingRole);
-        await loadUsers();
+        await loadUsers(force: true);
         break;
       case 'audit':
         auditLogs.removeWhere((item) => item.id == id);

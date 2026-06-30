@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -60,65 +62,112 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       await _loadSessionProfile();
-      await _preloadDashboardData();
+      await _warmViewData(_currentView);
     });
   }
 
-  Future<void> _preloadDashboardData() async {
+  Future<void> _warmViewData(String view) async {
     final db = ref.read(superAdminBackendChangeNotifierProvider);
+    final resolved = _normalizeView(view);
     final tasks = <Future<void>>[];
 
-    switch (widget.role) {
-      case AppLoginRole.admin:
+    switch (resolved) {
+      case 'dashboard':
+        switch (widget.role) {
+          case AppLoginRole.admin:
+            tasks.addAll([
+              db.loadOrganizations(),
+              db.loadDevices(),
+              db.loadUsers(),
+            ]);
+            tasks.add(db.loadOrganizations().then((_) => db.loadSites()));
+            break;
+          case AppLoginRole.userAdmin:
+            tasks.addAll([
+              db.loadOrganizations(),
+              db.loadUsers(),
+            ]);
+            tasks.add(db.loadOrganizations().then((_) => db.loadSites()));
+            break;
+          case AppLoginRole.user:
+            tasks.addAll([
+              db.loadSensors(),
+              db.loadDevices(),
+            ]);
+            break;
+          case AppLoginRole.engineer:
+            tasks.addAll([
+              db.loadDevices(),
+              db.loadSensors(),
+            ]);
+            break;
+          case AppLoginRole.vendor:
+            tasks.addAll([
+              db.loadOrganizations(),
+              db.loadUsers(),
+            ]);
+            tasks.add(db.loadOrganizations().then((_) => db.loadSites()));
+            break;
+          case AppLoginRole.analytics:
+          case AppLoginRole.analyticsRole:
+            tasks.addAll([
+              db.loadSensors(),
+              db.loadDevices(),
+              db.loadThresholdValues(),
+            ]);
+            break;
+        }
+        tasks.add(_refreshAlerts());
+        break;
+      case 'organizations':
+      case 'map':
         tasks.addAll([
           db.loadOrganizations(),
+        ]);
+        tasks.add(db.loadOrganizations().then((_) => db.loadSites()));
+        break;
+      case 'users':
+        tasks.addAll([
+          db.loadOrganizations(),
+          db.loadDevices(),
+          db.loadSensors(),
           db.loadUsers(),
+        ]);
+        tasks.add(db.loadOrganizations().then((_) => db.loadSites()));
+        break;
+      case 'devices':
+        tasks.addAll([
+          db.loadOrganizations(),
           db.loadDevices(),
         ]);
-        tasks.add(
-          db.loadOrganizations().then((_) => db.loadSites()),
-        );
+        tasks.add(db.loadOrganizations().then((_) => db.loadSites()));
         break;
-      case AppLoginRole.userAdmin:
+      case 'sensors':
         tasks.addAll([
-          db.loadUsers(),
-          db.loadOrganizations(),
+          db.loadDevices(),
+          db.loadSensors(),
+          db.loadSensorTypes(),
         ]);
-        tasks.add(
-          db.loadOrganizations().then((_) => db.loadSites()),
-        );
         break;
-      case AppLoginRole.user:
+      case 'alerts':
+        tasks.addAll([
+          db.loadThresholdValues(),
+          db.loadSensorTypes(),
+          db.loadSensorParameters(),
+          _refreshAlerts(),
+        ]);
+        break;
+      case 'analytics':
+      case 'liveAnalytics':
         tasks.addAll([
           db.loadSensors(),
           db.loadDevices(),
-        ]);
-        tasks.add(
-          db.loadOrganizations().then((_) => db.loadSites()),
-        );
-        break;
-      case AppLoginRole.engineer:
-        tasks.addAll([
-          db.loadDevices(),
-          db.loadSensors(),
+          db.loadThresholdValues(),
         ]);
         break;
-      case AppLoginRole.vendor:
-        tasks.addAll([
-          db.loadOrganizations(),
-          db.loadUsers(),
-        ]);
-        break;
-      case AppLoginRole.analytics:
-      case AppLoginRole.analyticsRole:
-        tasks.addAll([
-          db.loadSensors(),
-          db.loadDevices(),
-        ]);
+      default:
         break;
     }
-
-    tasks.add(_refreshAlerts());
 
     try {
       await Future.wait(tasks);
@@ -188,10 +237,8 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
     final resolved =
         _allowedViews.contains(normalized) ? normalized : 'dashboard';
     if (_currentView == resolved) return;
-    if (resolved == 'alerts') {
-      _refreshAlerts();
-    }
     setState(() => _currentView = resolved);
+    unawaited(_warmViewData(resolved));
     if (!context.isDesktopLayout) closeMenu();
   }
 

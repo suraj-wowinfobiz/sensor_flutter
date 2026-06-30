@@ -37,6 +37,18 @@ class _SessionCheckScreenState extends State<SessionCheckScreen> {
 
       if (token != null && token.isNotEmpty) {
         await ApiClient.setAuthToken(token);
+        try {
+          await ApiClient.get('/api/v1/auth/me');
+        } catch (_) {
+          await AppSession.clearSession();
+          if (!mounted) return;
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(
+              builder: (_) => const MainPage(),
+            ),
+          );
+          return;
+        }
       }
 
       Widget? targetPage;

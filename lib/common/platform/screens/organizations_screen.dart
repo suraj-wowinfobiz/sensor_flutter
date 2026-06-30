@@ -43,8 +43,10 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
 
   Future<void> _loadData() async {
     final db = ref.read(superAdminBackendChangeNotifierProvider);
-    await db.loadOrganizations();
-    await db.loadSites();
+    await Future.wait([
+      db.loadOrganizations(),
+      db.loadOrganizations().then((_) => db.loadSites()),
+    ]);
     final firstOrgId =
         db.organizations.isNotEmpty ? db.organizations.first.id : null;
     final firstSiteId = db.sites

@@ -7,13 +7,16 @@ import '../core/api/admin_api_config.dart';
 class OrgServiceApi {
   static String get baseUrl => '${AdminApiConfig.apiV1Base}/org';
   static const String _tokenStorageKey = 'platform_auth_token';
+  static const String _sessionTokenStorageKey = 'app_session_token';
   static const Duration _requestDeadline = Duration(seconds: 30);
 
   static Future<Map<String, String>> _headers({bool json = false}) async {
     final headers = <String, String>{};
     if (json) headers['Content-Type'] = 'application/json';
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(_tokenStorageKey)?.trim();
+    final token = (prefs.getString(_tokenStorageKey) ??
+            prefs.getString(_sessionTokenStorageKey))
+        ?.trim();
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }

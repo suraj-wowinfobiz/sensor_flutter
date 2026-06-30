@@ -6,6 +6,7 @@ class ApiClient {
   ApiClient._();
 
   static const String _tokenStorageKey = 'platform_auth_token';
+  static const String _sessionTokenStorageKey = 'app_session_token';
   static const Duration _requestDeadline = Duration(seconds: 30);
   static String? _authToken;
   static bool _tokenLoaded = false;
@@ -28,7 +29,8 @@ class ApiClient {
     _dio.options.baseUrl = AdminApiConfig.baseUrl;
     if (_tokenLoaded) return;
     final prefs = await SharedPreferences.getInstance();
-    _authToken = prefs.getString(_tokenStorageKey);
+    _authToken = prefs.getString(_tokenStorageKey) ??
+        prefs.getString(_sessionTokenStorageKey);
     _tokenLoaded = true;
     _applyAuthorizationHeader();
   }
