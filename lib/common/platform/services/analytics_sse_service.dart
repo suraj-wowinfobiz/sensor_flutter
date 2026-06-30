@@ -7,6 +7,7 @@ import '../core/api/admin_api_config.dart';
 
 class AnalyticsSseService {
   static const String _tokenStorageKey = 'platform_auth_token';
+  static const String _sessionTokenStorageKey = 'app_session_token';
 
   final StreamController<dynamic> _controller =
       StreamController<dynamic>.broadcast();
@@ -60,7 +61,9 @@ class AnalyticsSseService {
       request.headers['Accept'] = 'text/event-stream';
       request.headers['Cache-Control'] = 'no-cache';
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(_tokenStorageKey)?.trim();
+      final token = (prefs.getString(_tokenStorageKey) ??
+              prefs.getString(_sessionTokenStorageKey))
+          ?.trim();
       if (token != null && token.isNotEmpty) {
         request.headers['Authorization'] = 'Bearer $token';
       }

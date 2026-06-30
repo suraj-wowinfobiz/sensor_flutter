@@ -10,6 +10,7 @@ class GenericSseService {
   GenericSseService(this.endpointPath);
 
   static const String _tokenStorageKey = 'platform_auth_token';
+  static const String _sessionTokenStorageKey = 'app_session_token';
 
   final String endpointPath;
   final StreamController<dynamic> _controller =
@@ -62,7 +63,9 @@ class GenericSseService {
       request.headers['Accept'] = 'text/event-stream';
       request.headers['Cache-Control'] = 'no-cache';
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(_tokenStorageKey)?.trim();
+      final token = (prefs.getString(_tokenStorageKey) ??
+              prefs.getString(_sessionTokenStorageKey))
+          ?.trim();
       if (token != null && token.isNotEmpty) {
         request.headers['Authorization'] = 'Bearer $token';
       }
