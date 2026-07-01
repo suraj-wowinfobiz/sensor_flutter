@@ -21,29 +21,27 @@ class _SessionCheckScreenState extends State<SessionCheckScreen> {
   }
 
   Future<void> _checkSession() async {
-    final isValid = await AppSession.isSessionValid();
+    final sessionData = await AppSession.getSessionData();
+    final role = sessionData['role']?.trim() ?? '';
+    final token = sessionData['token']?.trim() ?? '';
 
     if (!mounted) return;
 
-    if (isValid) {
-      final sessionData = await AppSession.getSessionData();
-      final role = sessionData['role'];
-      final token = sessionData['token'];
-
-      if (token != null && token.isNotEmpty) {
-        await ApiClient.setAuthToken(token);
-        try {
-          await ApiClient.get('/api/v1/auth/me');
-        } catch (_) {
-          await AppSession.clearSession();
-          if (!mounted) return;
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute<void>(
-              builder: (_) => const MainPage(),
-            ),
-          );
-          return;
-        }
+    if (token.isNotEmpty) {
+      await ApiClient.setAuthToken(token);
+      try {
+        await ApiClient.get('/api/v1/auth/me').timeout(
+          const Duration(seconds: 6),
+        );
+      } catch (_) {
+        await AppSession.clearSession();
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(
+            builder: (_) => const MainPage(),
+          ),
+        );
+        return;
       }
 
       Widget? targetPage;
@@ -79,6 +77,8 @@ class _SessionCheckScreenState extends State<SessionCheckScreen> {
         );
         return;
       }
+
+      await AppSession.clearSession();
     }
 
     if (mounted) {

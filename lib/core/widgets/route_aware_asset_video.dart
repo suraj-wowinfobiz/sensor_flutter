@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -12,12 +13,14 @@ class RouteAwareAssetVideo extends StatefulWidget {
     required this.fallbackAsset,
     this.fit = BoxFit.cover,
     this.startDelay = const Duration(milliseconds: 600),
+    this.disableVideoOnWeb = true,
   });
 
   final String videoAsset;
   final String fallbackAsset;
   final BoxFit fit;
   final Duration startDelay;
+  final bool disableVideoOnWeb;
 
   @override
   State<RouteAwareAssetVideo> createState() => _RouteAwareAssetVideoState();
@@ -33,6 +36,15 @@ class _RouteAwareAssetVideoState extends State<RouteAwareAssetVideo>
   bool _initializing = false;
 
   bool get _shouldPlay => _appResumed && _routeVisible;
+
+  bool _shouldUseFallbackOnly(BuildContext context) {
+    final mediaQuery = MediaQuery.maybeOf(context);
+    final disableAnimations = mediaQuery?.disableAnimations ?? false;
+    if (disableAnimations) return true;
+    if (widget.disableVideoOnWeb && kIsWeb) return true;
+    if (kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) return true;
+    return false;
+  }
 
   @override
   void initState() {
@@ -82,6 +94,10 @@ class _RouteAwareAssetVideoState extends State<RouteAwareAssetVideo>
   }
 
   void _syncPlaybackState() {
+    if (_shouldUseFallbackOnly(context)) {
+      _startTimer?.cancel();
+      return;
+    }
     final controller = _controller;
     if (!_shouldPlay) {
       _startTimer?.cancel();
@@ -102,7 +118,11 @@ class _RouteAwareAssetVideoState extends State<RouteAwareAssetVideo>
   }
 
   Future<void> _initializeVideo() async {
-    if (!mounted || !_shouldPlay || _controller != null || _initializing) {
+    if (!mounted ||
+        !_shouldPlay ||
+        _controller != null ||
+        _initializing ||
+        _shouldUseFallbackOnly(context)) {
       return;
     }
 
@@ -147,6 +167,13 @@ class _RouteAwareAssetVideoState extends State<RouteAwareAssetVideo>
 
   @override
   Widget build(BuildContext context) {
+    if (_shouldUseFallbackOnly(context)) {
+      return Image.asset(
+        widget.fallbackAsset,
+        fit: widget.fit,
+        filterQuality: FilterQuality.low,
+      );
+    }
     final controller = _controller;
     if (controller != null && controller.value.isInitialized) {
       return FittedBox(
@@ -165,7 +192,7 @@ class _RouteAwareAssetVideoState extends State<RouteAwareAssetVideo>
     return Image.asset(
       widget.fallbackAsset,
       fit: widget.fit,
-      filterQuality: FilterQuality.medium,
+      filterQuality: FilterQuality.low,
     );
   }
 }

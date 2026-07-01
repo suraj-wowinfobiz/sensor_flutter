@@ -173,6 +173,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         db.loadSensors(),
         db.loadUsers(),
       ]);
+      final siteIds = db.sites.map((site) => site.id).toList(growable: false);
+      await Future.wait(siteIds.map((siteId) => db.loadZones(siteId)));
     } catch (_) {
       // Best-effort preload for dashboard tables.
     }
@@ -494,11 +496,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final statsApi = ref.watch(superAdminDashboardStatsApiProvider).valueOrNull;
     final organizationsCount = (db.organizations as List).length;
     final sitesCount = (db.sites as List).length;
+    final zonesCount = (db.zones as List).length;
     final devicesCount = (db.devices as List).length;
-    final activeOrganizationsCount = (db.organizations as List)
-        .where(
-            (item) => (item.status as String).trim().toLowerCase() == 'active')
-        .length;
+    final usersCount = (db.users as List).length;
+    final sensorsCount = (db.sensors as List).length;
     final onlineDevicesCount = (db.devices as List).where((item) {
       final status = (item.status as String).trim().toLowerCase();
       return status == 'active' ||
@@ -515,50 +516,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       return level.contains('critical') || level.contains('high');
     }).length;
     final platformUpdateAt = _latestPlatformUpdateAt(db) ?? DateTime.now();
-    final vendorSeries = _dailySpotsFromDates(
-      (db.users as List).where((item) {
-        final role = (item.role as String).trim().toLowerCase();
-        return role.contains('vendor');
-      }).map((item) => item.createdAt as DateTime),
+    final usersSeries = _dailySpotsFromDates(
+      (db.users as List).map((item) => item.createdAt as DateTime),
       days: 30,
     );
-    final engineerSeries = _dailySpotsFromDates(
-      (db.users as List).where((item) {
-        final role = (item.role as String).trim().toLowerCase();
-        return role.contains('engineer');
-      }).map((item) => item.createdAt as DateTime),
+    final sensorsSeries = _dailySpotsFromDates(
+      (db.sensors as List).map((item) => item.installedAt as DateTime),
       days: 30,
-    );
-    final userRoleSeries = _dailySpotsFromDates(
-      (db.users as List).where((item) {
-        final role = (item.role as String).trim().toLowerCase();
-        return role.contains('user') && !role.contains('admin');
-      }).map((item) => item.createdAt as DateTime),
-      days: 30,
-    );
-    final criticalSeries = _dailySpotsFromDates(
-      (db.alerts as List).where((item) {
-        final level = (item.alertLevel as String).trim().toLowerCase();
-        return level.contains('critical') || level.contains('high');
-      }).map((item) => item.triggeredAt as DateTime),
-      days: 14,
-    );
-    final warningSeries = _dailySpotsFromDates(
-      (db.alerts as List).where((item) {
-        final level = (item.alertLevel as String).trim().toLowerCase();
-        return level.contains('warning') || level.contains('warn');
-      }).map((item) => item.triggeredAt as DateTime),
-      days: 14,
-    );
-    final infoSeries = _dailySpotsFromDates(
-      (db.alerts as List).where((item) {
-        final level = (item.alertLevel as String).trim().toLowerCase();
-        return !(level.contains('critical') ||
-            level.contains('high') ||
-            level.contains('warning') ||
-            level.contains('warn'));
-      }).map((item) => item.triggeredAt as DateTime),
-      days: 14,
     );
     final openAlerts = (db.alerts as List)
         .where((item) => item.resolvedAt == null)
@@ -571,8 +535,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final infoAlerts = openAlerts.length - criticalAlerts - warningAlerts;
     final content = OpsPage(
       title: 'Dashboard',
-      subtitle:
-          'Platform-wide overview of organizations, devices, alerts, onboarding, and live sensor analytics',
+      subtitle: 'Platform-wide monitoring and configuration.',
       actions: [
         OutlinedButton.icon(
           onPressed: () {},
@@ -599,8 +562,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               OpsKpiCard(
                 label: 'Organizations',
                 value: '$organizationsCount',
-                helper: '$activeOrganizationsCount active',
-                icon: Icons.apartment_rounded,
+                helper: 'Platform-wide organization count',
+                icon: Icons.business_outlined,
+              ),
+              OpsKpiCard(
+                label: 'Users',
+                value: '$usersCount',
+                helper: 'Accounts on the platform',
+                icon: Icons.people_outline_rounded,
+                color: OpsColors.success,
+              ),
+              OpsKpiCard(
+                label: 'Devices',
+                value: '$devicesCount',
+                helper: 'Connected platform devices',
+                icon: Icons.devices_other_outlined,
+                color: OpsColors.warning,
               ),
               OpsKpiCard(
                 label: 'Sites',
@@ -609,33 +586,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 icon: Icons.location_city_outlined,
               ),
               OpsKpiCard(
-                label: 'Devices',
-                value: '$devicesCount',
-                helper: '$onlineDevicesCount online',
-                icon: Icons.devices_other_rounded,
-                color: OpsColors.success,
+                label: 'Sensors',
+                value: '$sensorsCount',
+                helper: 'Sensors visible on the platform',
+                icon: Icons.sensors_outlined,
+                color: OpsColors.primaryContainer,
               ),
               OpsKpiCard(
                 label: 'Active Alerts',
                 value: '$activeAlerts',
-                helper: '$criticalAlerts critical',
+                helper: '$criticalAlerts critical • $zonesCount zones',
                 icon: Icons.warning_amber_rounded,
                 color: OpsColors.danger,
-              ),
-              OpsKpiCard(
-                label: 'Vendors',
-                value:
-                    '${db.users.where((u) => u.role.toLowerCase().contains('vendor')).length}',
-                helper: 'Partner accounts',
-                icon: Icons.storefront_outlined,
-              ),
-              OpsKpiCard(
-                label: 'Engineers',
-                value:
-                    '${db.users.where((u) => u.role.toLowerCase().contains('engineer')).length}',
-                helper: 'Field & support',
-                icon: Icons.engineering_outlined,
-                color: OpsColors.primaryContainer,
               ),
             ],
           ),
@@ -705,13 +667,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 child: _AdminOverviewTable(db: db),
               );
               final trend = OpsPanel(
-                title: 'User Role Onboarding Trend',
+                title: 'Platform Growth Trend',
                 padding: const EdgeInsets.all(24),
                 child: _AdminHealthTrend(
-                  firstLabel: 'Vendors',
-                  secondLabel: 'Engineers',
-                  firstValues: _seriesPercentages(vendorSeries),
-                  secondValues: _seriesPercentages(engineerSeries),
+                  firstLabel: 'Users',
+                  secondLabel: 'Sensors',
+                  firstValues: _seriesPercentages(usersSeries),
+                  secondValues: _seriesPercentages(sensorsSeries),
                   bottomLabels: _dayLabels(7),
                 ),
               );
@@ -751,13 +713,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     Expanded(
                       flex: 4,
                       child: OpsPanel(
-                        title: 'User Role Onboarding Trend',
+                        title: 'Platform Growth Trend',
                         padding: const EdgeInsets.all(24),
                         child: _AdminHealthTrend(
-                          firstLabel: 'Vendors',
-                          secondLabel: 'Engineers',
-                          firstValues: _seriesPercentages(vendorSeries),
-                          secondValues: _seriesPercentages(engineerSeries),
+                          firstLabel: 'Users',
+                          secondLabel: 'Sensors',
+                          firstValues: _seriesPercentages(usersSeries),
+                          secondValues: _seriesPercentages(sensorsSeries),
                           bottomLabels: _dayLabels(7),
                         ),
                       ),

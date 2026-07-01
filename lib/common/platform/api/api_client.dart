@@ -71,8 +71,6 @@ class ApiClient {
           queryParameters: queryParameters,
         )
         .timeout(_requestDeadline);
-    print(
-        '🌐 GET $path -> statusCode=${response.statusCode}, data=${response.data}');
     return ApiEnvelope.fromResponse(response.data);
   }
 
