@@ -1315,6 +1315,7 @@ class _LoginHeroImage extends StatelessWidget {
       videoAsset: videoAsset,
       fallbackAsset: fallbackAsset,
       startDelay: const Duration(milliseconds: 700),
+      disableVideoOnWeb: false,
     );
   }
 }

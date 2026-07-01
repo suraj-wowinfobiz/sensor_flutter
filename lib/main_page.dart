@@ -67,6 +67,7 @@ class _MainPageState extends State<MainPage> {
     return const RouteAwareAssetVideo(
       videoAsset: 'assets/images/background.mp4',
       fallbackAsset: 'assets/images/construction.jpg',
+      disableVideoOnWeb: false,
     );
   }
 
