@@ -93,7 +93,7 @@ class _AppRoot extends ConsumerWidget {
                 allowRoleSelection: false,
               ),
           '/login/admin': (context) => const GlobalLoginScreen(
-                initialRole: AppLoginRole.admin,
+                initialRole: AppLoginRole.userAdmin,
                 allowRoleSelection: false,
               ),
           '/login/super-admin': (context) => const GlobalLoginScreen(

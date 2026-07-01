@@ -38,7 +38,10 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
   final List<FlSpot> _processedAccelerationData = <FlSpot>[];
   final List<FlSpot> _analyzedVelocityData = <FlSpot>[];
   final List<FlSpot> _analyzedAccelerationData = <FlSpot>[];
-  final List<FlSpot> _configuredMetricData = <FlSpot>[];
+  final Map<String, List<FlSpot>> _configuredMetricSeries =
+      <String, List<FlSpot>>{};
+  final Set<String> _rawHydratedReadingIds = <String>{};
+  final Set<String> _configuredHydratedReadingIds = <String>{};
 
   GenericSseService? _rawSseService;
   GenericSseService? _processedSseService;
@@ -67,7 +70,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
   String _resolvedAnalyticsEndpoint = '';
   String _sensorName = 'Workspace Sensor';
   String _primarySensorId = '';
-  SensorParameter? _configuredParameter;
+  List<SensorParameter> _configuredParameters = const <SensorParameter>[];
   Set<String> _assignedSensorIds = <String>{};
   bool _sensorAccessLoaded = false;
   String? _sensorAccessError;
@@ -118,9 +121,9 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     }
 
     if (scopedSensors.isEmpty) {
-    _sensorName = sensorAccessError == null
-        ? 'No assigned sensors'
-        : 'Sensor access unavailable';
+      _sensorName = sensorAccessError == null
+          ? 'No assigned sensors'
+          : 'Sensor access unavailable';
       _primarySensorId = '';
       _rawEndpointPath = '';
       _processedEndpointPath = '';
@@ -143,14 +146,38 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
         ? '/api/v1/analytics/events/live'
         : '/api/v1/analytics/events/live/${sensor.endpointKey.trim()}/{userId}';
     final currentUserId = await AppSession.currentPrincipalId();
-    _resolvedRawEndpoint = _replaceUserIdPlaceholder(_rawEndpointPath, currentUserId);
+    _resolvedRawEndpoint =
+        _replaceUserIdPlaceholder(_rawEndpointPath, currentUserId);
     _resolvedAnalyticsEndpoint =
         _replaceUserIdPlaceholder(_analyticsEndpointPath, currentUserId);
     final matchingParameters = db.sensorParameters
-        .where((parameter) => parameter.id.trim() == sensor.sensorParameterId.trim())
-        .toList();
-    _configuredParameter =
-        matchingParameters.isEmpty ? null : matchingParameters.first;
+        .where((parameter) =>
+            parameter.sensorTypeId.trim() == sensor.sensorTypeId.trim())
+        .where((parameter) => parameter.formulaType.trim().isNotEmpty)
+        .toList()
+      ..sort((left, right) {
+        final selectedId = sensor.sensorParameterId.trim();
+        final leftSelected = left.id.trim() == selectedId;
+        final rightSelected = right.id.trim() == selectedId;
+        if (leftSelected != rightSelected) {
+          return leftSelected ? -1 : 1;
+        }
+        final useCompare = left.useFor.trim().toLowerCase().compareTo(
+              right.useFor.trim().toLowerCase(),
+            );
+        if (useCompare != 0) return useCompare;
+        return left.name.trim().toLowerCase().compareTo(
+              right.name.trim().toLowerCase(),
+            );
+      });
+    _configuredParameters = matchingParameters;
+    _configuredMetricSeries
+      ..clear()
+      ..addEntries(
+        matchingParameters.map(
+          (parameter) => MapEntry(parameter.id.trim(), <FlSpot>[]),
+        ),
+      );
   }
 
   String _replaceUserIdPlaceholder(String value, String userId) {
@@ -178,8 +205,12 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
   }
 
   String _sensorLabel(Sensor sensor) {
-    if (sensor.name.trim().isNotEmpty) return sensor.name.trim();
-    if (sensor.serialNumber.trim().isNotEmpty) return sensor.serialNumber.trim();
+    if (sensor.name.trim().isNotEmpty) {
+      return sensor.name.trim();
+    }
+    if (sensor.serialNumber.trim().isNotEmpty) {
+      return sensor.serialNumber.trim();
+    }
     return 'Workspace Sensor';
   }
 
@@ -199,16 +230,10 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     _rawSubscription = _rawSseService!.stream.listen((data) {
       if (!mounted) return;
       if (!_matchesPrimarySensor(data)) return;
+      _hydrateRawAndConfiguredSeries(data);
       final xyz = _extractRawXyz(data);
       if (xyz == null) return;
       setState(() {
-        _appendPoint(_rawXData, _rawIndex, xyz.$1);
-        _appendPoint(_rawYData, _rawIndex, xyz.$2);
-        _appendPoint(_rawZData, _rawIndex, xyz.$3);
-        final configuredMetric = _computeConfiguredMetric(xyz.$1, xyz.$2, xyz.$3);
-        if (configuredMetric != null) {
-          _appendPoint(_configuredMetricData, _rawIndex, configuredMetric);
-        }
         _rawIndex = _rawXData.length;
       });
     });
@@ -217,16 +242,16 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     _processedSubscription = _processedSseService!.stream.listen((data) {
       if (!mounted) return;
       if (!_matchesPrimarySensor(data)) return;
+      _hydrateRawAndConfiguredSeries(data);
       final snapshot = _extractProcessedSnapshot(data);
       if (snapshot == null) return;
       final nowSec = DateTime.now().millisecondsSinceEpoch / 1000.0;
       final dt = (_previousProcessedTimestampSec == null)
           ? null
           : nowSec - _previousProcessedTimestampSec!;
-      final velocity =
-          (_previousProcessedTilt == null || dt == null || dt <= 0)
-              ? 0.0
-              : (snapshot.tilt - _previousProcessedTilt!) / dt;
+      final velocity = (_previousProcessedTilt == null || dt == null || dt <= 0)
+          ? 0.0
+          : (snapshot.tilt - _previousProcessedTilt!) / dt;
       final acceleration =
           (_previousProcessedVelocity == null || dt == null || dt <= 0)
               ? 0.0
@@ -250,15 +275,15 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     _analyticsSubscription = _analyticsSseService!.stream.listen((data) {
       if (!mounted) return;
       if (!_matchesPrimarySensor(data)) return;
+      _hydrateRawAndConfiguredSeries(data);
       final snapshot = _extractAnalyzedSnapshot(data);
       if (snapshot == null) return;
       final dt = (_previousAnalyzedTimestamp == null)
           ? null
           : _deltaSeconds(snapshot.timestamp - _previousAnalyzedTimestamp!);
-      final velocity =
-          (_previousAnalyzedTilt == null || dt == null || dt <= 0)
-              ? 0.0
-              : (snapshot.tilt - _previousAnalyzedTilt!) / dt;
+      final velocity = (_previousAnalyzedTilt == null || dt == null || dt <= 0)
+          ? 0.0
+          : (snapshot.tilt - _previousAnalyzedTilt!) / dt;
       final acceleration =
           (_previousAnalyzedVelocity == null || dt == null || dt <= 0)
               ? 0.0
@@ -361,8 +386,9 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
 
     final rawPayload = map['rawPayload'];
     if (rawPayload is Map) {
-      final rawSensorId =
-          (rawPayload['sensorId'] ?? rawPayload['sensor_id'])?.toString().trim();
+      final rawSensorId = (rawPayload['sensorId'] ?? rawPayload['sensor_id'])
+          ?.toString()
+          .trim();
       if (rawSensorId != null && rawSensorId.isNotEmpty) return rawSensorId;
     }
 
@@ -442,6 +468,58 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     return null;
   }
 
+  void _hydrateRawAndConfiguredSeries(dynamic payload) {
+    final readingId = _readingIdFromPayload(payload);
+    final shouldHydrateRaw =
+        readingId == null || !_rawHydratedReadingIds.contains(readingId);
+    final shouldHydrateConfigured =
+        readingId == null || !_configuredHydratedReadingIds.contains(readingId);
+    final context = _extractFormulaContext(payload);
+
+    if (!shouldHydrateRaw && !shouldHydrateConfigured) {
+      return;
+    }
+
+    if (context == null) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      if (shouldHydrateRaw &&
+          context.x != null &&
+          context.y != null &&
+          context.z != null) {
+        _appendPoint(_rawXData, _rawIndex, context.x!);
+        _appendPoint(_rawYData, _rawIndex, context.y!);
+        _appendPoint(_rawZData, _rawIndex, context.z!);
+        _rawIndex = _rawXData.length;
+        if (readingId != null) {
+          _rawHydratedReadingIds.add(readingId);
+        }
+      }
+
+      if (shouldHydrateConfigured) {
+        var appendedAny = false;
+        for (final parameter in _configuredParameters) {
+          final metric = _computeConfiguredMetric(parameter, context);
+          if (metric == null) continue;
+          final parameterId = parameter.id.trim();
+          final series = _configuredMetricSeries.putIfAbsent(
+              parameterId, () => <FlSpot>[]);
+          _appendPoint(series, series.length, metric);
+          appendedAny = true;
+        }
+        if (appendedAny && readingId != null) {
+          _configuredHydratedReadingIds.add(readingId);
+        }
+      }
+    });
+  }
+
   _AnalyzedSnapshot? _extractAnalyzedSnapshot(dynamic payload) {
     for (final map in _candidateMaps(payload)) {
       final values = <String, double>{};
@@ -461,8 +539,8 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
       if (evaluations is List) {
         for (final item in evaluations) {
           if (item is! Map) continue;
-          final name = item['parameterName']?.toString() ??
-              item['name']?.toString();
+          final name =
+              item['parameterName']?.toString() ?? item['name']?.toString();
           final value = _toDouble(item['value']);
           if (name == null || value == null) continue;
           values[name] = value;
@@ -472,14 +550,14 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
       final processedPayload = map['processedPayload'] is Map
           ? map['processedPayload'] as Map<dynamic, dynamic>
           : null;
-      final tiltPayload = processedPayload != null &&
-              processedPayload['tilt'] is Map
-          ? processedPayload['tilt'] as Map<dynamic, dynamic>
-          : null;
-      final inclinoPayload = processedPayload != null &&
-              processedPayload['inclinometer'] is Map
-          ? processedPayload['inclinometer'] as Map<dynamic, dynamic>
-          : null;
+      final tiltPayload =
+          processedPayload != null && processedPayload['tilt'] is Map
+              ? processedPayload['tilt'] as Map<dynamic, dynamic>
+              : null;
+      final inclinoPayload =
+          processedPayload != null && processedPayload['inclinometer'] is Map
+              ? processedPayload['inclinometer'] as Map<dynamic, dynamic>
+              : null;
 
       final roll = _firstDouble([
         values['rollDegrees'],
@@ -593,26 +671,202 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     return rawDelta;
   }
 
-  double? _computeConfiguredMetric(double x, double y, double z) {
-    final formula = (_configuredParameter?.formulaType ?? '').trim();
+  double? _computeConfiguredMetric(
+    SensorParameter parameter,
+    _FormulaContext context,
+  ) {
+    final formula = parameter.formulaType.trim();
     if (formula.isEmpty) return null;
     switch (formula) {
       case 'x':
-        return x;
+        return context.x;
       case 'y':
-        return y;
+        return context.y;
       case 'z':
-        return z;
+        return context.z;
       case 'average_xyz':
-        return (x + y + z) / 3.0;
+        if (context.x == null || context.y == null || context.z == null) {
+          return null;
+        }
+        return (context.x! + context.y! + context.z!) / 3.0;
       case 'magnitude_xyz':
-        return math.sqrt((x * x) + (y * y) + (z * z));
+        if (context.x == null || context.y == null || context.z == null) {
+          return null;
+        }
+        return math.sqrt(
+          (context.x! * context.x!) +
+              (context.y! * context.y!) +
+              (context.z! * context.z!),
+        );
       case 'tilt_angle_deg':
-        final horizontal = math.sqrt((x * x) + (y * y));
-        return math.atan2(horizontal, z) * 180 / math.pi;
+        if (context.x == null || context.y == null || context.z == null) {
+          return null;
+        }
+        final horizontal = math.sqrt(
+          (context.x! * context.x!) + (context.y! * context.y!),
+        );
+        return math.atan2(horizontal, context.z!) * 180 / math.pi;
       default:
-        return null;
+        return _FormulaParser(
+          expression: formula,
+          variables: context.variables,
+        ).parse();
     }
+  }
+
+  _FormulaContext? _extractFormulaContext(dynamic payload) {
+    for (final map in _candidateMaps(payload)) {
+      final rawPayload = map['rawPayload'];
+      final rawParameters = rawPayload is Map ? rawPayload['parameters'] : null;
+
+      final values = <String, double>{};
+      void collectValue(String key, dynamic value) {
+        final parsed = _toDouble(value);
+        if (parsed != null) {
+          values[key] = parsed;
+        }
+      }
+
+      if (rawParameters is Map) {
+        for (final entry in rawParameters.entries) {
+          collectValue(entry.key.toString(), entry.value);
+        }
+      }
+
+      final parameters = map['parameters'];
+      if (parameters is Map) {
+        for (final entry in parameters.entries) {
+          collectValue(entry.key.toString(), entry.value);
+        }
+      }
+
+      final processedPayload = map['processedPayload'] is Map
+          ? map['processedPayload'] as Map
+          : null;
+      if (processedPayload != null) {
+        _collectNumericValues(values, processedPayload);
+      }
+
+      final eventMap = map['event'];
+      if (eventMap is Map) {
+        _collectNumericValues(values, eventMap);
+      }
+
+      final evaluations =
+          eventMap is Map ? eventMap['evaluations'] : map['evaluations'];
+      if (evaluations is List) {
+        for (final item in evaluations) {
+          if (item is! Map) continue;
+          final name = item['parameterName']?.toString() ??
+              item['name']?.toString() ??
+              '';
+          if (name.isEmpty) continue;
+          collectValue(name, item['value']);
+        }
+      }
+
+      collectValue('x', map['x']);
+      collectValue('y', map['y']);
+      collectValue('z', map['z']);
+
+      final x = _firstDouble([
+        values['x'],
+        values['ax'],
+        values['accelX'],
+        values['acc_x'],
+        values['rawPayload.parameters.x'],
+      ]);
+      final y = _firstDouble([
+        values['y'],
+        values['ay'],
+        values['accelY'],
+        values['acc_y'],
+        values['rawPayload.parameters.y'],
+      ]);
+      final z = _firstDouble([
+        values['z'],
+        values['az'],
+        values['accelZ'],
+        values['acc_z'],
+        values['rawPayload.parameters.z'],
+      ]);
+      final roll = _firstDouble([
+        values['rollDegrees'],
+        values['roll'],
+        values['tilt.rollDegrees'],
+      ]);
+      final pitch = _firstDouble([
+        values['pitchDegrees'],
+        values['pitch'],
+        values['tilt.pitchDegrees'],
+      ]);
+      final tilt = _firstDouble([
+        values['tiltFromVerticalDegrees'],
+        values['inclinationDegrees'],
+        values['tilt'],
+        values['tilt.tiltFromVerticalDegrees'],
+      ]);
+      final horizontalMagnitude = _firstDouble([
+        values['horizontalMagnitude'],
+        values['accelerationMagnitude'],
+      ]);
+
+      final hasAnyValue = x != null ||
+          y != null ||
+          z != null ||
+          roll != null ||
+          pitch != null ||
+          tilt != null ||
+          horizontalMagnitude != null ||
+          values.isNotEmpty;
+      if (!hasAnyValue) {
+        continue;
+      }
+
+      return _FormulaContext(
+        x: x,
+        y: y,
+        z: z,
+        roll: roll,
+        pitch: pitch,
+        tilt: tilt,
+        horizontalMagnitude: horizontalMagnitude,
+        values: values,
+      );
+    }
+    return null;
+  }
+
+  void _collectNumericValues(
+    Map<String, double> target,
+    Map<dynamic, dynamic> source, {
+    String prefix = '',
+  }) {
+    for (final entry in source.entries) {
+      final rawKey = entry.key?.toString().trim() ?? '';
+      if (rawKey.isEmpty) continue;
+      final key = prefix.isEmpty ? rawKey : '$prefix.$rawKey';
+      final value = entry.value;
+      final parsed = _toDouble(value);
+      if (parsed != null) {
+        target[key] = parsed;
+        continue;
+      }
+      if (value is Map) {
+        _collectNumericValues(target, value, prefix: key);
+      }
+    }
+  }
+
+  String? _readingIdFromPayload(dynamic payload) {
+    for (final map in _candidateMaps(payload)) {
+      final readingId =
+          (map['readingId'] ?? map['reading_id'])?.toString().trim();
+      if (readingId != null && readingId.isNotEmpty) {
+        return readingId;
+      }
+    }
+    return null;
   }
 
   double? _timestampToSeconds(dynamic value) {
@@ -644,7 +898,8 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     final db = ref.watch(superAdminBackendChangeNotifierProvider);
     final scopedSensors = _scopedSensors(db);
     final scopedAlerts = _scopedActiveAlerts(db);
-    final scopedDeviceIds = scopedSensors.map((sensor) => sensor.deviceId).toSet();
+    final scopedDeviceIds =
+        scopedSensors.map((sensor) => sensor.deviceId).toSet();
     final assignedDevices = db.devices
         .where((device) => scopedDeviceIds.contains(device.id))
         .toList();
@@ -654,8 +909,8 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
         .toSet();
 
     final activeAlerts = scopedAlerts.length;
-    final avgTilt =
-        _averageAbsolute(_processedTiltData) ?? _averageSensorReading(scopedSensors);
+    final avgTilt = _averageAbsolute(_processedTiltData) ??
+        _averageSensorReading(scopedSensors);
     final maxTilt =
         _maxAbsolute(_processedTiltData) ?? _maxSensorReading(scopedSensors);
     final latestTilt = _processedTiltData.isNotEmpty
@@ -677,8 +932,9 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
         (100 - (activeAlerts * 6) - ((latestTilt?.abs() ?? 0) * 1.8))
             .clamp(0, 100)
             .toDouble();
-    final showNoAssignmentState =
-        _sensorAccessLoaded && _assignedSensorIds.isEmpty && _sensorAccessError == null;
+    final showNoAssignmentState = _sensorAccessLoaded &&
+        _assignedSensorIds.isEmpty &&
+        _sensorAccessError == null;
 
     final content = OpsPage(
       title: 'Dashboard',
@@ -761,14 +1017,13 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          if (_configuredParameter != null &&
-              _configuredParameter!.formulaType.trim().isNotEmpty) ...[
-            _buildConfiguredMetricCard(context),
+          if (_configuredParameters.isNotEmpty) ...[
+            _buildConfiguredMetricsSection(context),
             const SizedBox(height: 16),
           ],
           LayoutBuilder(
             builder: (context, constraints) {
-              final stacked = constraints.maxWidth < 1180;
+              final stacked = constraints.maxWidth < 900;
               final rawCard = _buildSeriesCard(
                 context,
                 title: 'Sensor Live Records',
@@ -819,7 +1074,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
-              final stacked = constraints.maxWidth < 1180;
+              final stacked = constraints.maxWidth < 900;
               final analyzedCard = _buildSeriesCard(
                 context,
                 title: 'Analyzed Live Data',
@@ -866,7 +1121,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
-              final stacked = constraints.maxWidth < 1180;
+              final stacked = constraints.maxWidth < 900;
               final velocityCard = _buildMetricChartCard(
                 context,
                 title: 'Velocity Analytics',
@@ -936,12 +1191,16 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
   }) {
     final allSpots = [...xData, ...yData, ...zData];
     final hasData = allSpots.isNotEmpty;
-    final minY = hasData ? allSpots.map((spot) => spot.y).reduce(math.min) : 0.0;
-    final maxY = hasData ? allSpots.map((spot) => spot.y).reduce(math.max) : 10.0;
+    final minY =
+        hasData ? allSpots.map((spot) => spot.y).reduce(math.min) : 0.0;
+    final maxY =
+        hasData ? allSpots.map((spot) => spot.y).reduce(math.max) : 10.0;
     final span = (maxY - minY).abs();
     final chartMinY = minY - math.max(span * 0.12, 0.5);
     final chartMaxY = maxY + math.max(span * 0.12, 0.5);
-    final maxX = allSpots.isEmpty ? 12.0 : allSpots.map((spot) => spot.x).reduce(math.max);
+    final maxX = allSpots.isEmpty
+        ? 12.0
+        : allSpots.map((spot) => spot.x).reduce(math.max);
 
     return OpsPanel(
       title: title,
@@ -972,7 +1231,8 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
                       gridData: FlGridData(
                         drawVerticalLine: false,
                         horizontalInterval:
-                            (((chartMaxY - chartMinY).abs()) / 5).clamp(0.5, 9999),
+                            (((chartMaxY - chartMinY).abs()) / 5)
+                                .clamp(0.5, 9999),
                         getDrawingHorizontalLine: (_) => const FlLine(
                           color: OpsColors.border,
                           strokeWidth: 1,
@@ -1052,15 +1312,61 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     );
   }
 
-  Widget _buildConfiguredMetricCard(BuildContext context) {
-    final parameter = _configuredParameter!;
+  Widget _buildConfiguredMetricsSection(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final twoColumns = constraints.maxWidth >= 900;
+        final children = _configuredParameters
+            .map((parameter) => _buildConfiguredMetricCard(context, parameter))
+            .toList(growable: false);
+
+        if (!twoColumns) {
+          return Column(
+            children: [
+              for (var i = 0; i < children.length; i++) ...[
+                children[i],
+                if (i != children.length - 1) const SizedBox(height: 16),
+              ],
+            ],
+          );
+        }
+
+        return Column(
+          children: [
+            for (var i = 0; i < children.length; i += 2) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: children[i]),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: i + 1 < children.length
+                        ? children[i + 1]
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+              if (i + 2 < children.length) const SizedBox(height: 16),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildConfiguredMetricCard(
+    BuildContext context,
+    SensorParameter parameter,
+  ) {
+    final parameterId = parameter.id.trim();
+    final series = _configuredMetricSeries[parameterId] ?? const <FlSpot>[];
     final title = parameter.calculationName.trim().isEmpty
         ? parameter.name
         : parameter.calculationName.trim();
     final subtitle = parameter.formulaType.trim().isEmpty
         ? 'Configured custom calculation'
         : 'Formula: ${parameter.formulaType}';
-    final hasData = _configuredMetricData.isNotEmpty;
+    final hasData = series.isNotEmpty;
     final graphType = parameter.graphType.trim().isEmpty
         ? 'line'
         : parameter.graphType.trim().toLowerCase();
@@ -1073,23 +1379,29 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
         height: 300,
         child: hasData
             ? (graphType == 'bar'
-                ? _buildConfiguredBarChart()
+                ? _buildConfiguredBarChart(series)
                 : _buildConfiguredLineChart(
-                    label:
-                        title + (parameter.unit.trim().isEmpty ? '' : ' (${parameter.unit.trim()})'),
+                    series: series,
+                    label: title +
+                        (parameter.unit.trim().isEmpty
+                            ? ''
+                            : ' (${parameter.unit.trim()})'),
                   ))
             : _emptyState('Waiting for configured calculation samples...'),
       ),
     );
   }
 
-  Widget _buildConfiguredLineChart({required String label}) {
-    final minY = _configuredMetricData.map((spot) => spot.y).reduce(math.min);
-    final maxY = _configuredMetricData.map((spot) => spot.y).reduce(math.max);
+  Widget _buildConfiguredLineChart({
+    required List<FlSpot> series,
+    required String label,
+  }) {
+    final minY = series.map((spot) => spot.y).reduce(math.min);
+    final maxY = series.map((spot) => spot.y).reduce(math.max);
     final span = (maxY - minY).abs();
     final chartMinY = minY - math.max(span * 0.12, 0.5);
     final chartMaxY = maxY + math.max(span * 0.12, 0.5);
-    final maxX = _configuredMetricData.map((spot) => spot.x).reduce(math.max);
+    final maxX = series.map((spot) => spot.x).reduce(math.max);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1127,11 +1439,13 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
                 ),
               ),
               titlesData: const FlTitlesData(
-                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles:
+                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles:
+                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
               ),
               lineBarsData: [
-                _lineBar(_configuredMetricData, const Color(0xFF8E44EC)),
+                _lineBar(series, const Color(0xFF8E44EC)),
               ],
             ),
           ),
@@ -1140,8 +1454,8 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     );
   }
 
-  Widget _buildConfiguredBarChart() {
-    final latest = _configuredMetricData.last.y;
+  Widget _buildConfiguredBarChart(List<FlSpot> series) {
+    final latest = series.last.y;
     return BarChart(
       BarChartData(
         alignment: BarChartAlignment.center,
@@ -1194,7 +1508,8 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     final span = (maxY - minY).abs();
     final chartMinY = minY - math.max(span * 0.14, 0.3);
     final chartMaxY = maxY + math.max(span * 0.14, 0.3);
-    final maxX = all.isEmpty ? 12.0 : all.map((spot) => spot.x).reduce(math.max);
+    final maxX =
+        all.isEmpty ? 12.0 : all.map((spot) => spot.x).reduce(math.max);
 
     return OpsPanel(
       title: title,
@@ -1294,7 +1609,8 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     final items = <({String label, String value, String helper})>[
       (
         label: 'Latest Tilt',
-        value: latestTilt == null ? '--' : '${latestTilt.toStringAsFixed(2)} deg',
+        value:
+            latestTilt == null ? '--' : '${latestTilt.toStringAsFixed(2)} deg',
         helper: 'Most recent processed or analyzed tilt',
       ),
       (
@@ -1313,12 +1629,15 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
       ),
       (
         label: 'Workspace',
-        value: '$totalSensors sensors / $totalDevices devices / $totalSites sites',
+        value:
+            '$totalSensors sensors / $totalDevices devices / $totalSites sites',
         helper: '$activeAlerts active alerts across assigned sensors',
       ),
       (
         label: 'Raw SSE',
-        value: _resolvedRawEndpoint.isEmpty ? _rawEndpointPath : _resolvedRawEndpoint,
+        value: _resolvedRawEndpoint.isEmpty
+            ? _rawEndpointPath
+            : _resolvedRawEndpoint,
         helper: 'Current raw stream endpoint',
       ),
       (
@@ -1444,9 +1763,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
 
   double _maxSensorReading(List<Sensor> sensors) {
     if (sensors.isEmpty) return 0.0;
-    return sensors
-        .map((sensor) => sensor.lastReading.abs())
-        .reduce(math.max);
+    return sensors.map((sensor) => sensor.lastReading.abs()).reduce(math.max);
   }
 
   double? _averageAbsolute(List<FlSpot> values) {
@@ -1470,6 +1787,248 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     final hours = minutes ~/ 60;
     if (hours < 24) return '${hours}h ago';
     return '${hours ~/ 24}d ago';
+  }
+}
+
+class _FormulaContext {
+  const _FormulaContext({
+    required this.x,
+    required this.y,
+    required this.z,
+    required this.roll,
+    required this.pitch,
+    required this.tilt,
+    required this.horizontalMagnitude,
+    required this.values,
+  });
+
+  final double? x;
+  final double? y;
+  final double? z;
+  final double? roll;
+  final double? pitch;
+  final double? tilt;
+  final double? horizontalMagnitude;
+  final Map<String, double> values;
+
+  Map<String, double> get variables {
+    final result = <String, double>{...values};
+    void putIfValue(String key, double? value) {
+      if (value != null) {
+        result[key] = value;
+      }
+    }
+
+    putIfValue('x', x);
+    putIfValue('y', y);
+    putIfValue('z', z);
+    putIfValue('roll', roll);
+    putIfValue('rollDegrees', roll);
+    putIfValue('pitch', pitch);
+    putIfValue('pitchDegrees', pitch);
+    putIfValue('tilt', tilt);
+    putIfValue('tiltDegrees', tilt);
+    putIfValue('tiltFromVerticalDegrees', tilt);
+    putIfValue('horizontalMagnitude', horizontalMagnitude);
+    return result;
+  }
+}
+
+class _FormulaParser {
+  _FormulaParser({
+    required this.expression,
+    required this.variables,
+  });
+
+  final String expression;
+  final Map<String, double> variables;
+  int _index = 0;
+
+  double? parse() {
+    try {
+      final value = _parseExpression();
+      _skipWhitespace();
+      if (_index != expression.length) {
+        return null;
+      }
+      return value;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  double _parseExpression() {
+    var value = _parseTerm();
+    while (true) {
+      _skipWhitespace();
+      if (_match('+')) {
+        value += _parseTerm();
+      } else if (_match('-')) {
+        value -= _parseTerm();
+      } else {
+        return value;
+      }
+    }
+  }
+
+  double _parseTerm() {
+    var value = _parseFactor();
+    while (true) {
+      _skipWhitespace();
+      if (_match('*')) {
+        value *= _parseFactor();
+      } else if (_match('/')) {
+        final divisor = _parseFactor();
+        if (divisor == 0) {
+          throw const FormatException('Division by zero');
+        }
+        value /= divisor;
+      } else {
+        return value;
+      }
+    }
+  }
+
+  double _parseFactor() {
+    _skipWhitespace();
+    if (_match('+')) return _parseFactor();
+    if (_match('-')) return -_parseFactor();
+
+    var value = _parsePrimary();
+    _skipWhitespace();
+    while (_match('^')) {
+      value = math.pow(value, _parseFactor()).toDouble();
+      _skipWhitespace();
+    }
+    return value;
+  }
+
+  double _parsePrimary() {
+    _skipWhitespace();
+    if (_match('(')) {
+      final value = _parseExpression();
+      _expect(')');
+      return value;
+    }
+
+    if (_isIdentifierStart(_currentChar)) {
+      final identifier = _parseIdentifier();
+      _skipWhitespace();
+      if (_match('(')) {
+        final args = <double>[];
+        _skipWhitespace();
+        if (!_match(')')) {
+          do {
+            args.add(_parseExpression());
+            _skipWhitespace();
+          } while (_match(','));
+          _expect(')');
+        }
+        return _callFunction(identifier, args);
+      }
+      final normalized = identifier.trim();
+      if (variables.containsKey(normalized)) {
+        return variables[normalized]!;
+      }
+      throw FormatException('Unknown variable: $identifier');
+    }
+
+    return _parseNumber();
+  }
+
+  double _parseNumber() {
+    final start = _index;
+    var hasDot = false;
+    while (_index < expression.length) {
+      final char = expression[_index];
+      if (char == '.') {
+        if (hasDot) break;
+        hasDot = true;
+        _index++;
+        continue;
+      }
+      if (!_isDigit(char)) break;
+      _index++;
+    }
+    if (start == _index) {
+      throw const FormatException('Expected number');
+    }
+    return double.parse(expression.substring(start, _index));
+  }
+
+  String _parseIdentifier() {
+    final start = _index;
+    while (_index < expression.length) {
+      final char = expression[_index];
+      if (!_isIdentifierPart(char)) break;
+      _index++;
+    }
+    return expression.substring(start, _index);
+  }
+
+  double _callFunction(String name, List<double> args) {
+    switch (name.trim().toLowerCase()) {
+      case 'sqrt':
+        return math.sqrt(args.first);
+      case 'abs':
+        return args.first.abs();
+      case 'sin':
+        return math.sin(args.first);
+      case 'cos':
+        return math.cos(args.first);
+      case 'tan':
+        return math.tan(args.first);
+      case 'atan':
+        return math.atan(args.first);
+      case 'atan2':
+        return math.atan2(args[0], args[1]);
+      case 'pow':
+        return math.pow(args[0], args[1]).toDouble();
+      case 'min':
+        return math.min(args[0], args[1]);
+      case 'max':
+        return math.max(args[0], args[1]);
+      default:
+        throw FormatException('Unknown function: $name');
+    }
+  }
+
+  void _skipWhitespace() {
+    while (_index < expression.length && expression[_index].trim().isEmpty) {
+      _index++;
+    }
+  }
+
+  bool _match(String expected) {
+    if (_index >= expression.length || expression[_index] != expected) {
+      return false;
+    }
+    _index++;
+    return true;
+  }
+
+  void _expect(String expected) {
+    if (!_match(expected)) {
+      throw FormatException('Expected $expected');
+    }
+  }
+
+  String? get _currentChar =>
+      _index < expression.length ? expression[_index] : null;
+
+  bool _isDigit(String value) =>
+      value.codeUnitAt(0) >= 48 && value.codeUnitAt(0) <= 57;
+
+  bool _isIdentifierStart(String? value) {
+    if (value == null) return false;
+    final code = value.codeUnitAt(0);
+    return (code >= 65 && code <= 90) ||
+        (code >= 97 && code <= 122) ||
+        value == '_';
+  }
+
+  bool _isIdentifierPart(String value) {
+    return _isIdentifierStart(value) || _isDigit(value) || value == '.';
   }
 }
 

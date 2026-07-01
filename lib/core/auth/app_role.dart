@@ -31,7 +31,7 @@ extension AppLoginRoleX on AppLoginRole {
       case AppLoginRole.user:
         return 'User';
       case AppLoginRole.userAdmin:
-        return 'User Admin';
+        return 'Admin';
       case AppLoginRole.engineer:
         return 'Engineer';
       case AppLoginRole.vendor:
@@ -50,7 +50,7 @@ extension AppLoginRoleX on AppLoginRole {
       case AppLoginRole.user:
         return 'Monitor sensors, devices, alerts, and live site activity.';
       case AppLoginRole.userAdmin:
-        return 'Manage users, organizations, and operational access.';
+        return 'Manage users, alerts, and operational access.';
       case AppLoginRole.engineer:
         return 'Configure devices, sensors, and engineering workflows.';
       case AppLoginRole.vendor:
@@ -69,7 +69,7 @@ extension AppLoginRoleX on AppLoginRole {
       case AppLoginRole.user:
         return 'user@example.com';
       case AppLoginRole.userAdmin:
-        return 'useradmin@example.com';
+        return 'admin@example.com';
       case AppLoginRole.engineer:
         return 'engineer@example.com';
       case AppLoginRole.vendor:
@@ -143,6 +143,8 @@ extension AppLoginRoleX on AppLoginRole {
   String get sessionValue {
     switch (this) {
       case AppLoginRole.admin:
+        return 'super_admin';
+      case AppLoginRole.userAdmin:
         return 'admin';
       default:
         return loginRoleValue;
@@ -183,7 +185,7 @@ extension AppLoginRoleX on AppLoginRole {
       case AppLoginRole.user:
         return 'U';
       case AppLoginRole.userAdmin:
-        return 'UA';
+        return 'AD';
       case AppLoginRole.engineer:
         return 'EN';
       case AppLoginRole.vendor:

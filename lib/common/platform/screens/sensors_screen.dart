@@ -1143,6 +1143,10 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
       color: theme.colorScheme.primary,
       backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
     );
+    final overlayBaseStyle = baseStyle.copyWith(
+      color: Colors.transparent,
+      backgroundColor: Colors.transparent,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1167,7 +1171,7 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
                       text: _buildHighlightedFormulaText(
                         value.text,
                         highlightWords,
-                        baseStyle,
+                        overlayBaseStyle,
                         highlightStyle,
                       ),
                     ),
@@ -1179,7 +1183,7 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
               controller: controller,
               onChanged: onChanged,
               cursorColor: theme.colorScheme.primary,
-              style: baseStyle.copyWith(color: Colors.transparent),
+              style: baseStyle,
               decoration: InputDecoration(
                 hintText: hint,
                 helperText: helperText,

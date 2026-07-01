@@ -58,8 +58,14 @@ class AppSession {
 
     switch (sessionRole) {
       case 'admin':
-        return (prefs.getString('admin_principal_id') ??
+        return (prefs.getString('user_admin_principal_id') ??
+                prefs.getString('admin_principal_id') ??
                 prefs.getString('super_admin_principal_id') ??
+                '')
+            .trim();
+      case 'super_admin':
+        return (prefs.getString('super_admin_principal_id') ??
+                prefs.getString('admin_principal_id') ??
                 '')
             .trim();
       case 'user_admin':

@@ -66,6 +66,8 @@ class _SessionCheckScreenState extends State<SessionCheckScreen> {
               const PlatformShellPage(role: AppLoginRole.analyticsRole);
           break;
         case 'admin':
+          targetPage = const PlatformShellPage(role: AppLoginRole.userAdmin);
+          break;
         case 'super_admin':
           targetPage = const PlatformShellPage(role: AppLoginRole.admin);
           break;
