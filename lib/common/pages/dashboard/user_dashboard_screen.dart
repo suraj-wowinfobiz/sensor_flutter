@@ -241,6 +241,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     await _rawSseService!.connect();
     _rawSubscription = _rawSseService!.stream.listen((data) {
       if (!mounted) return;
+      if (!_isLiveRawReadingPayload(data)) return;
       if (!_matchesPrimarySensor(data)) return;
       if (_hydrateRawAndConfiguredSeries(data)) {
         _scheduleUiRefresh();
@@ -250,6 +251,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     await _processedSseService!.connect();
     _processedSubscription = _processedSseService!.stream.listen((data) {
       if (!mounted) return;
+      if (!_isLiveProcessedReadingPayload(data)) return;
       if (!_matchesPrimarySensor(data)) return;
       final historyChanged = _hydrateRawAndConfiguredSeries(data);
       final snapshot = _extractProcessedSnapshot(data);
@@ -287,6 +289,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     await _analyticsSseService!.connect();
     _analyticsSubscription = _analyticsSseService!.stream.listen((data) {
       if (!mounted) return;
+      if (!_isLiveAnalyticsPayload(data)) return;
       if (!_matchesPrimarySensor(data)) return;
       final historyChanged = _hydrateRawAndConfiguredSeries(data);
       final snapshot = _extractAnalyzedSnapshot(data);
@@ -351,7 +354,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     try {
       final processedResponse = await ApiClient.get(
         '/api/v1/processing/readings',
-        queryParameters: {'sensorId': sensorId},
+        queryParameters: {'sensorId': sensorId, 'limit': _maxChartPoints},
       );
       final processedBody = processedResponse.body;
       final processedRecords =
@@ -410,6 +413,45 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     while (points.length > _maxChartPoints) {
       points.removeAt(0);
     }
+  }
+
+  bool _isLiveRawReadingPayload(dynamic payload) {
+    if (payload is! Map) {
+      return false;
+    }
+    if (payload['type'] != null) {
+      return false;
+    }
+    return _readingIdFromPayload(payload) != null;
+  }
+
+  bool _isLiveProcessedReadingPayload(dynamic payload) {
+    if (payload is! Map) {
+      return false;
+    }
+    if (payload['type'] != null) {
+      return false;
+    }
+    if (_readingIdFromPayload(payload) == null) {
+      return false;
+    }
+    return payload['processedPayload'] is Map;
+  }
+
+  bool _isLiveAnalyticsPayload(dynamic payload) {
+    if (payload is! Map) {
+      return false;
+    }
+    if (payload['type'] != null) {
+      return false;
+    }
+    final eventType = payload['eventType']?.toString().trim();
+    if (eventType != null &&
+        eventType.isNotEmpty &&
+        eventType != 'analytics-live') {
+      return false;
+    }
+    return _readingIdFromPayload(payload) != null;
   }
 
   bool _matchesPrimarySensor(dynamic payload) {
