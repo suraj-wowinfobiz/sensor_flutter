@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/ops_theme.dart';
-import '../../platform/api/analytics_api.dart';
 import '../../platform/api/api_client.dart';
 import '../../platform/models/sensor.dart';
 import '../../platform/models/sensor_parameter.dart';
@@ -252,9 +251,14 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     _processedSubscription = _processedSseService!.stream.listen((data) {
       if (!mounted) return;
       if (!_matchesPrimarySensor(data)) return;
-      _hydrateRawAndConfiguredSeries(data);
+      final historyChanged = _hydrateRawAndConfiguredSeries(data);
       final snapshot = _extractProcessedSnapshot(data);
-      if (snapshot == null) return;
+      if (snapshot == null) {
+        if (historyChanged) {
+          _scheduleUiRefresh();
+        }
+        return;
+      }
       final nowSec = DateTime.now().millisecondsSinceEpoch / 1000.0;
       final dt = (_previousProcessedTimestampSec == null)
           ? null
@@ -267,7 +271,6 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
               ? 0.0
               : (velocity - _previousProcessedVelocity!) / dt;
 
-      _hydrateRawAndConfiguredSeries(data);
       _appendPoint(_processedRollData, _processedIndex, snapshot.roll);
       _appendPoint(_processedPitchData, _processedIndex, snapshot.pitch);
       _appendPoint(_processedTiltData, _processedIndex, snapshot.tilt);
@@ -285,9 +288,14 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     _analyticsSubscription = _analyticsSseService!.stream.listen((data) {
       if (!mounted) return;
       if (!_matchesPrimarySensor(data)) return;
-      _hydrateRawAndConfiguredSeries(data);
+      final historyChanged = _hydrateRawAndConfiguredSeries(data);
       final snapshot = _extractAnalyzedSnapshot(data);
-      if (snapshot == null) return;
+      if (snapshot == null) {
+        if (historyChanged) {
+          _scheduleUiRefresh();
+        }
+        return;
+      }
       final dt = (_previousAnalyzedTimestamp == null)
           ? null
           : _deltaSeconds(snapshot.timestamp - _previousAnalyzedTimestamp!);
@@ -299,7 +307,6 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
               ? 0.0
               : (velocity - _previousAnalyzedVelocity!) / dt;
 
-      _hydrateRawAndConfiguredSeries(data);
       _appendPoint(_analyzedRollData, _analyzedIndex, snapshot.roll);
       _appendPoint(_analyzedPitchData, _analyzedIndex, snapshot.pitch);
       _appendPoint(_analyzedTiltData, _analyzedIndex, snapshot.tilt);
@@ -352,7 +359,8 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
       if (processedRecords is List) {
         for (final item in processedRecords.reversed) {
           if (!_matchesPrimarySensor(item)) continue;
-          historyChanged = _hydrateRawAndConfiguredSeries(item) || historyChanged;
+          historyChanged =
+              _hydrateRawAndConfiguredSeries(item) || historyChanged;
           final snapshot = _extractProcessedSnapshot(item);
           if (snapshot == null) continue;
           final timestampSec =
@@ -387,55 +395,6 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
           _lastProcessedAt = snapshot.receivedAt;
           historyChanged = true;
         }
-      }
-    } catch (_) {
-      // If history is unavailable, the live stream will still populate data.
-    }
-
-    try {
-      final recentEvents = await AnalyticsApi.getRecentEvents(limit: 200);
-      final matchingEvents = recentEvents
-          .where((event) => _matchesPrimarySensor(event))
-          .toList()
-        ..sort((left, right) {
-          final leftTs = _timestampToSeconds(_timestampFromPayload(left)) ?? 0;
-          final rightTs =
-              _timestampToSeconds(_timestampFromPayload(right)) ?? 0;
-          return leftTs.compareTo(rightTs);
-        });
-
-      for (final event in matchingEvents) {
-        historyChanged = _hydrateRawAndConfiguredSeries(event) || historyChanged;
-        final snapshot = _extractAnalyzedSnapshot(event);
-        if (snapshot == null) continue;
-        final dt = (_previousAnalyzedTimestamp == null)
-            ? null
-            : _deltaSeconds(snapshot.timestamp - _previousAnalyzedTimestamp!);
-        final velocity =
-            (_previousAnalyzedTilt == null || dt == null || dt <= 0)
-                ? 0.0
-                : (snapshot.tilt - _previousAnalyzedTilt!) / dt;
-        final acceleration =
-            (_previousAnalyzedVelocity == null || dt == null || dt <= 0)
-                ? 0.0
-                : (velocity - _previousAnalyzedVelocity!) / dt;
-
-        if (!mounted) return;
-        _appendPoint(_analyzedRollData, _analyzedIndex, snapshot.roll);
-        _appendPoint(_analyzedPitchData, _analyzedIndex, snapshot.pitch);
-        _appendPoint(_analyzedTiltData, _analyzedIndex, snapshot.tilt);
-        _appendPoint(_analyzedVelocityData, _analyzedIndex, velocity);
-        _appendPoint(
-          _analyzedAccelerationData,
-          _analyzedIndex,
-          acceleration,
-        );
-        _analyzedIndex++;
-        _previousAnalyzedTilt = snapshot.tilt;
-        _previousAnalyzedTimestamp = snapshot.timestamp;
-        _previousAnalyzedVelocity = velocity;
-        _lastAnalyzedAt = DateTime.now();
-        historyChanged = true;
       }
     } catch (_) {
       // If history is unavailable, the live stream will still populate data.
@@ -554,18 +513,17 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
   }
 
   bool _hydrateRawAndConfiguredSeries(dynamic payload) {
-    final readingId = _readingIdFromPayload(payload);
-    final shouldHydrateRaw =
-        readingId == null || !_rawHydratedReadingIds.contains(readingId);
-    final shouldHydrateConfigured =
-        readingId == null || !_configuredHydratedReadingIds.contains(readingId);
     final context = _extractFormulaContext(payload);
-
-    if (!shouldHydrateRaw && !shouldHydrateConfigured) {
+    if (context == null) {
       return false;
     }
+    final readingKey = _hydrationKeyFromPayload(payload, context);
+    final shouldHydrateRaw =
+        readingKey == null || !_rawHydratedReadingIds.contains(readingKey);
+    final shouldHydrateConfigured = readingKey == null ||
+        !_configuredHydratedReadingIds.contains(readingKey);
 
-    if (context == null) {
+    if (!shouldHydrateRaw && !shouldHydrateConfigured) {
       return false;
     }
 
@@ -578,11 +536,11 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
       _appendPoint(_rawYData, _rawIndex, context.y!);
       _appendPoint(_rawZData, _rawIndex, context.z!);
       _rawIndex++;
-      if (readingId != null) {
+      if (readingKey != null) {
         _rememberHydratedReading(
           _rawHydratedReadingIds,
           _rawHydratedReadingOrder,
-          readingId,
+          readingKey,
         );
       }
       changed = true;
@@ -601,17 +559,45 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
         _configuredMetricIndices[parameterId] = index + 1;
         appendedAny = true;
       }
-      if (appendedAny && readingId != null) {
+      if (appendedAny && readingKey != null) {
         _rememberHydratedReading(
           _configuredHydratedReadingIds,
           _configuredHydratedReadingOrder,
-          readingId,
+          readingKey,
         );
       }
       changed = changed || appendedAny;
     }
 
     return changed;
+  }
+
+  String? _hydrationKeyFromPayload(
+    dynamic payload,
+    _FormulaContext context,
+  ) {
+    final readingId = _readingIdFromPayload(payload);
+    if (readingId != null) {
+      return 'reading:$readingId';
+    }
+
+    final sensorId = _sensorIdFromPayload(payload);
+    final timestamp = _timestampToSeconds(_timestampFromPayload(payload));
+    final parts = <String>[
+      if (sensorId != null && sensorId.isNotEmpty) 'sensor:$sensorId',
+      if (timestamp != null) 'ts:${timestamp.toStringAsFixed(6)}',
+      if (context.x != null) 'x:${context.x!.toStringAsFixed(6)}',
+      if (context.y != null) 'y:${context.y!.toStringAsFixed(6)}',
+      if (context.z != null) 'z:${context.z!.toStringAsFixed(6)}',
+      if (context.roll != null) 'roll:${context.roll!.toStringAsFixed(6)}',
+      if (context.pitch != null) 'pitch:${context.pitch!.toStringAsFixed(6)}',
+      if (context.tilt != null) 'tilt:${context.tilt!.toStringAsFixed(6)}',
+    ];
+
+    if (parts.isEmpty) {
+      return null;
+    }
+    return parts.join('|');
   }
 
   void _rememberHydratedReading(
@@ -978,6 +964,16 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     return null;
   }
 
+  String? _sensorIdFromPayload(dynamic payload) {
+    for (final map in _candidateMaps(payload)) {
+      final sensorId = _sensorIdFromMap(map);
+      if (sensorId != null && sensorId.isNotEmpty) {
+        return sensorId;
+      }
+    }
+    return null;
+  }
+
   dynamic _timestampFromPayload(dynamic payload) {
     for (final map in _candidateMaps(payload)) {
       if (map.containsKey('timestamp')) {
@@ -1326,7 +1322,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
                 ? LineChart(
                     duration: Duration.zero,
                     LineChartData(
-                      clipData: FlClipData.all(),
+                      clipData: const FlClipData.all(),
                       minX: minX,
                       maxX: maxX <= minX ? minX + 1 : maxX,
                       minY: chartMinY,
@@ -1522,7 +1518,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
           child: LineChart(
             duration: Duration.zero,
             LineChartData(
-              clipData: FlClipData.all(),
+              clipData: const FlClipData.all(),
               minX: minX,
               maxX: maxX <= minX ? minX + 1 : maxX,
               minY: chartMinY,
@@ -1613,8 +1609,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     final span = (maxY - minY).abs();
     final chartMinY = minY - math.max(span * 0.14, 0.3);
     final chartMaxY = maxY + math.max(span * 0.14, 0.3);
-    final minX =
-        all.isEmpty ? 0.0 : all.map((spot) => spot.x).reduce(math.min);
+    final minX = all.isEmpty ? 0.0 : all.map((spot) => spot.x).reduce(math.min);
     final maxX =
         all.isEmpty ? 12.0 : all.map((spot) => spot.x).reduce(math.max);
 
@@ -1640,7 +1635,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
                 ? LineChart(
                     duration: Duration.zero,
                     LineChartData(
-                      clipData: FlClipData.all(),
+                      clipData: const FlClipData.all(),
                       minX: minX,
                       maxX: maxX <= minX ? minX + 1 : maxX,
                       minY: chartMinY,
