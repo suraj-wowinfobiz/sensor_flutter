@@ -6,6 +6,7 @@ import '../../../shared/widgets/universal_table.dart';
 import '../api/alerts_api.dart';
 import '../api/sensor_api.dart';
 import '../models/alert.dart';
+import '../models/sensor_parameter.dart';
 import '../providers/super_admin_api_riverpod_provider.dart';
 import '../providers/super_admin_riverpod_provider.dart';
 import '../widgets/crud_modal.dart';
@@ -467,8 +468,10 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
           parameter.name.trim().isEmpty ? parameter.id : parameter.name;
       final calc = parameter.calculationName.trim();
       final unit = parameter.unit.trim();
-      final label = calc.isNotEmpty && calc != base ? '$base ($calc)' : base;
-      return unit.isEmpty ? label : '$label [$unit]';
+      final primary = calc.isNotEmpty ? calc : base;
+      final detail = calc.isNotEmpty && calc != base ? ' · $base' : '';
+      final valueLabel = '$primary$detail';
+      return unit.isEmpty ? valueLabel : '$valueLabel [$unit]';
     }
 
     void applyParameterDefaults(String parameterId) {
@@ -501,8 +504,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
       return '';
     }
 
-    List<Map<String, String>> parameterOptionsForSensor(
-        String selectedSensorId) {
+    List<SensorParameter> parametersForSensor(String selectedSensorId) {
       final typeId = sensorTypeForSelection(selectedSensorId).trim();
       var filtered = db.sensorParameters
           .where((parameter) => parameter.id.trim().isNotEmpty)
@@ -518,6 +520,16 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
             .toList();
       }
       return filtered
+          .where((parameter) =>
+              parameter.name.trim().isNotEmpty ||
+              parameter.calculationName.trim().isNotEmpty)
+          .toList()
+        ..sort((a, b) => parameterLabel(a).compareTo(parameterLabel(b)));
+    }
+
+    List<Map<String, String>> parameterOptionsForSensor(
+        String selectedSensorId) {
+      return parametersForSensor(selectedSensorId)
           .map(
             (parameter) => {
               'value': parameter.id,
@@ -538,10 +550,10 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) {
           return CrudModal(
-            title: 'Add Threshold Value',
+            title: 'Add Sensor Threshold',
             fields: [
               {
-                'label': 'sensorId',
+                'label': 'Sensor',
                 'type': 'select',
                 'value': sensorId.isEmpty ? null : sensorId,
                 'options': db.sensors
@@ -567,7 +579,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                     }),
               },
               {
-                'label': 'sensorParameterId',
+                'label': 'Calculation',
                 'type': 'select',
                 'value': sensorParameterId.isEmpty ? null : sensorParameterId,
                 'options': sensorParameterOptions,
@@ -577,7 +589,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                     }),
               },
               {
-                'label': 'thresholdProfileId',
+                'label': 'Threshold Profile',
                 'type': 'select',
                 'value': thresholdProfileId.isEmpty ? null : thresholdProfileId,
                 'options': db.thresholdProfiles
@@ -595,28 +607,28 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                     }),
               },
               {
-                'label': 'minThresholdValue',
+                'label': 'Minimum Range',
                 'value': minThresholdValue,
                 'onChanged': (String value) =>
                     setDialogState(() => minThresholdValue = value),
                 'keyboardType': TextInputType.number,
               },
               {
-                'label': 'maxThresholdValue',
+                'label': 'Maximum Range',
                 'value': maxThresholdValue,
                 'onChanged': (String value) =>
                     setDialogState(() => maxThresholdValue = value),
                 'keyboardType': TextInputType.number,
               },
               {
-                'label': 'warningLevel',
+                'label': 'Warning Level',
                 'value': warningLevel,
                 'onChanged': (String value) =>
                     setDialogState(() => warningLevel = value),
                 'keyboardType': TextInputType.number,
               },
               {
-                'label': 'criticalLevel',
+                'label': 'Critical Level',
                 'value': criticalLevel,
                 'onChanged': (String value) =>
                     setDialogState(() => criticalLevel = value),
