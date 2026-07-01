@@ -29,6 +29,8 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  static const Duration _uiRefreshInterval = Duration(milliseconds: 120);
+
   final AnalyticsSseService _analyticsSseService = AnalyticsSseService();
   final GenericSseService _rawSseService =
       GenericSseService('/api/v1/ingestion/readings/live');
@@ -67,6 +69,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   StreamSubscription? _analyticsSubscription;
   StreamSubscription? _rawSubscription;
   StreamSubscription? _processedSubscription;
+  Timer? _uiRefreshTimer;
+  bool _uiRefreshScheduled = false;
 
   @override
   void initState() {
@@ -96,21 +100,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           (_previousAnalyzedAngularVelocity == null || dt == null || dt <= 0)
               ? 0.0
               : (angularVelocity - _previousAnalyzedAngularVelocity!) / dt;
-      setState(() {
-        _appendAnalyzedPoint(_analyzedXData, detail.x);
-        _appendAnalyzedPoint(_analyzedYData, detail.y);
-        _appendAnalyzedPoint(_analyzedZData, detail.z);
-        _appendAnalyzedPoint(_analyzedRollData, roll);
-        _appendAnalyzedPoint(_analyzedPitchData, pitch);
-        _appendAnalyzedPoint(_analyzedTiltData, tilt);
-        _appendAnalyzedPoint(_analyzedAngularVelocityData, angularVelocity);
-        _appendAnalyzedPoint(_analyzedAccelerationData, angularAcceleration);
-        _analyzedIndex++;
-        _trimAndReindexAnalyzedSeries();
-        _previousAnalyzedTilt = tilt;
-        _previousAnalyzedTimestamp = detail.streamTimestamp;
-        _previousAnalyzedAngularVelocity = angularVelocity;
-      });
+      _appendAnalyzedPoint(_analyzedXData, detail.x);
+      _appendAnalyzedPoint(_analyzedYData, detail.y);
+      _appendAnalyzedPoint(_analyzedZData, detail.z);
+      _appendAnalyzedPoint(_analyzedRollData, roll);
+      _appendAnalyzedPoint(_analyzedPitchData, pitch);
+      _appendAnalyzedPoint(_analyzedTiltData, tilt);
+      _appendAnalyzedPoint(_analyzedAngularVelocityData, angularVelocity);
+      _appendAnalyzedPoint(_analyzedAccelerationData, angularAcceleration);
+      _analyzedIndex++;
+      _trimAndReindexAnalyzedSeries();
+      _previousAnalyzedTilt = tilt;
+      _previousAnalyzedTimestamp = detail.streamTimestamp;
+      _previousAnalyzedAngularVelocity = angularVelocity;
+      _scheduleUiRefresh();
     });
 
     await _rawSseService.connect();
@@ -118,13 +121,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (!mounted) return;
       final rawValues = _extractXyzValues(data);
       if (rawValues == null) return;
-      setState(() {
-        _appendRawPoint(_rawXData, rawValues.$1);
-        _appendRawPoint(_rawYData, rawValues.$2);
-        _appendRawPoint(_rawZData, rawValues.$3);
-        _rawIndex++;
-        _trimAndReindexRawSeries();
-      });
+      _appendRawPoint(_rawXData, rawValues.$1);
+      _appendRawPoint(_rawYData, rawValues.$2);
+      _appendRawPoint(_rawZData, rawValues.$3);
+      _rawIndex++;
+      _trimAndReindexRawSeries();
+      _scheduleUiRefresh();
     });
 
     await _processedSseService.connect();
@@ -144,29 +146,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           (_previousProcessedAngularVelocity == null || dt == null || dt <= 0)
               ? 0.0
               : (angularVelocity - _previousProcessedAngularVelocity!) / dt;
-      setState(() {
-        _appendProcessedPoint(_processedXData, snapshot.roll);
-        _appendProcessedPoint(_processedYData, snapshot.pitch);
-        _appendProcessedPoint(_processedZData, snapshot.tilt);
-        _appendProcessedPoint(_processedMagnitudeData, snapshot.magnitude);
-        _appendProcessedPoint(_processedAngularVelocityData, angularVelocity);
-        _appendProcessedPoint(_processedAccelerationData, angularAcceleration);
-        if (snapshot.vibrationRms != null) {
-          _appendProcessedPoint(
-              _processedVibrationData, snapshot.vibrationRms!);
-        }
-        _appendProcessedPoint(
-          _processedMotionData,
-          snapshot.motionDetected ? 1 : 0,
-        );
-        _processedIndex++;
-        _processedSnapshots.add(snapshot);
-        _processedSensorIds.add(snapshot.sensorId);
-        _trimAndReindexProcessedSeries();
-        _previousProcessedTilt = snapshot.tilt;
-        _previousProcessedTimestampSec = nowSec;
-        _previousProcessedAngularVelocity = angularVelocity;
-      });
+      _appendProcessedPoint(_processedXData, snapshot.roll);
+      _appendProcessedPoint(_processedYData, snapshot.pitch);
+      _appendProcessedPoint(_processedZData, snapshot.tilt);
+      _appendProcessedPoint(_processedMagnitudeData, snapshot.magnitude);
+      _appendProcessedPoint(_processedAngularVelocityData, angularVelocity);
+      _appendProcessedPoint(_processedAccelerationData, angularAcceleration);
+      if (snapshot.vibrationRms != null) {
+        _appendProcessedPoint(_processedVibrationData, snapshot.vibrationRms!);
+      }
+      _appendProcessedPoint(
+        _processedMotionData,
+        snapshot.motionDetected ? 1 : 0,
+      );
+      _processedIndex++;
+      _processedSnapshots.add(snapshot);
+      _processedSensorIds.add(snapshot.sensorId);
+      _trimAndReindexProcessedSeries();
+      _previousProcessedTilt = snapshot.tilt;
+      _previousProcessedTimestampSec = nowSec;
+      _previousProcessedAngularVelocity = angularVelocity;
+      _scheduleUiRefresh();
     });
   }
 
@@ -189,6 +189,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   void dispose() {
+    _uiRefreshTimer?.cancel();
     _analyticsSubscription?.cancel();
     _rawSubscription?.cancel();
     _processedSubscription?.cancel();
@@ -251,6 +252,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     if (overflow > 0) {
       values.removeRange(0, overflow);
     }
+  }
+
+  void _scheduleUiRefresh() {
+    if (!mounted || _uiRefreshScheduled) return;
+    _uiRefreshScheduled = true;
+    _uiRefreshTimer?.cancel();
+    _uiRefreshTimer = Timer(_uiRefreshInterval, () {
+      _uiRefreshScheduled = false;
+      if (!mounted) return;
+      setState(() {});
+    });
   }
 
   (double, double, double)? _extractXyzValues(dynamic payload) {
@@ -869,6 +881,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             height: 320,
             child: LineChart(
               LineChartData(
+                clipData: FlClipData.all(),
                 minX: minX,
                 maxX: maxX,
                 minY: minY,
@@ -962,6 +975,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   LineChartBarData(
                     spots: safeXData,
                     isCurved: true,
+                    preventCurveOverShooting: true,
                     color: const Color(0xFF2E8BFF),
                     barWidth: 2.5,
                     dotData: const FlDotData(show: false),
@@ -969,6 +983,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   LineChartBarData(
                     spots: safeYData,
                     isCurved: true,
+                    preventCurveOverShooting: true,
                     color: const Color(0xFF11A95D),
                     barWidth: 2.5,
                     dotData: const FlDotData(show: false),
@@ -976,6 +991,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   LineChartBarData(
                     spots: safeZData,
                     isCurved: true,
+                    preventCurveOverShooting: true,
                     color: const Color(0xFFE58500),
                     barWidth: 2.5,
                     dotData: const FlDotData(show: false),

@@ -6,21 +6,46 @@ import '../../../core/auth/app_session.dart';
 import '../core/api/admin_api_config.dart';
 
 class AnalyticsSseService {
+  AnalyticsSseService({
+    this.emitInterval = const Duration(milliseconds: 120),
+  });
+
+  final Duration emitInterval;
   final StreamController<dynamic> _controller =
       StreamController<dynamic>.broadcast();
   http.Client? _client;
   StreamSubscription<String>? _streamSubscription;
   Future<void>? _connectTask;
   bool _isConnected = false;
+  Timer? _emitTimer;
+  dynamic _pendingEvent;
 
   Stream<dynamic> get stream => _controller.stream;
   bool get isConnected => _isConnected;
+
+  void _emitPayload(dynamic payload) {
+    if (emitInterval <= Duration.zero) {
+      _controller.add(payload);
+      return;
+    }
+
+    _pendingEvent = payload;
+    if (_emitTimer != null) return;
+    _emitTimer = Timer(emitInterval, () {
+      _emitTimer = null;
+      final event = _pendingEvent;
+      _pendingEvent = null;
+      if (event != null && !_controller.isClosed) {
+        _controller.add(event);
+      }
+    });
+  }
 
   void _tryEmitBufferedJson(StringBuffer buffer) {
     if (buffer.isEmpty) return;
     final raw = buffer.toString();
     try {
-      _controller.add(jsonDecode(raw));
+      _emitPayload(jsonDecode(raw));
       buffer.clear();
     } catch (_) {
       // Keep buffering until a complete JSON payload is available.
@@ -105,6 +130,9 @@ class AnalyticsSseService {
   }
 
   void disconnect() {
+    _emitTimer?.cancel();
+    _emitTimer = null;
+    _pendingEvent = null;
     _streamSubscription?.cancel();
     _streamSubscription = null;
     _client?.close();

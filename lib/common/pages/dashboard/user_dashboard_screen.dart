@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
@@ -26,6 +27,10 @@ class UserDashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
+  static const int _maxChartPoints = 48;
+  static const int _maxHydratedReadingCache = 240;
+  static const Duration _uiRefreshInterval = Duration(milliseconds: 120);
+
   final List<FlSpot> _rawXData = <FlSpot>[];
   final List<FlSpot> _rawYData = <FlSpot>[];
   final List<FlSpot> _rawZData = <FlSpot>[];
@@ -43,6 +48,9 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
       <String, List<FlSpot>>{};
   final Set<String> _rawHydratedReadingIds = <String>{};
   final Set<String> _configuredHydratedReadingIds = <String>{};
+  final Queue<String> _rawHydratedReadingOrder = Queue<String>();
+  final Queue<String> _configuredHydratedReadingOrder = Queue<String>();
+  final Map<String, int> _configuredMetricIndices = <String, int>{};
 
   GenericSseService? _rawSseService;
   GenericSseService? _processedSseService;
@@ -61,6 +69,8 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
   double? _previousAnalyzedTilt;
   double? _previousAnalyzedTimestamp;
   double? _previousAnalyzedVelocity;
+  Timer? _uiRefreshTimer;
+  bool _uiRefreshScheduled = false;
 
   DateTime? _lastProcessedAt;
   DateTime? _lastAnalyzedAt;
@@ -179,6 +189,13 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
           (parameter) => MapEntry(parameter.id.trim(), <FlSpot>[]),
         ),
       );
+    _configuredMetricIndices
+      ..clear()
+      ..addEntries(
+        matchingParameters.map(
+          (parameter) => MapEntry(parameter.id.trim(), 0),
+        ),
+      );
   }
 
   Sensor _primarySensor(List<Sensor> sensors) {
@@ -226,12 +243,9 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     _rawSubscription = _rawSseService!.stream.listen((data) {
       if (!mounted) return;
       if (!_matchesPrimarySensor(data)) return;
-      _hydrateRawAndConfiguredSeries(data);
-      final xyz = _extractRawXyz(data);
-      if (xyz == null) return;
-      setState(() {
-        _rawIndex = _rawXData.length;
-      });
+      if (_hydrateRawAndConfiguredSeries(data)) {
+        _scheduleUiRefresh();
+      }
     });
 
     await _processedSseService!.connect();
@@ -253,18 +267,18 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
               ? 0.0
               : (velocity - _previousProcessedVelocity!) / dt;
 
-      setState(() {
-        _appendPoint(_processedRollData, _processedIndex, snapshot.roll);
-        _appendPoint(_processedPitchData, _processedIndex, snapshot.pitch);
-        _appendPoint(_processedTiltData, _processedIndex, snapshot.tilt);
-        _appendPoint(_processedVelocityData, _processedIndex, velocity);
-        _appendPoint(_processedAccelerationData, _processedIndex, acceleration);
-        _processedIndex = _processedTiltData.length;
-        _previousProcessedTilt = snapshot.tilt;
-        _previousProcessedTimestampSec = nowSec;
-        _previousProcessedVelocity = velocity;
-        _lastProcessedAt = snapshot.receivedAt;
-      });
+      _hydrateRawAndConfiguredSeries(data);
+      _appendPoint(_processedRollData, _processedIndex, snapshot.roll);
+      _appendPoint(_processedPitchData, _processedIndex, snapshot.pitch);
+      _appendPoint(_processedTiltData, _processedIndex, snapshot.tilt);
+      _appendPoint(_processedVelocityData, _processedIndex, velocity);
+      _appendPoint(_processedAccelerationData, _processedIndex, acceleration);
+      _processedIndex++;
+      _previousProcessedTilt = snapshot.tilt;
+      _previousProcessedTimestampSec = nowSec;
+      _previousProcessedVelocity = velocity;
+      _lastProcessedAt = snapshot.receivedAt;
+      _scheduleUiRefresh();
     });
 
     await _analyticsSseService!.connect();
@@ -285,22 +299,22 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
               ? 0.0
               : (velocity - _previousAnalyzedVelocity!) / dt;
 
-      setState(() {
-        _appendPoint(_analyzedRollData, _analyzedIndex, snapshot.roll);
-        _appendPoint(_analyzedPitchData, _analyzedIndex, snapshot.pitch);
-        _appendPoint(_analyzedTiltData, _analyzedIndex, snapshot.tilt);
-        _appendPoint(_analyzedVelocityData, _analyzedIndex, velocity);
-        _appendPoint(
-          _analyzedAccelerationData,
-          _analyzedIndex,
-          acceleration,
-        );
-        _analyzedIndex = _analyzedTiltData.length;
-        _previousAnalyzedTilt = snapshot.tilt;
-        _previousAnalyzedTimestamp = snapshot.timestamp;
-        _previousAnalyzedVelocity = velocity;
-        _lastAnalyzedAt = DateTime.now();
-      });
+      _hydrateRawAndConfiguredSeries(data);
+      _appendPoint(_analyzedRollData, _analyzedIndex, snapshot.roll);
+      _appendPoint(_analyzedPitchData, _analyzedIndex, snapshot.pitch);
+      _appendPoint(_analyzedTiltData, _analyzedIndex, snapshot.tilt);
+      _appendPoint(_analyzedVelocityData, _analyzedIndex, velocity);
+      _appendPoint(
+        _analyzedAccelerationData,
+        _analyzedIndex,
+        acceleration,
+      );
+      _analyzedIndex++;
+      _previousAnalyzedTilt = snapshot.tilt;
+      _previousAnalyzedTimestamp = snapshot.timestamp;
+      _previousAnalyzedVelocity = velocity;
+      _lastAnalyzedAt = DateTime.now();
+      _scheduleUiRefresh();
     });
   }
 
@@ -325,6 +339,8 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
       return;
     }
 
+    var historyChanged = false;
+
     try {
       final processedResponse = await ApiClient.get(
         '/api/v1/processing/readings',
@@ -336,7 +352,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
       if (processedRecords is List) {
         for (final item in processedRecords.reversed) {
           if (!_matchesPrimarySensor(item)) continue;
-          _hydrateRawAndConfiguredSeries(item);
+          historyChanged = _hydrateRawAndConfiguredSeries(item) || historyChanged;
           final snapshot = _extractProcessedSnapshot(item);
           if (snapshot == null) continue;
           final timestampSec =
@@ -355,22 +371,21 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
                   : (velocity - _previousProcessedVelocity!) / dt;
 
           if (!mounted) return;
-          setState(() {
-            _appendPoint(_processedRollData, _processedIndex, snapshot.roll);
-            _appendPoint(_processedPitchData, _processedIndex, snapshot.pitch);
-            _appendPoint(_processedTiltData, _processedIndex, snapshot.tilt);
-            _appendPoint(_processedVelocityData, _processedIndex, velocity);
-            _appendPoint(
-              _processedAccelerationData,
-              _processedIndex,
-              acceleration,
-            );
-            _processedIndex = _processedTiltData.length;
-            _previousProcessedTilt = snapshot.tilt;
-            _previousProcessedTimestampSec = timestampSec;
-            _previousProcessedVelocity = velocity;
-            _lastProcessedAt = snapshot.receivedAt;
-          });
+          _appendPoint(_processedRollData, _processedIndex, snapshot.roll);
+          _appendPoint(_processedPitchData, _processedIndex, snapshot.pitch);
+          _appendPoint(_processedTiltData, _processedIndex, snapshot.tilt);
+          _appendPoint(_processedVelocityData, _processedIndex, velocity);
+          _appendPoint(
+            _processedAccelerationData,
+            _processedIndex,
+            acceleration,
+          );
+          _processedIndex++;
+          _previousProcessedTilt = snapshot.tilt;
+          _previousProcessedTimestampSec = timestampSec;
+          _previousProcessedVelocity = velocity;
+          _lastProcessedAt = snapshot.receivedAt;
+          historyChanged = true;
         }
       }
     } catch (_) {
@@ -390,7 +405,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
         });
 
       for (final event in matchingEvents) {
-        _hydrateRawAndConfiguredSeries(event);
+        historyChanged = _hydrateRawAndConfiguredSeries(event) || historyChanged;
         final snapshot = _extractAnalyzedSnapshot(event);
         if (snapshot == null) continue;
         final dt = (_previousAnalyzedTimestamp == null)
@@ -406,71 +421,36 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
                 : (velocity - _previousAnalyzedVelocity!) / dt;
 
         if (!mounted) return;
-        setState(() {
-          _appendPoint(_analyzedRollData, _analyzedIndex, snapshot.roll);
-          _appendPoint(_analyzedPitchData, _analyzedIndex, snapshot.pitch);
-          _appendPoint(_analyzedTiltData, _analyzedIndex, snapshot.tilt);
-          _appendPoint(_analyzedVelocityData, _analyzedIndex, velocity);
-          _appendPoint(
-            _analyzedAccelerationData,
-            _analyzedIndex,
-            acceleration,
-          );
-          _analyzedIndex = _analyzedTiltData.length;
-          _previousAnalyzedTilt = snapshot.tilt;
-          _previousAnalyzedTimestamp = snapshot.timestamp;
-          _previousAnalyzedVelocity = velocity;
-          _lastAnalyzedAt = DateTime.now();
-        });
+        _appendPoint(_analyzedRollData, _analyzedIndex, snapshot.roll);
+        _appendPoint(_analyzedPitchData, _analyzedIndex, snapshot.pitch);
+        _appendPoint(_analyzedTiltData, _analyzedIndex, snapshot.tilt);
+        _appendPoint(_analyzedVelocityData, _analyzedIndex, velocity);
+        _appendPoint(
+          _analyzedAccelerationData,
+          _analyzedIndex,
+          acceleration,
+        );
+        _analyzedIndex++;
+        _previousAnalyzedTilt = snapshot.tilt;
+        _previousAnalyzedTimestamp = snapshot.timestamp;
+        _previousAnalyzedVelocity = velocity;
+        _lastAnalyzedAt = DateTime.now();
+        historyChanged = true;
       }
     } catch (_) {
       // If history is unavailable, the live stream will still populate data.
+    }
+
+    if (historyChanged) {
+      _scheduleUiRefresh(force: true);
     }
   }
 
   void _appendPoint(List<FlSpot> points, int index, double value) {
     points.add(FlSpot(index.toDouble(), value));
-    while (points.length > 65) {
+    while (points.length > _maxChartPoints) {
       points.removeAt(0);
     }
-    for (var i = 0; i < points.length; i++) {
-      points[i] = FlSpot(i.toDouble(), points[i].y);
-    }
-  }
-
-  (double, double, double)? _extractRawXyz(dynamic payload) {
-    for (final map in _candidateMaps(payload)) {
-      final rawPayload = map['rawPayload'];
-      if (rawPayload is Map) {
-        final params = rawPayload['parameters'];
-        if (params is Map) {
-          final x = _toDouble(params['x']);
-          final y = _toDouble(params['y']);
-          final z = _toDouble(params['z']);
-          if (x != null && y != null && z != null) {
-            return (x, y, z);
-          }
-        }
-      }
-
-      final params = map['parameters'];
-      if (params is Map) {
-        final x = _toDouble(params['x']);
-        final y = _toDouble(params['y']);
-        final z = _toDouble(params['z']);
-        if (x != null && y != null && z != null) {
-          return (x, y, z);
-        }
-      }
-
-      final x = _toDouble(map['x']);
-      final y = _toDouble(map['y']);
-      final z = _toDouble(map['z']);
-      if (x != null && y != null && z != null) {
-        return (x, y, z);
-      }
-    }
-    return null;
   }
 
   bool _matchesPrimarySensor(dynamic payload) {
@@ -573,7 +553,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     return null;
   }
 
-  void _hydrateRawAndConfiguredSeries(dynamic payload) {
+  bool _hydrateRawAndConfiguredSeries(dynamic payload) {
     final readingId = _readingIdFromPayload(payload);
     final shouldHydrateRaw =
         readingId == null || !_rawHydratedReadingIds.contains(readingId);
@@ -582,47 +562,70 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     final context = _extractFormulaContext(payload);
 
     if (!shouldHydrateRaw && !shouldHydrateConfigured) {
-      return;
+      return false;
     }
 
     if (context == null) {
-      return;
+      return false;
     }
 
-    if (!mounted) {
-      return;
+    var changed = false;
+    if (shouldHydrateRaw &&
+        context.x != null &&
+        context.y != null &&
+        context.z != null) {
+      _appendPoint(_rawXData, _rawIndex, context.x!);
+      _appendPoint(_rawYData, _rawIndex, context.y!);
+      _appendPoint(_rawZData, _rawIndex, context.z!);
+      _rawIndex++;
+      if (readingId != null) {
+        _rememberHydratedReading(
+          _rawHydratedReadingIds,
+          _rawHydratedReadingOrder,
+          readingId,
+        );
+      }
+      changed = true;
     }
 
-    setState(() {
-      if (shouldHydrateRaw &&
-          context.x != null &&
-          context.y != null &&
-          context.z != null) {
-        _appendPoint(_rawXData, _rawIndex, context.x!);
-        _appendPoint(_rawYData, _rawIndex, context.y!);
-        _appendPoint(_rawZData, _rawIndex, context.z!);
-        _rawIndex = _rawXData.length;
-        if (readingId != null) {
-          _rawHydratedReadingIds.add(readingId);
-        }
+    if (shouldHydrateConfigured) {
+      var appendedAny = false;
+      for (final parameter in _configuredParameters) {
+        final metric = _computeConfiguredMetric(parameter, context);
+        if (metric == null) continue;
+        final parameterId = parameter.id.trim();
+        final series =
+            _configuredMetricSeries.putIfAbsent(parameterId, () => <FlSpot>[]);
+        final index = _configuredMetricIndices[parameterId] ?? 0;
+        _appendPoint(series, index, metric);
+        _configuredMetricIndices[parameterId] = index + 1;
+        appendedAny = true;
       }
+      if (appendedAny && readingId != null) {
+        _rememberHydratedReading(
+          _configuredHydratedReadingIds,
+          _configuredHydratedReadingOrder,
+          readingId,
+        );
+      }
+      changed = changed || appendedAny;
+    }
 
-      if (shouldHydrateConfigured) {
-        var appendedAny = false;
-        for (final parameter in _configuredParameters) {
-          final metric = _computeConfiguredMetric(parameter, context);
-          if (metric == null) continue;
-          final parameterId = parameter.id.trim();
-          final series = _configuredMetricSeries.putIfAbsent(
-              parameterId, () => <FlSpot>[]);
-          _appendPoint(series, series.length, metric);
-          appendedAny = true;
-        }
-        if (appendedAny && readingId != null) {
-          _configuredHydratedReadingIds.add(readingId);
-        }
-      }
-    });
+    return changed;
+  }
+
+  void _rememberHydratedReading(
+    Set<String> cache,
+    Queue<String> order,
+    String readingId,
+  ) {
+    if (cache.contains(readingId)) return;
+    cache.add(readingId);
+    order.addLast(readingId);
+    while (order.length > _maxHydratedReadingCache) {
+      final oldest = order.removeFirst();
+      cache.remove(oldest);
+    }
   }
 
   _AnalyzedSnapshot? _extractAnalyzedSnapshot(dynamic payload) {
@@ -1011,8 +1014,27 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
 
   @override
   void dispose() {
+    _uiRefreshTimer?.cancel();
     _disconnectStreams();
     super.dispose();
+  }
+
+  void _scheduleUiRefresh({bool force = false}) {
+    if (!mounted) return;
+    if (force) {
+      _uiRefreshTimer?.cancel();
+      _uiRefreshScheduled = false;
+      setState(() {});
+      return;
+    }
+    if (_uiRefreshScheduled) return;
+    _uiRefreshScheduled = true;
+    _uiRefreshTimer?.cancel();
+    _uiRefreshTimer = Timer(_uiRefreshInterval, () {
+      _uiRefreshScheduled = false;
+      if (!mounted) return;
+      setState(() {});
+    });
   }
 
   @override
@@ -1274,6 +1296,9 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     final span = (maxY - minY).abs();
     final chartMinY = minY - math.max(span * 0.12, 0.5);
     final chartMaxY = maxY + math.max(span * 0.12, 0.5);
+    final minX = allSpots.isEmpty
+        ? 0.0
+        : allSpots.map((spot) => spot.x).reduce(math.min);
     final maxX = allSpots.isEmpty
         ? 12.0
         : allSpots.map((spot) => spot.x).reduce(math.max);
@@ -1299,9 +1324,11 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
             height: 320,
             child: hasData
                 ? LineChart(
+                    duration: Duration.zero,
                     LineChartData(
-                      minX: 0,
-                      maxX: maxX <= 0 ? 1 : maxX,
+                      clipData: FlClipData.all(),
+                      minX: minX,
+                      maxX: maxX <= minX ? minX + 1 : maxX,
                       minY: chartMinY,
                       maxY: chartMaxY <= chartMinY ? chartMinY + 1 : chartMaxY,
                       gridData: FlGridData(
@@ -1476,6 +1503,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     final span = (maxY - minY).abs();
     final chartMinY = minY - math.max(span * 0.12, 0.5);
     final chartMaxY = maxY + math.max(span * 0.12, 0.5);
+    final minX = series.map((spot) => spot.x).reduce(math.min);
     final maxX = series.map((spot) => spot.x).reduce(math.max);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1492,9 +1520,11 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
         const SizedBox(height: 14),
         Expanded(
           child: LineChart(
+            duration: Duration.zero,
             LineChartData(
-              minX: 0,
-              maxX: maxX <= 0 ? 1 : maxX,
+              clipData: FlClipData.all(),
+              minX: minX,
+              maxX: maxX <= minX ? minX + 1 : maxX,
               minY: chartMinY,
               maxY: chartMaxY <= chartMinY ? chartMinY + 1 : chartMaxY,
               gridData: FlGridData(
@@ -1583,6 +1613,8 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     final span = (maxY - minY).abs();
     final chartMinY = minY - math.max(span * 0.14, 0.3);
     final chartMaxY = maxY + math.max(span * 0.14, 0.3);
+    final minX =
+        all.isEmpty ? 0.0 : all.map((spot) => spot.x).reduce(math.min);
     final maxX =
         all.isEmpty ? 12.0 : all.map((spot) => spot.x).reduce(math.max);
 
@@ -1606,9 +1638,11 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
             height: 300,
             child: hasData
                 ? LineChart(
+                    duration: Duration.zero,
                     LineChartData(
-                      minX: 0,
-                      maxX: maxX <= 0 ? 1 : maxX,
+                      clipData: FlClipData.all(),
+                      minX: minX,
+                      maxX: maxX <= minX ? minX + 1 : maxX,
                       minY: chartMinY,
                       maxY: chartMaxY <= chartMinY ? chartMinY + 1 : chartMaxY,
                       gridData: FlGridData(
@@ -1676,7 +1710,8 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     final safeSpots = spots.isEmpty ? const [FlSpot(0, 0)] : spots;
     return LineChartBarData(
       spots: safeSpots,
-      isCurved: true,
+      isCurved: safeSpots.length <= 12,
+      preventCurveOverShooting: true,
       color: color,
       barWidth: 2.4,
       dotData: const FlDotData(show: false),
