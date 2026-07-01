@@ -45,6 +45,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
       await Future.wait([
         safe(db.loadThresholdProfiles()),
         safe(db.loadThresholdValues()),
+        safe(db.loadSensors()),
         safe(db.loadSensorTypes()),
         safe(db.loadSensorParameters()),
       ]);
@@ -432,24 +433,43 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
     await _primeThresholdData();
     if (!context.mounted) return;
 
-    if (db.thresholdProfiles.isEmpty || db.sensorParameters.isEmpty) {
+    if (db.thresholdProfiles.isEmpty ||
+        db.sensorParameters.isEmpty ||
+        db.sensors.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Add at least one threshold profile and sensor parameter first',
+            'Add at least one sensor, threshold profile, and sensor parameter first',
           ),
         ),
       );
       return;
     }
 
-    String sensorTypeId = '';
+    String sensorId = db.sensors.first.id;
     String thresholdProfileId = db.thresholdProfiles.first.id;
-    String sensorParameterId = db.sensorParameters.first.id;
+    String sensorParameterId = '';
     String minThresholdValue = '0';
     String maxThresholdValue = '0';
     String warningLevel = '0';
     String criticalLevel = '0';
+
+    String sensorLabel(dynamic sensor) {
+      final name = sensor.name.trim();
+      if (name.isNotEmpty) return name;
+      final serial = sensor.serialNumber.trim();
+      if (serial.isNotEmpty) return serial;
+      return sensor.id;
+    }
+
+    String parameterLabel(dynamic parameter) {
+      final base =
+          parameter.name.trim().isEmpty ? parameter.id : parameter.name;
+      final calc = parameter.calculationName.trim();
+      final unit = parameter.unit.trim();
+      final label = calc.isNotEmpty && calc != base ? '$base ($calc)' : base;
+      return unit.isEmpty ? label : '$label [$unit]';
+    }
 
     void applyParameterDefaults(String parameterId) {
       var parameter = db.sensorParameters.first;
@@ -472,20 +492,24 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
           (minValue + ((maxValue - minValue) * 0.9)).toStringAsFixed(2);
     }
 
-    if (db.sensorTypes.isNotEmpty) {
-      sensorTypeId = db.sensorTypes.first.id;
-    } else if (db.sensorParameters.isNotEmpty) {
-      sensorTypeId = db.sensorParameters.first.sensorTypeId;
+    String sensorTypeForSelection(String selectedSensorId) {
+      for (final sensor in db.sensors) {
+        if (sensor.id == selectedSensorId) {
+          return sensor.sensorTypeId;
+        }
+      }
+      return '';
     }
 
-    List<Map<String, String>> parameterOptionsForType(String typeId) {
-      final trimmed = typeId.trim();
+    List<Map<String, String>> parameterOptionsForSensor(
+        String selectedSensorId) {
+      final typeId = sensorTypeForSelection(selectedSensorId).trim();
       var filtered = db.sensorParameters
           .where((parameter) => parameter.id.trim().isNotEmpty)
           .toList();
-      if (trimmed.isNotEmpty) {
+      if (typeId.isNotEmpty) {
         filtered = filtered
-            .where((parameter) => parameter.sensorTypeId.trim() == trimmed)
+            .where((parameter) => parameter.sensorTypeId.trim() == typeId)
             .toList();
       }
       if (filtered.isEmpty) {
@@ -497,14 +521,13 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
           .map(
             (parameter) => {
               'value': parameter.id,
-              'label':
-                  parameter.name.trim().isEmpty ? parameter.id : parameter.name,
+              'label': parameterLabel(parameter),
             },
           )
           .toList();
     }
 
-    var sensorParameterOptions = parameterOptionsForType(sensorTypeId);
+    var sensorParameterOptions = parameterOptionsForSensor(sensorId);
     if (sensorParameterOptions.isNotEmpty) {
       sensorParameterId = sensorParameterOptions.first['value']!;
       applyParameterDefaults(sensorParameterId);
@@ -518,22 +541,22 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
             title: 'Add Threshold Value',
             fields: [
               {
-                'label': 'sensorTypeId',
+                'label': 'sensorId',
                 'type': 'select',
-                'value': sensorTypeId.isEmpty ? null : sensorTypeId,
-                'options': db.sensorTypes
-                    .where((type) => type.id.trim().isNotEmpty)
+                'value': sensorId.isEmpty ? null : sensorId,
+                'options': db.sensors
+                    .where((sensor) => sensor.id.trim().isNotEmpty)
                     .map(
-                      (type) => {
-                        'value': type.id,
-                        'label': type.name.trim().isEmpty ? type.id : type.name,
+                      (sensor) => {
+                        'value': sensor.id,
+                        'label': sensorLabel(sensor),
                       },
                     )
                     .toList(),
                 'onChanged': (String? value) => setDialogState(() {
-                      sensorTypeId = value ?? '';
+                      sensorId = value ?? '';
                       sensorParameterOptions =
-                          parameterOptionsForType(sensorTypeId);
+                          parameterOptionsForSensor(sensorId);
                       if (sensorParameterOptions.isEmpty) {
                         sensorParameterId = '';
                       } else {
@@ -633,6 +656,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
               try {
                 await db.create('threshold_values', {
                   'minThresholdValue': minValue,
+                  'sensorId': sensorId.trim(),
                   'sensorParameterId': sensorParameterId.trim(),
                   'thresholdProfileId': thresholdProfileId.trim(),
                   'maxThresholdValue': maxValue,
@@ -733,10 +757,25 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
     final profileNameById = <String, String>{
       for (final profile in db.thresholdProfiles) profile.id: profile.name,
     };
+    final sensorNameById = <String, String>{
+      for (final sensor in db.sensors)
+        sensor.id: sensor.name.trim().isEmpty
+            ? (sensor.serialNumber.trim().isEmpty
+                ? sensor.id
+                : sensor.serialNumber)
+            : sensor.name,
+    };
     final sensorParameterLabelById = <String, String>{
       for (final parameter in db.sensorParameters)
-        parameter.id:
-            parameter.name.trim().isEmpty ? parameter.id : parameter.name,
+        parameter.id: (() {
+          final base =
+              parameter.name.trim().isEmpty ? parameter.id : parameter.name;
+          final calc = parameter.calculationName.trim();
+          final unit = parameter.unit.trim();
+          final label =
+              calc.isNotEmpty && calc != base ? '$base ($calc)' : base;
+          return unit.isEmpty ? label : '$label [$unit]';
+        })(),
     };
 
     return Container(
@@ -865,8 +904,9 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
             )
           else
             UniversalDataTable(
-              minWidth: 980,
+              minWidth: 1180,
               columns: const [
+                DataColumn(label: UniversalTableHeaderText('SENSOR')),
                 DataColumn(label: UniversalTableHeaderText('PROFILE')),
                 DataColumn(label: UniversalTableHeaderText('SENSOR PARAMETER')),
                 DataColumn(label: UniversalTableHeaderText('MIN')),
@@ -876,6 +916,9 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                 DataColumn(label: UniversalTableHeaderText('ACTIONS')),
               ],
               rows: db.thresholdValues.map<DataRow>((value) {
+                final sensorName = value.sensorId.trim().isEmpty
+                    ? 'All Sensors'
+                    : (sensorNameById[value.sensorId] ?? value.sensorId);
                 final profileName = profileNameById[value.thresholdProfileId] ??
                     value.thresholdProfileId;
                 final parameterName =
@@ -883,6 +926,12 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                         value.sensorParameterId;
                 return DataRow(
                   cells: [
+                    DataCell(
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 180),
+                        child: UniversalTableText(sensorName),
+                      ),
+                    ),
                     DataCell(
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 180),

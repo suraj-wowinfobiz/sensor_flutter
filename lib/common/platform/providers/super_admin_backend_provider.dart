@@ -633,6 +633,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
             json['thresholdValueId'] ?? json['thresholdId'] ?? json['id'],
             _uuid(),
           ),
+          sensorId: _asString(json['sensorId'] ?? json['sensor_id']),
           sensorParameterId: _asString(
             json['sensorParameterId'] ??
                 json['sensorParamterId'] ??
@@ -777,6 +778,7 @@ class SuperAdminBackendProvider extends ChangeNotifier {
       case 'threshold_values':
         await ThresholdsApi.createThreshold(
           minThresholdValue: _asDouble(data['minThresholdValue']),
+          sensorId: _asString(data['sensorId'] ?? data['sensor_id']),
           sensorParameterId: _asString(
             data['sensorParameterId'] ?? data['sensorParamterId'],
           ),

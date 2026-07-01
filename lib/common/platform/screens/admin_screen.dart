@@ -48,6 +48,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
   String _profileName = '';
   String _profileInitial = '';
   String _profileSubtitle = '';
+  Timer? _alertsRefreshTimer;
 
   List<RoleNavigationItem> get _navigationItems => widget.role.navigationItems;
   Set<String> get _allowedViews =>
@@ -64,6 +65,10 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
       if (!mounted) return;
       await _loadSessionProfile();
       await _warmViewData(_currentView);
+    });
+    _alertsRefreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (!mounted) return;
+      _refreshAlerts();
     });
   }
 
@@ -320,8 +325,9 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
       workspaceIcon: widget.role.icon,
       profileName:
           _profileName.isNotEmpty ? _profileName : widget.role.profileTitle,
-      profileRole:
-          _profileSubtitle.isNotEmpty ? _profileSubtitle : widget.role.profileTitle,
+      profileRole: _profileSubtitle.isNotEmpty
+          ? _profileSubtitle
+          : widget.role.profileTitle,
       profileInitial: _profileInitial.isNotEmpty
           ? _profileInitial
           : widget.role.profileInitial,
@@ -551,6 +557,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen>
 
   @override
   void dispose() {
+    _alertsRefreshTimer?.cancel();
     _menuController.dispose();
     super.dispose();
   }

@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 
 class ThresholdValue extends Equatable {
   final String id;
+  final String sensorId;
   final String sensorParameterId;
   final String thresholdProfileId;
   final double minThreshold;
@@ -11,6 +12,7 @@ class ThresholdValue extends Equatable {
 
   const ThresholdValue({
     required this.id,
+    this.sensorId = '',
     required this.sensorParameterId,
     required this.thresholdProfileId,
     required this.minThreshold,
@@ -20,20 +22,37 @@ class ThresholdValue extends Equatable {
   });
 
   factory ThresholdValue.fromJson(Map<String, dynamic> json) {
+    String asString(dynamic value) => value?.toString() ?? '';
+    double asDouble(dynamic value) {
+      if (value is num) return value.toDouble();
+      return double.tryParse(value?.toString() ?? '') ?? 0.0;
+    }
+
     return ThresholdValue(
-      id: json['id'] as String,
-      sensorParameterId: json['sensor_parameter_id'] as String,
-      thresholdProfileId: json['threshold_profile_id'] as String,
-      minThreshold: (json['min_threshold'] as num).toDouble(),
-      maxThreshold: (json['max_threshold'] as num).toDouble(),
-      warningLevel: (json['warning_level'] as num).toDouble(),
-      criticalLevel: (json['critical_level'] as num).toDouble(),
+      id: asString(
+          json['thresholdValueId'] ?? json['thresholdId'] ?? json['id']),
+      sensorId: asString(json['sensorId'] ?? json['sensor_id']),
+      sensorParameterId: asString(json['sensorParameterId'] ??
+          json['sensorParamterId'] ??
+          json['sensor_parameter_id']),
+      thresholdProfileId:
+          asString(json['thresholdProfileId'] ?? json['threshold_profile_id']),
+      minThreshold:
+          asDouble(json['minThresholdValue'] ?? json['min_threshold']),
+      maxThreshold:
+          asDouble(json['maxThresholdValue'] ?? json['max_threshold']),
+      warningLevel: asDouble(json['warningLevel'] ??
+          json['warrningLevel'] ??
+          json['warning_level']),
+      criticalLevel: asDouble(json['criticalLevel'] ?? json['critical_level']),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'sensor_id': sensorId,
+      'sensorId': sensorId,
       'sensor_parameter_id': sensorParameterId,
       'threshold_profile_id': thresholdProfileId,
       'min_threshold': minThreshold,
@@ -46,6 +65,7 @@ class ThresholdValue extends Equatable {
   @override
   List<Object?> get props => [
         id,
+        sensorId,
         sensorParameterId,
         thresholdProfileId,
         minThreshold,

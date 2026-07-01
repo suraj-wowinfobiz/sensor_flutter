@@ -29,6 +29,7 @@ class ThresholdsApi {
     required double maxThresholdValue,
     required double warningLevel,
     required double criticalLevel,
+    String? sensorId,
     double? warrningLevel,
     String? sensorParamterId,
   }) async {
@@ -36,6 +37,8 @@ class ThresholdsApi {
       '/api/v1/thresholds',
       data: {
         'minThresholdValue': minThresholdValue,
+        if (sensorId != null && sensorId.trim().isNotEmpty)
+          'sensorId': sensorId,
         'sensorParameterId': sensorParameterId,
         'thresholdProfileId': thresholdProfileId,
         'maxThresholdValue': maxThresholdValue,
