@@ -5,8 +5,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/auth/app_session.dart';
 import '../../../core/theme/ops_theme.dart';
+import '../../platform/api/analytics_api.dart';
+import '../../platform/api/api_client.dart';
 import '../../platform/models/sensor.dart';
 import '../../platform/models/sensor_parameter.dart';
 import '../../platform/api/users_api.dart';
@@ -66,8 +67,6 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
   String _rawEndpointPath = '/api/v1/ingestion/readings/live';
   String _processedEndpointPath = '/api/v1/processing/readings/live';
   String _analyticsEndpointPath = '/api/v1/analytics/events/live';
-  String _resolvedRawEndpoint = '';
-  String _resolvedAnalyticsEndpoint = '';
   String _sensorName = 'Workspace Sensor';
   String _primarySensorId = '';
   List<SensorParameter> _configuredParameters = const <SensorParameter>[];
@@ -83,6 +82,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
 
   Future<void> _bootstrap() async {
     await _primeDashboardData();
+    await _primeHistoricalLiveCharts();
     await _connectStreams();
   }
 
@@ -139,17 +139,18 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
           ? '/api/v1/ingestion/readings/live'
           : '/api/v1/ingestion/readings/live/${sensor.endpointKey.trim()}/{userId}',
     );
-    _processedEndpointPath = sensor.endpointKey.trim().isEmpty
-        ? '/api/v1/processing/readings/live'
-        : '/api/v1/processing/readings/live/${sensor.endpointKey.trim()}/{userId}';
-    _analyticsEndpointPath = sensor.endpointKey.trim().isEmpty
-        ? '/api/v1/analytics/events/live'
-        : '/api/v1/analytics/events/live/${sensor.endpointKey.trim()}/{userId}';
-    final currentUserId = await AppSession.currentPrincipalId();
-    _resolvedRawEndpoint =
-        _replaceUserIdPlaceholder(_rawEndpointPath, currentUserId);
-    _resolvedAnalyticsEndpoint =
-        _replaceUserIdPlaceholder(_analyticsEndpointPath, currentUserId);
+    _processedEndpointPath = _resolveLivePath(
+      explicitPath: sensor.processingLiveEndpoint,
+      fallbackPath: sensor.endpointKey.trim().isEmpty
+          ? '/api/v1/processing/readings/live'
+          : '/api/v1/processing/readings/live/${sensor.endpointKey.trim()}/{userId}',
+    );
+    _analyticsEndpointPath = _resolveLivePath(
+      explicitPath: sensor.analyticsLiveEndpoint,
+      fallbackPath: sensor.endpointKey.trim().isEmpty
+          ? '/api/v1/analytics/events/live'
+          : '/api/v1/analytics/events/live/${sensor.endpointKey.trim()}/{userId}',
+    );
     final matchingParameters = db.sensorParameters
         .where((parameter) =>
             parameter.sensorTypeId.trim() == sensor.sensorTypeId.trim())
@@ -178,11 +179,6 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
           (parameter) => MapEntry(parameter.id.trim(), <FlSpot>[]),
         ),
       );
-  }
-
-  String _replaceUserIdPlaceholder(String value, String userId) {
-    if (userId.trim().isEmpty) return value;
-    return value.replaceAll('{userId}', userId.trim());
   }
 
   Sensor _primarySensor(List<Sensor> sensors) {
@@ -321,6 +317,115 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     _rawSseService = null;
     _processedSseService = null;
     _analyticsSseService = null;
+  }
+
+  Future<void> _primeHistoricalLiveCharts() async {
+    final sensorId = _primarySensorId.trim();
+    if (sensorId.isEmpty) {
+      return;
+    }
+
+    try {
+      final processedResponse = await ApiClient.get(
+        '/api/v1/processing/readings',
+        queryParameters: {'sensorId': sensorId},
+      );
+      final processedBody = processedResponse.body;
+      final processedRecords =
+          processedBody is Map ? processedBody['records'] : null;
+      if (processedRecords is List) {
+        for (final item in processedRecords.reversed) {
+          if (!_matchesPrimarySensor(item)) continue;
+          _hydrateRawAndConfiguredSeries(item);
+          final snapshot = _extractProcessedSnapshot(item);
+          if (snapshot == null) continue;
+          final timestampSec =
+              _timestampToSeconds(_timestampFromPayload(item)) ??
+                  snapshot.receivedAt.millisecondsSinceEpoch / 1000.0;
+          final dt = (_previousProcessedTimestampSec == null)
+              ? null
+              : timestampSec - _previousProcessedTimestampSec!;
+          final velocity =
+              (_previousProcessedTilt == null || dt == null || dt <= 0)
+                  ? 0.0
+                  : (snapshot.tilt - _previousProcessedTilt!) / dt;
+          final acceleration =
+              (_previousProcessedVelocity == null || dt == null || dt <= 0)
+                  ? 0.0
+                  : (velocity - _previousProcessedVelocity!) / dt;
+
+          if (!mounted) return;
+          setState(() {
+            _appendPoint(_processedRollData, _processedIndex, snapshot.roll);
+            _appendPoint(_processedPitchData, _processedIndex, snapshot.pitch);
+            _appendPoint(_processedTiltData, _processedIndex, snapshot.tilt);
+            _appendPoint(_processedVelocityData, _processedIndex, velocity);
+            _appendPoint(
+              _processedAccelerationData,
+              _processedIndex,
+              acceleration,
+            );
+            _processedIndex = _processedTiltData.length;
+            _previousProcessedTilt = snapshot.tilt;
+            _previousProcessedTimestampSec = timestampSec;
+            _previousProcessedVelocity = velocity;
+            _lastProcessedAt = snapshot.receivedAt;
+          });
+        }
+      }
+    } catch (_) {
+      // If history is unavailable, the live stream will still populate data.
+    }
+
+    try {
+      final recentEvents = await AnalyticsApi.getRecentEvents(limit: 200);
+      final matchingEvents = recentEvents
+          .where((event) => _matchesPrimarySensor(event))
+          .toList()
+        ..sort((left, right) {
+          final leftTs = _timestampToSeconds(_timestampFromPayload(left)) ?? 0;
+          final rightTs =
+              _timestampToSeconds(_timestampFromPayload(right)) ?? 0;
+          return leftTs.compareTo(rightTs);
+        });
+
+      for (final event in matchingEvents) {
+        _hydrateRawAndConfiguredSeries(event);
+        final snapshot = _extractAnalyzedSnapshot(event);
+        if (snapshot == null) continue;
+        final dt = (_previousAnalyzedTimestamp == null)
+            ? null
+            : _deltaSeconds(snapshot.timestamp - _previousAnalyzedTimestamp!);
+        final velocity =
+            (_previousAnalyzedTilt == null || dt == null || dt <= 0)
+                ? 0.0
+                : (snapshot.tilt - _previousAnalyzedTilt!) / dt;
+        final acceleration =
+            (_previousAnalyzedVelocity == null || dt == null || dt <= 0)
+                ? 0.0
+                : (velocity - _previousAnalyzedVelocity!) / dt;
+
+        if (!mounted) return;
+        setState(() {
+          _appendPoint(_analyzedRollData, _analyzedIndex, snapshot.roll);
+          _appendPoint(_analyzedPitchData, _analyzedIndex, snapshot.pitch);
+          _appendPoint(_analyzedTiltData, _analyzedIndex, snapshot.tilt);
+          _appendPoint(_analyzedVelocityData, _analyzedIndex, velocity);
+          _appendPoint(
+            _analyzedAccelerationData,
+            _analyzedIndex,
+            acceleration,
+          );
+          _analyzedIndex = _analyzedTiltData.length;
+          _previousAnalyzedTilt = snapshot.tilt;
+          _previousAnalyzedTimestamp = snapshot.timestamp;
+          _previousAnalyzedVelocity = velocity;
+          _lastAnalyzedAt = DateTime.now();
+        });
+      }
+    } catch (_) {
+      // If history is unavailable, the live stream will still populate data.
+    }
   }
 
   void _appendPoint(List<FlSpot> points, int index, double value) {
@@ -635,6 +740,7 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
         'data',
         'payload',
         'event',
+        'records',
         'rawPayload',
         'processedPayload',
         'parameters',
@@ -869,6 +975,22 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     return null;
   }
 
+  dynamic _timestampFromPayload(dynamic payload) {
+    for (final map in _candidateMaps(payload)) {
+      if (map.containsKey('timestamp')) {
+        return map['timestamp'];
+      }
+      if (map.containsKey('eventTime')) {
+        return map['eventTime'];
+      }
+      final rawPayload = map['rawPayload'];
+      if (rawPayload is Map && rawPayload.containsKey('timestamp')) {
+        return rawPayload['timestamp'];
+      }
+    }
+    return null;
+  }
+
   double? _timestampToSeconds(dynamic value) {
     if (value == null) return null;
     if (value is num) {
@@ -898,38 +1020,14 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     final db = ref.watch(superAdminBackendChangeNotifierProvider);
     final scopedSensors = _scopedSensors(db);
     final scopedAlerts = _scopedActiveAlerts(db);
-    final scopedDeviceIds =
-        scopedSensors.map((sensor) => sensor.deviceId).toSet();
-    final assignedDevices = db.devices
-        .where((device) => scopedDeviceIds.contains(device.id))
-        .toList();
-    final scopedSiteIds = assignedDevices
-        .map((device) => device.siteId.trim())
-        .where((siteId) => siteId.isNotEmpty)
-        .toSet();
 
     final activeAlerts = scopedAlerts.length;
     final avgTilt = _averageAbsolute(_processedTiltData) ??
         _averageSensorReading(scopedSensors);
     final maxTilt =
         _maxAbsolute(_processedTiltData) ?? _maxSensorReading(scopedSensors);
-    final latestTilt = _processedTiltData.isNotEmpty
-        ? _processedTiltData.last.y
-        : _analyzedTiltData.isNotEmpty
-            ? _analyzedTiltData.last.y
-            : null;
-    final latestVelocity = _processedVelocityData.isNotEmpty
-        ? _processedVelocityData.last.y
-        : _analyzedVelocityData.isNotEmpty
-            ? _analyzedVelocityData.last.y
-            : null;
-    final latestAcceleration = _processedAccelerationData.isNotEmpty
-        ? _processedAccelerationData.last.y
-        : _analyzedAccelerationData.isNotEmpty
-            ? _analyzedAccelerationData.last.y
-            : null;
     final systemHealth =
-        (100 - (activeAlerts * 6) - ((latestTilt?.abs() ?? 0) * 1.8))
+        (100 - (activeAlerts * 6) - ((_latestTiltValue()?.abs() ?? 0) * 1.8))
             .clamp(0, 100)
             .toDouble();
     final showNoAssignmentState = _sensorAccessLoaded &&
@@ -1088,34 +1186,12 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
                 yAxisLabel: 'Analyzed angle (deg)',
                 xAxisLabel: 'Analyzed sample index',
               );
-              final snapshotCard = _buildSnapshotCard(
-                latestTilt: latestTilt,
-                latestVelocity: latestVelocity,
-                latestAcceleration: latestAcceleration,
-                activeAlerts: activeAlerts,
-                totalSensors: scopedSensors.length,
-                totalDevices: assignedDevices.length,
-                totalSites: scopedSiteIds.length,
-              );
 
               if (stacked) {
-                return Column(
-                  children: [
-                    analyzedCard,
-                    const SizedBox(height: 16),
-                    snapshotCard,
-                  ],
-                );
+                return analyzedCard;
               }
 
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 3, child: analyzedCard),
-                  const SizedBox(width: 16),
-                  Expanded(flex: 2, child: snapshotCard),
-                ],
-              );
+              return analyzedCard;
             },
           ),
           const SizedBox(height: 16),
@@ -1597,111 +1673,6 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
     );
   }
 
-  Widget _buildSnapshotCard({
-    required double? latestTilt,
-    required double? latestVelocity,
-    required double? latestAcceleration,
-    required int activeAlerts,
-    required int totalSensors,
-    required int totalDevices,
-    required int totalSites,
-  }) {
-    final items = <({String label, String value, String helper})>[
-      (
-        label: 'Latest Tilt',
-        value:
-            latestTilt == null ? '--' : '${latestTilt.toStringAsFixed(2)} deg',
-        helper: 'Most recent processed or analyzed tilt',
-      ),
-      (
-        label: 'Latest Velocity',
-        value: latestVelocity == null
-            ? '--'
-            : '${latestVelocity.toStringAsFixed(3)} deg/s',
-        helper: 'Computed from live tilt deltas',
-      ),
-      (
-        label: 'Latest Acceleration',
-        value: latestAcceleration == null
-            ? '--'
-            : '${latestAcceleration.toStringAsFixed(3)} deg/s2',
-        helper: 'Second-order live change rate',
-      ),
-      (
-        label: 'Workspace',
-        value:
-            '$totalSensors sensors / $totalDevices devices / $totalSites sites',
-        helper: '$activeAlerts active alerts across assigned sensors',
-      ),
-      (
-        label: 'Raw SSE',
-        value: _resolvedRawEndpoint.isEmpty
-            ? _rawEndpointPath
-            : _resolvedRawEndpoint,
-        helper: 'Current raw stream endpoint',
-      ),
-      (
-        label: 'Analytics SSE',
-        value: _resolvedAnalyticsEndpoint.isEmpty
-            ? _analyticsEndpointPath
-            : _resolvedAnalyticsEndpoint,
-        helper: 'Current analytics stream endpoint',
-      ),
-    ];
-
-    return OpsPanel(
-      title: 'Live Snapshot',
-      subtitle: 'Backend and SSE linked values',
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: items
-            .map(
-              (item) => Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: OpsColors.surfaceLow,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: OpsColors.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.label,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: OpsColors.outline,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      item.value,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: OpsColors.text,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.helper,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: OpsColors.muted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-            .toList(),
-      ),
-    );
-  }
-
   LineChartBarData _lineBar(List<FlSpot> spots, Color color) {
     final safeSpots = spots.isEmpty ? const [FlSpot(0, 0)] : spots;
     return LineChartBarData(
@@ -1775,6 +1746,16 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
   double? _maxAbsolute(List<FlSpot> values) {
     if (values.isEmpty) return null;
     return values.map((spot) => spot.y.abs()).reduce(math.max);
+  }
+
+  double? _latestTiltValue() {
+    if (_processedTiltData.isNotEmpty) {
+      return _processedTiltData.last.y;
+    }
+    if (_analyzedTiltData.isNotEmpty) {
+      return _analyzedTiltData.last.y;
+    }
+    return null;
   }
 
   String _agoLabel(DateTime? when) {

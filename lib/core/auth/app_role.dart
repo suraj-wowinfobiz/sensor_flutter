@@ -117,7 +117,7 @@ extension AppLoginRoleX on AppLoginRole {
       case AppLoginRole.analyticsRole:
         return 'analytics_role_principal_id';
       case AppLoginRole.admin:
-        return 'admin_principal_id';
+        return 'super_admin_principal_id';
     }
   }
 
@@ -423,5 +423,28 @@ extension AppLoginRoleX on AppLoginRole {
           ),
         ];
     }
+  }
+}
+
+AppLoginRole? appLoginRoleFromStoredValue(String value) {
+  switch (value.trim().toLowerCase()) {
+    case 'user':
+      return AppLoginRole.user;
+    case 'admin':
+    case 'user_admin':
+      return AppLoginRole.userAdmin;
+    case 'engineer':
+    case 'vendor_engineer':
+      return AppLoginRole.engineer;
+    case 'vendor':
+      return AppLoginRole.vendor;
+    case 'analytics':
+      return AppLoginRole.analytics;
+    case 'analytics_role':
+      return AppLoginRole.analyticsRole;
+    case 'super_admin':
+      return AppLoginRole.admin;
+    default:
+      return null;
   }
 }

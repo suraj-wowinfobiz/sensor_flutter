@@ -14,8 +14,15 @@ import '../services/generic_sse_service.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   final bool embeddedScroll;
+  final String pageTitle;
+  final String pageSubtitle;
 
-  const DashboardScreen({super.key, this.embeddedScroll = false});
+  const DashboardScreen({
+    super.key,
+    this.embeddedScroll = false,
+    this.pageTitle = 'Dashboard',
+    this.pageSubtitle = 'Platform-wide monitoring and configuration.',
+  });
 
   @override
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
@@ -534,8 +541,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }).length;
     final infoAlerts = openAlerts.length - criticalAlerts - warningAlerts;
     final content = OpsPage(
-      title: 'Dashboard',
-      subtitle: 'Platform-wide monitoring and configuration.',
+      title: widget.pageTitle,
+      subtitle: widget.pageSubtitle,
       actions: [
         OutlinedButton.icon(
           onPressed: () {},
@@ -794,13 +801,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ],
           );
         }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: left),
-            const SizedBox(width: 16),
-            Expanded(child: right),
-          ],
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: left),
+              const SizedBox(width: 16),
+              Expanded(child: right),
+            ],
+          ),
         );
       },
     );

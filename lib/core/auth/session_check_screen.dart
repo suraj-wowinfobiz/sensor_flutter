@@ -44,38 +44,13 @@ class _SessionCheckScreenState extends State<SessionCheckScreen> {
         return;
       }
 
-      Widget? targetPage;
-      switch (role) {
-        case 'user':
-          targetPage = const PlatformShellPage(role: AppLoginRole.user);
-          break;
-        case 'user_admin':
-          targetPage = const PlatformShellPage(role: AppLoginRole.userAdmin);
-          break;
-        case 'engineer':
-          targetPage = const PlatformShellPage(role: AppLoginRole.engineer);
-          break;
-        case 'vendor':
-          targetPage = const PlatformShellPage(role: AppLoginRole.vendor);
-          break;
-        case 'analytics':
-          targetPage = const PlatformShellPage(role: AppLoginRole.analytics);
-          break;
-        case 'analytics_role':
-          targetPage =
-              const PlatformShellPage(role: AppLoginRole.analyticsRole);
-          break;
-        case 'admin':
-          targetPage = const PlatformShellPage(role: AppLoginRole.userAdmin);
-          break;
-        case 'super_admin':
-          targetPage = const PlatformShellPage(role: AppLoginRole.admin);
-          break;
-      }
+      final appRole = appLoginRoleFromStoredValue(role);
+      final Widget? targetPage =
+          appRole == null ? null : PlatformShellPage(role: appRole);
 
       if (targetPage != null && mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute<void>(builder: (_) => targetPage!),
+          MaterialPageRoute<void>(builder: (_) => targetPage),
         );
         return;
       }

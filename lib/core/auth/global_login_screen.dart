@@ -52,13 +52,9 @@ class _GlobalLoginScreenState extends State<GlobalLoginScreen> {
     final rememberMe = prefs.getBool(_rememberEnabledKey) ?? true;
     final rememberedEmail = prefs.getString(_rememberEmailKey) ?? '';
     final rememberedRole = prefs.getString(_rememberRoleKey);
-    AppLoginRole? matchedRole;
-    for (final role in AppLoginRole.values) {
-      if (role.rememberValue == rememberedRole) {
-        matchedRole = role;
-        break;
-      }
-    }
+    final matchedRole = rememberedRole == null
+        ? null
+        : appLoginRoleFromStoredValue(rememberedRole);
 
     if (!mounted) return;
     setState(() {

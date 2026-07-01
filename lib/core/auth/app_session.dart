@@ -60,7 +60,6 @@ class AppSession {
       case 'admin':
         return (prefs.getString('user_admin_principal_id') ??
                 prefs.getString('admin_principal_id') ??
-                prefs.getString('super_admin_principal_id') ??
                 '')
             .trim();
       case 'super_admin':
@@ -69,10 +68,9 @@ class AppSession {
                 '')
             .trim();
       case 'user_admin':
-        return (prefs.getString('user_admin_principal_id') ??
-                prefs.getString('admin_principal_id') ??
-                '')
-            .trim();
+        return (prefs.getString('user_admin_principal_id') ?? '').trim();
+      case 'vendor_engineer':
+        return (prefs.getString('engineer_principal_id') ?? '').trim();
       case 'engineer':
         return (prefs.getString('engineer_principal_id') ?? '').trim();
       case 'vendor':

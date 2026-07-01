@@ -384,9 +384,13 @@ class UsersApi {
     final sessionRole = (prefs.getString('app_session_role') ?? '').trim();
     switch (sessionRole) {
       case 'admin':
+        return 'admin';
+      case 'super_admin':
         return 'super_admin';
       case 'user_admin':
         return 'admin';
+      case 'vendor_engineer':
+        return 'vendor_engineer';
       case 'engineer':
         return 'vendor_engineer';
       default:

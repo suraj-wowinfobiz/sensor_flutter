@@ -108,6 +108,10 @@ class _AppRoot extends ConsumerWidget {
                 initialRole: AppLoginRole.analytics,
                 allowRoleSelection: false,
               ),
+          '/login/analytics-role': (context) => const GlobalLoginScreen(
+                initialRole: AppLoginRole.analyticsRole,
+                allowRoleSelection: false,
+              ),
         },
       ),
     );
