@@ -1410,18 +1410,17 @@ class _UserDashboardScreenState extends ConsumerState<UserDashboardScreen> {
         return Column(
           children: [
             for (var i = 0; i < children.length; i += 2) ...[
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: children[i]),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: i + 1 < children.length
-                        ? children[i + 1]
-                        : const SizedBox.shrink(),
-                  ),
-                ],
-              ),
+              if (i + 1 < children.length)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: children[i]),
+                    const SizedBox(width: 16),
+                    Expanded(child: children[i + 1]),
+                  ],
+                )
+              else
+                children[i],
               if (i + 2 < children.length) const SizedBox(height: 16),
             ],
           ],

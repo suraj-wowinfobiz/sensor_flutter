@@ -704,30 +704,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               if (constraints.maxWidth <= 980) {
                 return const SizedBox.shrink();
               }
-              return SizedBox(
-                height: 396,
+              return IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(
                       flex: 6,
-                      child: OpsFramedPanel(
-                        header: const _AdminOverviewHeader(),
-                        child: _AdminOverviewTable(db: db),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 396),
+                        child: OpsFramedPanel(
+                          header: const _AdminOverviewHeader(),
+                          child: _AdminOverviewTable(db: db),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       flex: 4,
-                      child: OpsPanel(
-                        title: 'Platform Growth Trend',
-                        padding: const EdgeInsets.all(24),
-                        child: _AdminHealthTrend(
-                          firstLabel: 'Users',
-                          secondLabel: 'Sensors',
-                          firstValues: _seriesPercentages(usersSeries),
-                          secondValues: _seriesPercentages(sensorsSeries),
-                          bottomLabels: _dayLabels(7),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 396),
+                        child: OpsPanel(
+                          title: 'Platform Growth Trend',
+                          padding: const EdgeInsets.all(24),
+                          child: _AdminHealthTrend(
+                            firstLabel: 'Users',
+                            secondLabel: 'Sensors',
+                            firstValues: _seriesPercentages(usersSeries),
+                            secondValues: _seriesPercentages(sensorsSeries),
+                            bottomLabels: _dayLabels(7),
+                          ),
                         ),
                       ),
                     ),
