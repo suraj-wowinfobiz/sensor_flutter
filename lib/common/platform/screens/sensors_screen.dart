@@ -842,6 +842,7 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
         ? editingParameter!.useFor
         : 'custom';
     String? savedId;
+    final formulaController = TextEditingController(text: formulaType);
 
     Map<String, String> presetForType(String typeId) {
       final matchingTypes =
@@ -855,7 +856,6 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
           'formulaType': 'tilt_angle_deg',
           'graphType': 'line',
           'useFor': 'custom',
-          'unit': unit.isEmpty ? 'deg' : unit,
         };
       }
       if (typeName.contains('accel')) {
@@ -864,7 +864,6 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
           'formulaType': 'magnitude_xyz',
           'graphType': 'line',
           'useFor': 'custom',
-          'unit': unit.isEmpty ? 'm/s²' : unit,
         };
       }
       return {
@@ -872,7 +871,6 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
         'formulaType': formulaType,
         'graphType': graphType,
         'useFor': useFor,
-        'unit': unit,
       };
     }
 
@@ -882,195 +880,193 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
       formulaType = preset['formulaType'] ?? formulaType;
       graphType = preset['graphType'] ?? graphType;
       useFor = preset['useFor'] ?? useFor;
-      unit = preset['unit'] ?? unit;
+      formulaController.value = TextEditingValue(
+        text: formulaType,
+        selection: TextSelection.collapsed(offset: formulaType.length),
+      );
     }
 
     if (editingParameter == null && sensorTypeId.trim().isNotEmpty) {
       applyPresetForType(sensorTypeId);
     }
 
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(
-            editingParameter == null
-                ? 'Create Sensor Parameter'
-                : 'Edit Sensor Parameter',
-          ),
-          content: StatefulBuilder(
-            builder: (context, setDialogState) => SizedBox(
-              width: 440,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _dialogDropdown(
-                    label: 'Sensor Type',
-                    value: sensorTypeId.isEmpty ? null : sensorTypeId,
-                    hint: 'Select sensor type',
-                    items: db.sensorTypes
-                        .map((type) => DropdownMenuItem<String>(
-                              value: type.id,
-                              child: Text(type.name),
-                            ))
-                        .toList(),
-                    onChanged: (value) => setDialogState(() {
-                      sensorTypeId = value ?? '';
-                      if (editingParameter == null) {
-                        applyPresetForType(sensorTypeId);
-                      }
-                    }),
-                  ),
-                  const SizedBox(height: 10),
-                  _dialogTextField(
-                    label: 'Name',
-                    value: name,
-                    onChanged: (v) => setDialogState(() => name = v),
-                  ),
-                  const SizedBox(height: 10),
-                  _dialogTextField(
-                    label: 'Unit',
-                    value: unit,
-                    onChanged: (v) => setDialogState(() => unit = v),
-                  ),
-                  const SizedBox(height: 10),
-                  _dialogTextField(
-                    label: 'Calculation Name',
-                    value: calculationName,
-                    onChanged: (v) =>
-                        setDialogState(() => calculationName = v),
-                  ),
-                  const SizedBox(height: 10),
-                  _dialogDropdown(
-                    label: 'Formula',
-                    value: formulaType.isEmpty ? null : formulaType,
-                    hint: 'Select calculation formula',
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'x',
-                        child: Text('X only'),
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: Text(
+              editingParameter == null
+                  ? 'Create Sensor Parameter'
+                  : 'Edit Sensor Parameter',
+            ),
+            content: StatefulBuilder(
+              builder: (context, setDialogState) {
+                final formulaParameters = _formulaParameterNames(
+                  db,
+                  sensorTypeId,
+                  editingParameterId: editingParameter?.id,
+                );
+                return SizedBox(
+                  width: 440,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _dialogDropdown(
+                        label: 'Sensor Type',
+                        value: sensorTypeId.isEmpty ? null : sensorTypeId,
+                        hint: 'Select sensor type',
+                        items: db.sensorTypes
+                            .map((type) => DropdownMenuItem<String>(
+                                  value: type.id,
+                                  child: Text(type.name),
+                                ))
+                            .toList(),
+                        onChanged: (value) => setDialogState(() {
+                          sensorTypeId = value ?? '';
+                          if (editingParameter == null) {
+                            applyPresetForType(sensorTypeId);
+                          }
+                        }),
                       ),
-                      DropdownMenuItem(
-                        value: 'y',
-                        child: Text('Y only'),
+                      const SizedBox(height: 10),
+                      _dialogTextField(
+                        label: 'Name',
+                        value: name,
+                        onChanged: (v) => setDialogState(() => name = v),
                       ),
-                      DropdownMenuItem(
-                        value: 'z',
-                        child: Text('Z only'),
+                      const SizedBox(height: 10),
+                      _dialogTextField(
+                        label: 'Calculation Name',
+                        value: calculationName,
+                        onChanged: (v) =>
+                            setDialogState(() => calculationName = v),
                       ),
-                      DropdownMenuItem(
-                        value: 'average_xyz',
-                        child: Text('Average of X, Y, Z'),
+                      const SizedBox(height: 10),
+                      _dialogHighlightedTextField(
+                        label: 'Formula',
+                        controller: formulaController,
+                        hint:
+                            'Enter formula like x, (x + y) / 2, sqrt(x*x + y*y + z*z)',
+                        helperText: formulaParameters.isEmpty
+                            ? 'Type a formula manually. Known parameters will highlight automatically.'
+                            : 'Highlighted parameters: ${formulaParameters.join(', ')}',
+                        highlightWords: formulaParameters.toSet(),
+                        onChanged: (value) =>
+                            setDialogState(() => formulaType = value),
                       ),
-                      DropdownMenuItem(
-                        value: 'magnitude_xyz',
-                        child: Text('Magnitude sqrt(x²+y²+z²)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'tilt_angle_deg',
-                        child: Text('Tilt angle from X, Y, Z'),
+                      const SizedBox(height: 10),
+                      _dialogDropdown(
+                        label: 'Graph Type',
+                        value: graphType,
+                        hint: 'Select graph type',
+                        items: const [
+                          DropdownMenuItem(value: 'line', child: Text('Line')),
+                          DropdownMenuItem(value: 'bar', child: Text('Bar')),
+                          DropdownMenuItem(value: 'area', child: Text('Area')),
+                          DropdownMenuItem(
+                              value: 'scatter', child: Text('Scatter')),
+                          DropdownMenuItem(
+                              value: 'spline', child: Text('Spline')),
+                          DropdownMenuItem(value: 'step', child: Text('Step')),
+                          DropdownMenuItem(value: 'pie', child: Text('Pie')),
+                          DropdownMenuItem(
+                              value: 'gauge', child: Text('Gauge')),
+                        ],
+                        onChanged: (value) =>
+                            setDialogState(() => graphType = value ?? 'line'),
                       ),
                     ],
-                    onChanged: (value) =>
-                        setDialogState(() => formulaType = value ?? ''),
                   ),
-                  const SizedBox(height: 10),
-                  _dialogDropdown(
-                    label: 'Graph Type',
-                    value: graphType,
-                    hint: 'Select graph type',
-                    items: const [
-                      DropdownMenuItem(value: 'line', child: Text('Line')),
-                      DropdownMenuItem(value: 'bar', child: Text('Bar')),
-                    ],
-                    onChanged: (value) =>
-                        setDialogState(() => graphType = value ?? 'line'),
-                  ),
-                ],
+                );
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (sensorTypeId.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Sensor type is required')),
-                  );
-                  return;
-                }
-                if (name.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Sensor parameter name is required')),
-                  );
-                  return;
-                }
-                if (formulaType.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Calculation formula is required')),
-                  );
-                  return;
-                }
-                try {
-                  Map<String, dynamic> response;
-                  if (editingParameter == null) {
-                    response = await SensorParameterApi.createSensorParameter(
-                      sensorTypeId: sensorTypeId,
-                      name: name.trim(),
-                      unit: unit.trim(),
-                      minValue: 0,
-                      maxValue: 0,
-                      calculationName: calculationName.trim().isEmpty
-                          ? name.trim()
-                          : calculationName.trim(),
-                      formulaType: formulaType.trim(),
-                      graphType: graphType.trim(),
-                      useFor: useFor.trim(),
+              ElevatedButton(
+                onPressed: () async {
+                  formulaType = formulaController.text;
+                  if (sensorTypeId.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Sensor type is required')),
                     );
-                  } else {
-                    response = await SensorParameterApi.updateSensorParameter(
-                      sensorTypeId: sensorTypeId,
-                      sensorParameterId: editingParameter.id,
-                      name: name.trim(),
-                      unit: unit.trim(),
-                      minValue: 0,
-                      maxValue: 0,
-                      calculationName: calculationName.trim().isEmpty
-                          ? name.trim()
-                          : calculationName.trim(),
-                      formulaType: formulaType.trim(),
-                      graphType: graphType.trim(),
-                      useFor: useFor.trim(),
+                    return;
+                  }
+                  if (name.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Sensor parameter name is required')),
+                    );
+                    return;
+                  }
+                  if (formulaType.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Calculation formula is required')),
+                    );
+                    return;
+                  }
+                  try {
+                    Map<String, dynamic> response;
+                    if (editingParameter == null) {
+                      response = await SensorParameterApi.createSensorParameter(
+                        sensorTypeId: sensorTypeId,
+                        name: name.trim(),
+                        unit: unit.trim(),
+                        minValue: 0,
+                        maxValue: 0,
+                        calculationName: calculationName.trim().isEmpty
+                            ? name.trim()
+                            : calculationName.trim(),
+                        formulaType: formulaType.trim(),
+                        graphType: graphType.trim(),
+                        useFor: useFor.trim(),
+                      );
+                    } else {
+                      response = await SensorParameterApi.updateSensorParameter(
+                        sensorTypeId: sensorTypeId,
+                        sensorParameterId: editingParameter.id,
+                        name: name.trim(),
+                        unit: unit.trim(),
+                        minValue: 0,
+                        maxValue: 0,
+                        calculationName: calculationName.trim().isEmpty
+                            ? name.trim()
+                            : calculationName.trim(),
+                        formulaType: formulaType.trim(),
+                        graphType: graphType.trim(),
+                        useFor: useFor.trim(),
+                      );
+                    }
+                    final responseId =
+                        (response['sensorParameterId'] ?? response['id'] ?? '')
+                            .toString()
+                            .trim();
+                    savedId = responseId.isNotEmpty
+                        ? responseId
+                        : (editingParameter?.id ?? '');
+                    await db.loadSensorParameters();
+                    if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  } catch (e) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text('Failed to save sensor parameter: $e')),
                     );
                   }
-                  final responseId =
-                      (response['sensorParameterId'] ?? response['id'] ?? '')
-                          .toString()
-                          .trim();
-                  savedId = responseId.isNotEmpty
-                      ? responseId
-                      : (editingParameter?.id ?? '');
-                  await db.loadSensorParameters();
-                  if (dialogContext.mounted) Navigator.pop(dialogContext);
-                } catch (e) {
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text('Failed to save sensor parameter: $e')),
-                  );
-                }
-              },
-              child: Text(editingParameter == null ? 'Create' : 'Update'),
-            ),
-          ],
-        );
-      },
-    );
+                },
+                child: Text(editingParameter == null ? 'Create' : 'Update'),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
+      formulaController.dispose();
+    }
     return savedId;
   }
 
@@ -1115,6 +1111,100 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
               ),
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _dialogHighlightedTextField({
+    required String label,
+    required TextEditingController controller,
+    required ValueChanged<String> onChanged,
+    required Set<String> highlightWords,
+    String? hint,
+    String? helperText,
+  }) {
+    final theme = Theme.of(context);
+    final isLight = theme.brightness == Brightness.light;
+    final fillColor =
+        isLight ? const Color(0xFFF7FAFC) : const Color(0xFF1A3347);
+    final baseStyle = theme.textTheme.bodyMedium?.copyWith(
+          fontSize: 14,
+          height: 1.3,
+          color: isLight ? const Color(0xFF102A43) : const Color(0xFFE6EEF5),
+        ) ??
+        TextStyle(
+          fontSize: 14,
+          height: 1.3,
+          color: isLight ? const Color(0xFF102A43) : const Color(0xFFE6EEF5),
+        );
+    final highlightStyle = baseStyle.copyWith(
+      fontWeight: FontWeight.w700,
+      color: theme.colorScheme.primary,
+      backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
+        const SizedBox(height: 6),
+        Stack(
+          children: [
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  child: ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: controller,
+                    builder: (context, value, _) => RichText(
+                      text: _buildHighlightedFormulaText(
+                        value.text,
+                        highlightWords,
+                        baseStyle,
+                        highlightStyle,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            TextFormField(
+              controller: controller,
+              onChanged: onChanged,
+              cursorColor: theme.colorScheme.primary,
+              style: baseStyle.copyWith(color: Colors.transparent),
+              decoration: InputDecoration(
+                hintText: hint,
+                helperText: helperText,
+                filled: true,
+                fillColor: fillColor,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: theme.dividerColor),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: theme.dividerColor),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: theme.colorScheme.primary,
+                    width: 2,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -1343,24 +1433,20 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Theme.of(context).dividerColor),
             ),
-            child: Row(
+            child: Column(
               children: [
-                Expanded(
-                  child: _parameterTabButton(
-                    context,
-                    label: 'API Parameters',
-                    selected: tab == 'api',
-                    onTap: () => onTabChanged('api'),
-                  ),
+                _parameterTabButton(
+                  context,
+                  label: 'API Parameters',
+                  selected: tab == 'api',
+                  onTap: () => onTabChanged('api'),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _parameterTabButton(
-                    context,
-                    label: 'Calculations',
-                    selected: tab == 'calculation',
-                    onTap: () => onTabChanged('calculation'),
-                  ),
+                const SizedBox(height: 8),
+                _parameterTabButton(
+                  context,
+                  label: 'Calculations',
+                  selected: tab == 'calculation',
+                  onTap: () => onTabChanged('calculation'),
                 ),
               ],
             ),
@@ -1604,6 +1690,75 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
       default:
         return formulaType;
     }
+  }
+
+  List<String> _formulaParameterNames(
+    SuperAdminBackendProvider db,
+    String sensorTypeId, {
+    String? editingParameterId,
+  }) {
+    final names = <String>{'x', 'y', 'z', 'value'};
+    for (final parameter in db.sensorParameters) {
+      if (parameter.sensorTypeId != sensorTypeId) continue;
+      if (parameter.id == editingParameterId) continue;
+      final name = parameter.name.trim();
+      if (name.isNotEmpty) {
+        names.add(name);
+      }
+    }
+    final sorted = names.toList()
+      ..sort((a, b) {
+        final lengthCompare = b.length.compareTo(a.length);
+        if (lengthCompare != 0) return lengthCompare;
+        return a.toLowerCase().compareTo(b.toLowerCase());
+      });
+    return sorted;
+  }
+
+  TextSpan _buildHighlightedFormulaText(
+    String value,
+    Set<String> highlightWords,
+    TextStyle baseStyle,
+    TextStyle highlightStyle,
+  ) {
+    if (value.isEmpty || highlightWords.isEmpty) {
+      return TextSpan(text: value, style: baseStyle);
+    }
+    final escapedWords = highlightWords
+        .map((word) => word.trim())
+        .where((word) => word.isNotEmpty)
+        .map(RegExp.escape)
+        .toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+    if (escapedWords.isEmpty) {
+      return TextSpan(text: value, style: baseStyle);
+    }
+    final pattern = RegExp(
+      '\\b(${escapedWords.join('|')})\\b',
+      caseSensitive: false,
+    );
+    final spans = <InlineSpan>[];
+    var currentIndex = 0;
+    for (final match in pattern.allMatches(value)) {
+      if (match.start > currentIndex) {
+        spans.add(TextSpan(
+          text: value.substring(currentIndex, match.start),
+          style: baseStyle,
+        ));
+      }
+      spans.add(TextSpan(
+        text: value.substring(match.start, match.end),
+        style: highlightStyle,
+      ));
+      currentIndex = match.end;
+    }
+    if (currentIndex < value.length) {
+      spans.add(TextSpan(
+        text: value.substring(currentIndex),
+        style: baseStyle,
+      ));
+    }
+    return TextSpan(style: baseStyle, children: spans);
   }
 
   String _dropdownItemLabel(DropdownMenuItem<String> item) {
