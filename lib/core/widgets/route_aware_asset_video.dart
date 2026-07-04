@@ -42,7 +42,6 @@ class _RouteAwareAssetVideoState extends State<RouteAwareAssetVideo>
     final disableAnimations = mediaQuery?.disableAnimations ?? false;
     if (disableAnimations) return true;
     if (widget.disableVideoOnWeb && kIsWeb) return true;
-    if (kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) return true;
     return false;
   }
 
